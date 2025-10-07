@@ -4,7 +4,7 @@
   "description": "Backend API for Professional Track Management System",
   "main": "dist/app.js",
   "scripts": {
-    "start": "node dist/app.js",
+    "start": "node -r tsconfig-paths/register dist/app.js",
     "dev": "nodemon src/app.ts",
     "build": "tsc",
     "build:watch": "tsc --watch",
