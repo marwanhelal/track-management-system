@@ -4,18 +4,30 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Create database connection pool
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME || 'track_management',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'password',
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-  min: parseInt(process.env.DB_POOL_MIN || '2', 10),
-  max: parseInt(process.env.DB_POOL_MAX || '10', 10),
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '5000', 10),
-});
+// Use DATABASE_URL if available (Railway/production), otherwise use individual vars (local dev)
+const pool = new Pool(
+  process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+        min: parseInt(process.env.DB_POOL_MIN || '2', 10),
+        max: parseInt(process.env.DB_POOL_MAX || '10', 10),
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '5000', 10),
+      }
+    : {
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        database: process.env.DB_NAME || 'track_management',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'password',
+        ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+        min: parseInt(process.env.DB_POOL_MIN || '2', 10),
+        max: parseInt(process.env.DB_POOL_MAX || '10', 10),
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '5000', 10),
+      }
+);
 
 // Database connection test
 export const testConnection = async (): Promise<boolean> => {
