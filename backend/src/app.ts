@@ -9,18 +9,18 @@ import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import 'express-async-errors';
 
-import { testConnection, closeConnection, healthCheck } from '@/database/connection';
-import { ApiResponse, AppError } from '@/types';
+import { testConnection, closeConnection, healthCheck } from './database/connection';
+import { ApiResponse, AppError } from './types';
 
 // Import routes
-import authRoutes from '@/routes/auth';
-import phaseRoutes from '@/routes/phases';
-import projectRoutes from '@/routes/projects';
-import workLogRoutes from '@/routes/work-logs';
-import userRoutes from '@/routes/users';
-import smartTestRoutes from '@/routes/smart-test';
-import profileRoutes from '@/routes/profile';
-import progressRoutes from '@/routes/progress';
+import authRoutes from './routes/auth';
+import phaseRoutes from './routes/phases';
+import projectRoutes from './routes/projects';
+import workLogRoutes from './routes/work-logs';
+import userRoutes from './routes/users';
+import smartTestRoutes from './routes/smart-test';
+import profileRoutes from './routes/profile';
+import progressRoutes from './routes/progress';
 
 dotenv.config();
 
