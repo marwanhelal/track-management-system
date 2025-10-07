@@ -51,6 +51,7 @@
     "puppeteer": "^24.22.0",
     "redis": "^4.7.1",
     "socket.io": "^4.7.4",
+    "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0"
   },
   "devDependencies": {
@@ -75,7 +76,6 @@
     "supertest": "^6.3.4",
     "ts-jest": "^29.1.1",
     "ts-node": "^10.9.2",
-    "tsc-alias": "^1.8.16",
     "typescript": "^5.3.3"
   },
   "engines": {
