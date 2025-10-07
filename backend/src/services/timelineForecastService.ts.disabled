@@ -1,0 +1,98 @@
+// Simplified Timeline Forecast Service for database testing
+import { query } from '@/database/connection';
+import { ProjectTimelineForecast } from '@/types';
+
+export class TimelineForecastService {
+  static async generateForecast(projectId: string): Promise<ProjectTimelineForecast> {
+    try {
+      // Get basic project data
+      const projectResult = await query(`
+        SELECT * FROM projects WHERE id = $1
+      `, [projectId]);
+
+      if (projectResult.rows.length === 0) {
+        throw new Error('Project not found');
+      }
+
+      const project = projectResult.rows[0];
+
+      // Calculate basic prediction
+      const currentDate = new Date();
+      const completionDate = new Date();
+      completionDate.setDate(currentDate.getDate() + (project.planned_total_weeks * 7));
+
+      return {
+        id: 0,
+        project_id: projectId,
+        forecast_type: 'realistic',
+        predicted_completion_date: completionDate,
+        predicted_total_hours: project.predicted_hours || 280,
+        predicted_budget_variance: 0,
+        confidence_interval_lower: currentDate,
+        confidence_interval_upper: completionDate,
+        risk_factors: ['Resource availability', 'Scope changes'],
+        assumptions: ['Current team velocity', 'No major blockers'],
+        model_accuracy: 85.5,
+        created_by: undefined,
+        created_at: new Date()
+      };
+    } catch (error) {
+      console.error('Error generating forecast:', error);
+      throw error;
+    }
+  }
+
+  static async getHistoricalForecasts(projectId: string): Promise<ProjectTimelineForecast[]> {
+    try {
+      const result = await query(`
+        SELECT * FROM project_timeline_forecasts
+        WHERE project_id = $1
+        ORDER BY created_at DESC
+        LIMIT 20
+      `, [projectId]);
+
+      return result.rows.map((row: any) => ({
+        ...row,
+        risk_factors: Array.isArray(row.risk_factors) ? row.risk_factors : [],
+        assumptions: Array.isArray(row.assumptions) ? row.assumptions : []
+      }));
+    } catch (error) {
+      console.error('Error fetching historical forecasts:', error);
+      return [];
+    }
+  }
+
+  static async saveForecast(forecast: Omit<ProjectTimelineForecast, 'id' | 'created_at'>): Promise<ProjectTimelineForecast> {
+    try {
+      const result = await query(`
+        INSERT INTO project_timeline_forecasts (
+          project_id, forecast_type, predicted_completion_date, predicted_total_hours,
+          predicted_budget_variance, confidence_interval_lower, confidence_interval_upper,
+          risk_factors, assumptions, model_accuracy, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *
+      `, [
+        forecast.project_id,
+        forecast.forecast_type,
+        forecast.predicted_completion_date,
+        forecast.predicted_total_hours,
+        forecast.predicted_budget_variance,
+        forecast.confidence_interval_lower,
+        forecast.confidence_interval_upper,
+        forecast.risk_factors,
+        forecast.assumptions,
+        forecast.model_accuracy,
+        forecast.created_by
+      ]);
+
+      return {
+        ...result.rows[0],
+        risk_factors: Array.isArray(result.rows[0].risk_factors) ? result.rows[0].risk_factors : [],
+        assumptions: Array.isArray(result.rows[0].assumptions) ? result.rows[0].assumptions : []
+      };
+    } catch (error) {
+      console.error('Error saving forecast:', error);
+      throw error;
+    }
+  }
+}
