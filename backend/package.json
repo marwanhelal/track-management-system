@@ -4,9 +4,9 @@
   "description": "Backend API for Professional Track Management System",
   "main": "dist/app.js",
   "scripts": {
-    "start": "node -r tsconfig-paths/register dist/app.js",
+    "start": "node dist/app.js",
     "dev": "nodemon src/app.ts",
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "build:watch": "tsc --watch",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -75,6 +75,7 @@
     "supertest": "^6.3.4",
     "ts-jest": "^29.1.1",
     "ts-node": "^10.9.2",
+    "tsc-alias": "^1.8.16",
     "typescript": "^5.3.3"
   },
   "engines": {
