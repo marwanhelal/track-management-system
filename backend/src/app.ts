@@ -21,6 +21,7 @@ import userRoutes from './routes/users';
 import smartTestRoutes from './routes/smart-test';
 import profileRoutes from './routes/profile';
 import progressRoutes from './routes/progress';
+import importDataRoutes from './routes/import-data';
 
 dotenv.config();
 
@@ -151,6 +152,7 @@ class App {
     this.app.use('/api/v1/smart-test', smartTestRoutes);
     this.app.use('/api/v1/profile', profileRoutes);
     this.app.use('/api/v1/progress', progressRoutes);
+    this.app.use('/api/v1/import-data', importDataRoutes);
 
     // 404 handler
     this.app.use((req: Request, res: Response) => {
