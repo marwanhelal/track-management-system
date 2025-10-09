@@ -71,7 +71,7 @@ router.post('/create-schema', async (req: Request, res: Response) => {
         phase_id INTEGER NOT NULL REFERENCES project_phases(id) ON DELETE CASCADE,
         engineer_id INTEGER NOT NULL REFERENCES users(id),
         date DATE NOT NULL DEFAULT CURRENT_DATE,
-        hours DECIMAL(4,2) NOT NULL CHECK (hours > 0 AND hours <= 24),
+        hours DECIMAL(5,2) NOT NULL CHECK (hours > 0),
         description TEXT,
         supervisor_approved BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW(),
