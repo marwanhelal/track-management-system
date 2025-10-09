@@ -180,4 +180,22 @@ router.post('/import', async (req: Request, res: Response) => {
   }
 });
 
+// Add missing columns
+router.post('/add-columns', async (req: Request, res: Response) => {
+  try {
+    await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN DEFAULT false');
+
+    res.json({
+      success: true,
+      message: 'Missing columns added successfully'
+    });
+  } catch (error: any) {
+    console.error('Add columns error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 export default router;
