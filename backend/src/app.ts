@@ -43,8 +43,8 @@ class App {
   }
 
   private initializeMiddleware(): void {
-    // Trust proxy for rate limiting behind reverse proxy
-    this.app.set('trust proxy', true);
+    // Trust proxy for rate limiting behind reverse proxy (Coolify)
+    this.app.set('trust proxy', 1);
 
     // Security middleware
     this.app.use(helmet({
