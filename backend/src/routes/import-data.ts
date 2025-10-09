@@ -180,14 +180,34 @@ router.post('/import', async (req: Request, res: Response) => {
   }
 });
 
-// Add missing columns
+// Add missing columns and tables
 router.post('/add-columns', async (req: Request, res: Response) => {
   try {
+    // Add missing column to users table
     await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN DEFAULT false');
+
+    // Create audit_logs table if it doesn't exist
+    await query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        action VARCHAR(100) NOT NULL,
+        entity_type VARCHAR(50),
+        entity_id INTEGER,
+        details TEXT,
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    // Create index on audit_logs
+    await query('CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at)');
 
     res.json({
       success: true,
-      message: 'Missing columns added successfully'
+      message: 'Missing columns and tables added successfully'
     });
   } catch (error: any) {
     console.error('Add columns error:', error);
