@@ -1,0 +1,75 @@
+# Node modules
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Development files
+src
+*.ts
+!*.d.ts
+tsconfig.json
+.eslintrc.json
+nodemon.json
+
+# Tests
+__tests__
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+jest.config.js
+
+# Development environment
+.env
+.env.local
+.env.development
+.env.test
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Build artifacts (will be created during build)
+dist
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Documentation
+*.md
+docs
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Backups (will be created in runtime)
+backups/*
+!backups/.gitkeep
+
+# Scripts
+*.js
+!dist/**/*.js
+
+# Other
+coverage
+.nyc_output

@@ -1,0 +1,15 @@
+f30f6c3 Add deployment session recap for October 10
+ DEPLOYMENT_SESSION_RECAP_OCT10.md | 327 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 327 insertions(+)
+6e33f85 Add complete database backup for import
+ database_complete.sql | 3744 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 3744 insertions(+)
+0b114ee Fix: Change trust proxy from true to 1 for express-rate-limit compatibility
+ backend/src/app.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+3f448f1 Temporarily disable HTTPS auto-upgrade until SSL is configured
+ frontend/src/services/api.ts | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+ac07fbb Update package-lock.json with serve dependencies
+ frontend/package-lock.json | 481 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 481 insertions(+)

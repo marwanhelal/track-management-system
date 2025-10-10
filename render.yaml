@@ -1,0 +1,49 @@
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: track-management-db
+    plan: free
+    databaseName: track_management
+    user: track_user
+
+  # Backend Web Service
+  - type: web
+    name: track-management-backend
+    runtime: node
+    plan: free
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5005
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: track-management-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 30d
+      - key: BCRYPT_ROUNDS
+        value: 12
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 100
+      - key: API_PREFIX
+        value: /api/v1
+      - key: DB_POOL_MIN
+        value: 2
+      - key: DB_POOL_MAX
+        value: 10
+      - key: DB_CONNECTION_TIMEOUT
+        value: 5000

@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "@mui/icons-material": "^7.3.2"
+    "@mui/icons-material": "^7.3.2",
+    "pg": "^8.16.3"
   }
 }

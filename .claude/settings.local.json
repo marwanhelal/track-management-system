@@ -73,7 +73,10 @@
       "Bash(git commit:*)",
       "Bash(git remote add:*)",
       "Bash(git branch:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "WebSearch",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []
