@@ -51,7 +51,7 @@ export const useProjectEarlyAccess = (onRefresh: () => void): UseProjectEarlyAcc
   const grantEarlyAccess = useCallback(
     async (phaseId: number, note?: string) => {
       try {
-        const response = await apiService.grantEarlyAccess(phaseId, { note });
+        const response = await apiService.grantEarlyAccess(phaseId, note);
         if (response.success) {
           onRefresh();
         }
@@ -66,7 +66,7 @@ export const useProjectEarlyAccess = (onRefresh: () => void): UseProjectEarlyAcc
   const revokeEarlyAccess = useCallback(
     async (phaseId: number, note?: string) => {
       try {
-        const response = await apiService.revokeEarlyAccess(phaseId, { note });
+        const response = await apiService.revokeEarlyAccess(phaseId, note);
         if (response.success) {
           onRefresh();
         }
@@ -81,7 +81,7 @@ export const useProjectEarlyAccess = (onRefresh: () => void): UseProjectEarlyAcc
   const startPhaseWithEarlyAccess = useCallback(
     async (phaseId: number, note?: string) => {
       try {
-        const response = await apiService.startPhase(phaseId, { note });
+        const response = await apiService.startPhase(phaseId, note);
         if (response.success) {
           onRefresh();
         }
