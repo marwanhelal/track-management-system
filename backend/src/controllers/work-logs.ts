@@ -522,7 +522,7 @@ export const getWorkLogsSummary = async (req: Request, res: Response): Promise<v
       JOIN project_phases pp ON wl.phase_id = pp.id
       JOIN projects p ON pp.project_id = p.id
       ${whereClause}
-      GROUP BY pp.id, pp.phase_name, pp.project_id, p.name
+      GROUP BY pp.id, pp.phase_name, pp.phase_order, pp.project_id, p.name
       ORDER BY p.name, pp.phase_order
     `, params);
 
@@ -545,7 +545,7 @@ export const getWorkLogsSummary = async (req: Request, res: Response): Promise<v
       JOIN project_phases pp ON wl.phase_id = pp.id
       JOIN projects p ON pp.project_id = p.id
       ${whereClause}
-      GROUP BY pp.id, pp.phase_name, pp.project_id, p.name, u.id, u.name
+      GROUP BY pp.id, pp.phase_name, pp.phase_order, pp.project_id, p.name, u.id, u.name
       ORDER BY p.name, pp.phase_order, u.name
     `, params);
 

@@ -147,7 +147,7 @@ export const getComprehensiveOverview = async (req: Request, res: Response): Pro
         JOIN work_logs wl ON u.id = wl.engineer_id
         JOIN project_phases pp ON wl.phase_id = pp.id
         WHERE pp.project_id = $1 AND u.role = 'engineer'
-        GROUP BY u.id, u.name, pp.id, pp.phase_name
+        GROUP BY u.id, u.name, pp.id, pp.phase_name, pp.phase_order
         ORDER BY u.name, pp.phase_order
       `, [project.id]);
 
