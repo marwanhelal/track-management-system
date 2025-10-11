@@ -1,13 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Box, CssBaseline, ThemeProvider, Grid } from '@mui/material';
 import { motion } from 'framer-motion';
 import LoginForm from '../components/auth/LoginForm';
-import RegisterForm from '../components/auth/RegisterForm';
 import CompanyShowcase from '../components/common/CompanyShowcase';
 import { professionalTheme, animationVariants, transitionConfig } from '../styles/theme';
 
 const AuthPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
 
   return (
     <ThemeProvider theme={professionalTheme}>
@@ -56,11 +54,7 @@ const AuthPage = () => {
                   },
                 }}
               >
-                {isLogin ? (
-                  <LoginForm onSwitchToRegister={() => setIsLogin(false)} />
-                ) : (
-                  <RegisterForm onSwitchToLogin={() => setIsLogin(true)} />
-                )}
+                <LoginForm />
               </Box>
             </motion.div>
           </Grid>

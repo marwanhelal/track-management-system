@@ -119,10 +119,12 @@ class ApiService {
     return response.data;
   }
 
-  async register(userData: RegisterInput): Promise<ApiResponse<{ user: User; tokens: AuthTokens }>> {
-    const response = await this.api.post('/auth/register', userData);
-    return response.data;
-  }
+  // SECURITY: Public registration is DISABLED
+  // Only supervisors/administrators can create accounts via Team Management
+  // async register(userData: RegisterInput): Promise<ApiResponse<{ user: User; tokens: AuthTokens }>> {
+  //   const response = await this.api.post('/auth/register', userData);
+  //   return response.data;
+  // }
 
   async refreshToken(refreshToken: string): Promise<ApiResponse<{ tokens: AuthTokens }>> {
     const response = await this.api.post('/auth/refresh', { refreshToken });

@@ -9,7 +9,6 @@ import {
   CircularProgress,
   Container,
   Avatar,
-  Link,
 } from '@mui/material';
 import { LockOutlined, Business } from '@mui/icons-material';
 import { motion } from 'framer-motion';
@@ -19,11 +18,7 @@ import { LoginInput } from '../../types';
 import { glassMorphismStyles, animationVariants, transitionConfig, scaleTransition } from '../../styles/theme';
 import { companyAssets } from '../../assets/config';
 
-interface LoginFormProps {
-  onSwitchToRegister: () => void;
-}
-
-const LoginForm = ({ onSwitchToRegister }: LoginFormProps) => {
+const LoginForm = () => {
   const { login, loading, error, clearError } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState<LoginInput>({
@@ -253,27 +248,6 @@ const LoginForm = ({ onSwitchToRegister }: LoginFormProps) => {
                     )}
                   </Button>
                 </motion.div>
-
-                <Box textAlign="center">
-                  <Link
-                    component="button"
-                    variant="body2"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onSwitchToRegister();
-                    }}
-                    disabled={loading}
-                    sx={{
-                      color: 'primary.main',
-                      fontWeight: 500,
-                      '&:hover': {
-                        textDecoration: 'underline',
-                      },
-                    }}
-                  >
-                    Don't have an account? Sign Up
-                  </Link>
-                </Box>
               </Box>
             </Paper>
           </motion.div>

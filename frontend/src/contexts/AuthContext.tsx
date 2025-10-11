@@ -90,34 +90,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // SECURITY: Public registration is DISABLED for company internal system
+  // Only authorized supervisors/administrators can create accounts via Team Management
   const register = async (userData: RegisterInput): Promise<boolean> => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await apiService.register(userData);
-
-      if (response.success && response.data) {
-        const { user: newUser, tokens } = response.data;
-
-        // Store tokens and user data in sessionStorage (clears on browser close for security)
-        sessionStorage.setItem('accessToken', tokens.accessToken);
-        sessionStorage.setItem('refreshToken', tokens.refreshToken);
-        sessionStorage.setItem('user', JSON.stringify(newUser));
-
-        setUser(newUser);
-        return true;
-      } else {
-        setError(response.error || 'Registration failed');
-        return false;
-      }
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.error || error.message || 'Registration failed';
-      setError(errorMessage);
-      return false;
-    } finally {
-      setLoading(false);
-    }
+    setError('Public registration is disabled. Please contact your supervisor or administrator.');
+    return false;
   };
 
   const logout = async () => {

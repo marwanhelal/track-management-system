@@ -16,7 +16,9 @@ import {
 const router = Router();
 
 // Public routes
-router.post('/register', validateUserRegistration, register);
+// SECURITY: Public registration is DISABLED for company internal system
+// Only supervisors and administrators can create new user accounts
+// router.post('/register', validateUserRegistration, register);
 router.post('/login', validateUserLogin, login);
 router.post('/refresh', refreshToken);
 
