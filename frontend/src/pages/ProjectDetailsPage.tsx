@@ -53,6 +53,7 @@ import EditProjectDialog from '../components/projects/EditProjectDialog';
 import AddPhaseDialog from '../components/projects/AddPhaseDialog';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import EditPhaseDatesDialog from '../components/phases/EditPhaseDatesDialog';
+import PhaseProgressSummary from '../components/progress/PhaseProgressSummary';
 
 import { ProjectPhase, Project } from '../types';
 
@@ -92,6 +93,10 @@ const ProjectDetailsPage: React.FC = () => {
   const [editProjectDialog, setEditProjectDialog] = useState({ open: false });
   const [addPhaseDialog, setAddPhaseDialog] = useState({ open: false });
   const [editPhaseDatesDialog, setEditPhaseDatesDialog] = useState<{
+    open: boolean;
+    phase: ProjectPhase | null;
+  }>({ open: false, phase: null });
+  const [progressSummaryDialog, setProgressSummaryDialog] = useState<{
     open: boolean;
     phase: ProjectPhase | null;
   }>({ open: false, phase: null });
@@ -208,6 +213,10 @@ const ProjectDetailsPage: React.FC = () => {
     setEditPhaseDatesDialog({ open: true, phase });
   };
 
+  const handleManageProgress = (phase: ProjectPhase) => {
+    setProgressSummaryDialog({ open: true, phase });
+  };
+
   const handleSaveProject = async (updatedProject: Partial<Project>) => {
     try {
       await apiService.updateProject(parseInt(id!), updatedProject);
@@ -311,6 +320,7 @@ const ProjectDetailsPage: React.FC = () => {
             onRevokeEarlyAccess={earlyAccessHook.revokeEarlyAccess}
             onToggleWarning={handleToggleWarning}
             onEditDates={handleEditDates}
+            onManageProgress={handleManageProgress}
           />
         </TabPanel>
 
@@ -514,6 +524,18 @@ const ProjectDetailsPage: React.FC = () => {
           refetch();
         }}
       />
+
+      {progressSummaryDialog.phase && (
+        <PhaseProgressSummary
+          open={progressSummaryDialog.open}
+          onClose={() => setProgressSummaryDialog({ open: false, phase: null })}
+          phaseId={progressSummaryDialog.phase.id}
+          phaseName={progressSummaryDialog.phase.phase_name}
+          predictedHours={parseFloat(progressSummaryDialog.phase.predicted_hours?.toString() || '0')}
+          isSupervisor={isSupervisor}
+          onProgressUpdated={refetch}
+        />
+      )}
 
       {/* Snackbar Notifications */}
       <Snackbar

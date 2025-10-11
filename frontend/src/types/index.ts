@@ -92,6 +92,9 @@ export interface ProjectPhase {
   calculated_progress: number;
   actual_progress: number;
   progress_variance: number;
+  // Submitted/Approved Dates
+  submitted_date?: string;
+  approved_date?: string;
   created_at: string;
   updated_at: string;
 }

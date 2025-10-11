@@ -17,7 +17,8 @@ import {
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
   FastForward as FastForwardIcon,
-  DateRange as DateRangeIcon
+  DateRange as DateRangeIcon,
+  Assessment as AssessmentIcon
 } from '@mui/icons-material';
 import { ProjectPhase, User } from '../../../types';
 
@@ -37,6 +38,7 @@ interface ProjectPhasesListProps {
   onRevokeEarlyAccess: (phaseId: number, note?: string) => Promise<void>;
   onToggleWarning: (phaseId: number, currentState: boolean) => Promise<void>;
   onEditDates: (phase: ProjectPhase) => void;
+  onManageProgress?: (phase: ProjectPhase) => void;
 }
 
 const ProjectPhasesList: React.FC<ProjectPhasesListProps> = ({
@@ -54,7 +56,8 @@ const ProjectPhasesList: React.FC<ProjectPhasesListProps> = ({
   onGrantEarlyAccess,
   onRevokeEarlyAccess,
   onToggleWarning,
-  onEditDates
+  onEditDates,
+  onManageProgress
 }) => {
   return (
     <Box>
@@ -123,6 +126,16 @@ const ProjectPhasesList: React.FC<ProjectPhasesListProps> = ({
                     <Typography variant="body2">
                       <strong>Actual End:</strong> {phase.actual_end_date ? new Date(phase.actual_end_date).toLocaleDateString() : 'Not completed'}
                     </Typography>
+                    {phase.submitted_date && (
+                      <Typography variant="body2">
+                        <strong>Submitted Date:</strong> {new Date(phase.submitted_date).toLocaleDateString()}
+                      </Typography>
+                    )}
+                    {phase.approved_date && (
+                      <Typography variant="body2">
+                        <strong>Approved Date:</strong> {new Date(phase.approved_date).toLocaleDateString()}
+                      </Typography>
+                    )}
                     {isSupervisor && (
                       <Box sx={{ mt: 1 }}>
                         <Button
@@ -195,6 +208,19 @@ const ProjectPhasesList: React.FC<ProjectPhasesListProps> = ({
                         color="warning"
                         size="small"
                       />
+                    )}
+                    {isSupervisor && onManageProgress && (
+                      <Box sx={{ mt: 1 }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                          startIcon={<AssessmentIcon />}
+                          onClick={() => onManageProgress(phase)}
+                        >
+                          Calculate Actual Working Progress
+                        </Button>
+                      </Box>
                     )}
                   </Box>
                 </Box>
