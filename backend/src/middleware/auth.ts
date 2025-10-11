@@ -111,6 +111,34 @@ export const authenticatedUser = authorize('supervisor', 'engineer', 'administra
 // Supervisor and Administrator (for viewing and exporting)
 export const viewerAccess = authorize('supervisor', 'administrator');
 
+// Super Admin middleware - Only specific account can create/delete supervisor/administrator accounts
+// For production: Consider moving this email to environment variable or database flag
+export const superAdminOnly = (req: Request, res: Response, next: NextFunction): void => {
+  const authReq = req as AuthenticatedRequest;
+
+  if (!authReq.user) {
+    res.status(401).json({
+      success: false,
+      error: 'Authentication required'
+    });
+    return;
+  }
+
+  // Check if user is the designated super admin
+  // TODO: Move this to environment variable SUPER_ADMIN_EMAIL or add is_super_admin column to users table
+  const SUPER_ADMIN_EMAIL = 'marwanhelal5@gmail.com';
+
+  if (authReq.user.email !== SUPER_ADMIN_EMAIL) {
+    res.status(403).json({
+      success: false,
+      error: 'Only the super admin can perform this action'
+    });
+    return;
+  }
+
+  next();
+};
+
 // Optional authentication middleware (for public routes that can benefit from user context)
 export const optionalAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const authReq = req as AuthenticatedRequest;

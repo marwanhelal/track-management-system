@@ -298,6 +298,29 @@ class ApiService {
     return response.data;
   }
 
+  async createSupervisor(userData: { name: string; email: string; password: string }): Promise<ApiResponse<{ user: any }>> {
+    const response = await this.api.post('/users/supervisors', userData);
+    return response.data;
+  }
+
+  async createAdministrator(userData: { name: string; email: string; password: string }): Promise<ApiResponse<{ user: any }>> {
+    const response = await this.api.post('/users/administrators', userData);
+    return response.data;
+  }
+
+  // Check if current user is super admin
+  isSuperAdmin(): boolean {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return false;
+
+    try {
+      const user = JSON.parse(userStr);
+      return user.email === 'marwanhelal5@gmail.com';
+    } catch {
+      return false;
+    }
+  }
+
   async updateUser(id: number, updateData: any): Promise<ApiResponse<{ user: any }>> {
     const response = await this.api.put(`/users/${id}`, updateData);
     return response.data;

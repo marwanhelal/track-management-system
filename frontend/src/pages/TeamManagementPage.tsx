@@ -43,7 +43,7 @@ interface User {
   id: number;
   name: string;
   email: string;
-  role: 'supervisor' | 'engineer';
+  role: 'supervisor' | 'engineer' | 'administrator';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -56,6 +56,26 @@ interface TeamManagementState {
   loading: boolean;
   error: string | null;
   createDialog: {
+    open: boolean;
+    loading: boolean;
+    formData: {
+      name: string;
+      email: string;
+      password: string;
+    };
+    errors: Record<string, string>;
+  };
+  createSupervisorDialog: {
+    open: boolean;
+    loading: boolean;
+    formData: {
+      name: string;
+      email: string;
+      password: string;
+    };
+    errors: Record<string, string>;
+  };
+  createAdministratorDialog: {
     open: boolean;
     loading: boolean;
     formData: {
@@ -99,6 +119,26 @@ const TeamManagementPage: React.FC = () => {
     loading: true,
     error: null,
     createDialog: {
+      open: false,
+      loading: false,
+      formData: {
+        name: '',
+        email: '',
+        password: ''
+      },
+      errors: {}
+    },
+    createSupervisorDialog: {
+      open: false,
+      loading: false,
+      formData: {
+        name: '',
+        email: '',
+        password: ''
+      },
+      errors: {}
+    },
+    createAdministratorDialog: {
       open: false,
       loading: false,
       formData: {
@@ -243,6 +283,166 @@ const TeamManagementPage: React.FC = () => {
           ...prev.createDialog,
           loading: false,
           errors: { general: 'Failed to create engineer account' }
+        }
+      }));
+    }
+  };
+
+  const handleCreateSupervisor = () => {
+    setState(prev => ({
+      ...prev,
+      createSupervisorDialog: {
+        ...prev.createSupervisorDialog,
+        open: true,
+        formData: { name: '', email: '', password: '' },
+        errors: {}
+      }
+    }));
+  };
+
+  const handleCreateSupervisorSubmit = async () => {
+    const { formData } = state.createSupervisorDialog;
+    const errors: Record<string, string> = {};
+
+    // Validation
+    if (!formData.name.trim()) {
+      errors.name = 'Name is required';
+    }
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    if (!formData.password.trim()) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters long';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setState(prev => ({
+        ...prev,
+        createSupervisorDialog: { ...prev.createSupervisorDialog, errors }
+      }));
+      return;
+    }
+
+    try {
+      setState(prev => ({
+        ...prev,
+        createSupervisorDialog: { ...prev.createSupervisorDialog, loading: true, errors: {} }
+      }));
+
+      const response = await apiService.createSupervisor(formData);
+
+      if (response.success) {
+        setState(prev => ({
+          ...prev,
+          createSupervisorDialog: {
+            open: false,
+            loading: false,
+            formData: { name: '', email: '', password: '' },
+            errors: {}
+          }
+        }));
+        await fetchUsers();
+      } else {
+        setState(prev => ({
+          ...prev,
+          createSupervisorDialog: {
+            ...prev.createSupervisorDialog,
+            loading: false,
+            errors: { general: response.error || 'Failed to create supervisor account' }
+          }
+        }));
+      }
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        createSupervisorDialog: {
+          ...prev.createSupervisorDialog,
+          loading: false,
+          errors: { general: 'Failed to create supervisor account' }
+        }
+      }));
+    }
+  };
+
+  const handleCreateAdministrator = () => {
+    setState(prev => ({
+      ...prev,
+      createAdministratorDialog: {
+        ...prev.createAdministratorDialog,
+        open: true,
+        formData: { name: '', email: '', password: '' },
+        errors: {}
+      }
+    }));
+  };
+
+  const handleCreateAdministratorSubmit = async () => {
+    const { formData } = state.createAdministratorDialog;
+    const errors: Record<string, string> = {};
+
+    // Validation
+    if (!formData.name.trim()) {
+      errors.name = 'Name is required';
+    }
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    if (!formData.password.trim()) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters long';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setState(prev => ({
+        ...prev,
+        createAdministratorDialog: { ...prev.createAdministratorDialog, errors }
+      }));
+      return;
+    }
+
+    try {
+      setState(prev => ({
+        ...prev,
+        createAdministratorDialog: { ...prev.createAdministratorDialog, loading: true, errors: {} }
+      }));
+
+      const response = await apiService.createAdministrator(formData);
+
+      if (response.success) {
+        setState(prev => ({
+          ...prev,
+          createAdministratorDialog: {
+            open: false,
+            loading: false,
+            formData: { name: '', email: '', password: '' },
+            errors: {}
+          }
+        }));
+        await fetchUsers();
+      } else {
+        setState(prev => ({
+          ...prev,
+          createAdministratorDialog: {
+            ...prev.createAdministratorDialog,
+            loading: false,
+            errors: { general: response.error || 'Failed to create administrator account' }
+          }
+        }));
+      }
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        createAdministratorDialog: {
+          ...prev.createAdministratorDialog,
+          loading: false,
+          errors: { general: 'Failed to create administrator account' }
         }
       }));
     }
@@ -777,6 +977,26 @@ const TeamManagementPage: React.FC = () => {
           >
             Export Report
           </Button>
+          {apiService.isSuperAdmin() && (
+            <>
+              <Button
+                variant="contained"
+                startIcon={<PersonAddIcon />}
+                onClick={handleCreateSupervisor}
+                color="primary"
+              >
+                Add Supervisor
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<PersonAddIcon />}
+                onClick={handleCreateAdministrator}
+                color="secondary"
+              >
+                Add Administrator
+              </Button>
+            </>
+          )}
           <Button
             variant="contained"
             startIcon={<PersonAddIcon />}
@@ -925,11 +1145,12 @@ const TeamManagementPage: React.FC = () => {
             Deactivate
           </MenuItem>
         )}
-        {state.selectedUser && (state.selectedUser.role === 'engineer' ||
-          (state.selectedUser.role === 'supervisor' &&
-           (state.selectedUser.email.toLowerCase().includes('test') ||
-            state.selectedUser.email.toLowerCase().includes('example') ||
-            state.selectedUser.name.toLowerCase().includes('test')))) && (
+        {state.selectedUser && (
+          // Super admin can delete anyone
+          apiService.isSuperAdmin() ||
+          // Regular supervisors can only delete engineers
+          state.selectedUser.role === 'engineer'
+        ) && (
           <MenuItem
             onClick={() => state.selectedUser && handleDeleteUser(state.selectedUser)}
             sx={{ color: 'error.main' }}
@@ -1021,6 +1242,168 @@ const TeamManagementPage: React.FC = () => {
             disabled={state.createDialog.loading}
           >
             Create Engineer
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Supervisor Dialog */}
+      <Dialog open={state.createSupervisorDialog.open} onClose={() => setState(prev => ({ ...prev, createSupervisorDialog: { ...prev.createSupervisorDialog, open: false } }))}>
+        <DialogTitle>Create Supervisor Account</DialogTitle>
+        <DialogContent>
+          {state.createSupervisorDialog.errors.general && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {state.createSupervisorDialog.errors.general}
+            </Alert>
+          )}
+
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Name"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={state.createSupervisorDialog.formData.name}
+            onChange={(e) => setState(prev => ({
+              ...prev,
+              createSupervisorDialog: {
+                ...prev.createSupervisorDialog,
+                formData: { ...prev.createSupervisorDialog.formData, name: e.target.value }
+              }
+            }))}
+            error={!!state.createSupervisorDialog.errors.name}
+            helperText={state.createSupervisorDialog.errors.name}
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            margin="dense"
+            label="Email"
+            type="email"
+            fullWidth
+            variant="outlined"
+            value={state.createSupervisorDialog.formData.email}
+            onChange={(e) => setState(prev => ({
+              ...prev,
+              createSupervisorDialog: {
+                ...prev.createSupervisorDialog,
+                formData: { ...prev.createSupervisorDialog.formData, email: e.target.value }
+              }
+            }))}
+            error={!!state.createSupervisorDialog.errors.email}
+            helperText={state.createSupervisorDialog.errors.email}
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            margin="dense"
+            label="Password"
+            type="password"
+            fullWidth
+            variant="outlined"
+            value={state.createSupervisorDialog.formData.password}
+            onChange={(e) => setState(prev => ({
+              ...prev,
+              createSupervisorDialog: {
+                ...prev.createSupervisorDialog,
+                formData: { ...prev.createSupervisorDialog.formData, password: e.target.value }
+              }
+            }))}
+            error={!!state.createSupervisorDialog.errors.password}
+            helperText={state.createSupervisorDialog.errors.password || 'Password must be at least 8 characters with uppercase, lowercase, number, and special character'}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setState(prev => ({ ...prev, createSupervisorDialog: { ...prev.createSupervisorDialog, open: false } }))}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreateSupervisorSubmit}
+            variant="contained"
+            disabled={state.createSupervisorDialog.loading}
+          >
+            Create Supervisor
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Administrator Dialog */}
+      <Dialog open={state.createAdministratorDialog.open} onClose={() => setState(prev => ({ ...prev, createAdministratorDialog: { ...prev.createAdministratorDialog, open: false } }))}>
+        <DialogTitle>Create Administrator Account</DialogTitle>
+        <DialogContent>
+          {state.createAdministratorDialog.errors.general && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {state.createAdministratorDialog.errors.general}
+            </Alert>
+          )}
+
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Name"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={state.createAdministratorDialog.formData.name}
+            onChange={(e) => setState(prev => ({
+              ...prev,
+              createAdministratorDialog: {
+                ...prev.createAdministratorDialog,
+                formData: { ...prev.createAdministratorDialog.formData, name: e.target.value }
+              }
+            }))}
+            error={!!state.createAdministratorDialog.errors.name}
+            helperText={state.createAdministratorDialog.errors.name}
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            margin="dense"
+            label="Email"
+            type="email"
+            fullWidth
+            variant="outlined"
+            value={state.createAdministratorDialog.formData.email}
+            onChange={(e) => setState(prev => ({
+              ...prev,
+              createAdministratorDialog: {
+                ...prev.createAdministratorDialog,
+                formData: { ...prev.createAdministratorDialog.formData, email: e.target.value }
+              }
+            }))}
+            error={!!state.createAdministratorDialog.errors.email}
+            helperText={state.createAdministratorDialog.errors.email}
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            margin="dense"
+            label="Password"
+            type="password"
+            fullWidth
+            variant="outlined"
+            value={state.createAdministratorDialog.formData.password}
+            onChange={(e) => setState(prev => ({
+              ...prev,
+              createAdministratorDialog: {
+                ...prev.createAdministratorDialog,
+                formData: { ...prev.createAdministratorDialog.formData, password: e.target.value }
+              }
+            }))}
+            error={!!state.createAdministratorDialog.errors.password}
+            helperText={state.createAdministratorDialog.errors.password || 'Password must be at least 8 characters with uppercase, lowercase, number, and special character'}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setState(prev => ({ ...prev, createAdministratorDialog: { ...prev.createAdministratorDialog, open: false } }))}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreateAdministratorSubmit}
+            variant="contained"
+            disabled={state.createAdministratorDialog.loading}
+          >
+            Create Administrator
           </Button>
         </DialogActions>
       </Dialog>

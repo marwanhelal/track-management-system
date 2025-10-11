@@ -3,12 +3,14 @@ import {
   getUsers,
   getUser,
   createEngineer,
+  createSupervisor,
+  createAdministrator,
   updateUser,
   deactivateUser,
   deleteUser,
   reactivateUser
 } from '@/controllers/users';
-import { authenticate, supervisorOnly } from '@/middleware/auth';
+import { authenticate, supervisorOnly, superAdminOnly } from '@/middleware/auth';
 import {
   validateUserRegistration,
   validateEngineerCreation,
@@ -30,6 +32,12 @@ router.get('/:id', validateIdParam, getUser);
 
 // Create engineer (supervisor only)
 router.post('/engineers', supervisorOnly, validateEngineerCreation, handleValidationErrors, createEngineer);
+
+// Create supervisor (super admin only)
+router.post('/supervisors', superAdminOnly, validateEngineerCreation, handleValidationErrors, createSupervisor);
+
+// Create administrator (super admin only)
+router.post('/administrators', superAdminOnly, validateEngineerCreation, handleValidationErrors, createAdministrator);
 
 // Update user
 router.put('/:id', validateIdParam, validateUserUpdate, updateUser);

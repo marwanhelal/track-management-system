@@ -96,6 +96,180 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+// Create new supervisor (super admin only)
+export const createSupervisor = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array()
+      });
+      return;
+    }
+
+    const { name, email, password }: RegisterInput = req.body;
+
+    // Validate password strength
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.isValid) {
+      res.status(400).json({
+        success: false,
+        error: 'Password does not meet requirements',
+        details: passwordValidation.errors
+      });
+      return;
+    }
+
+    // Check if user already exists
+    const existingUserResult = await query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (existingUserResult.rows.length > 0) {
+      res.status(409).json({
+        success: false,
+        error: 'User with this email already exists'
+      });
+      return;
+    }
+
+    // Hash password
+    const passwordHash = await hashPassword(password);
+
+    // Create supervisor user
+    const userResult = await query(
+      `INSERT INTO users (name, email, password_hash, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, name, email, role, is_active, created_at`,
+      [name, email, passwordHash, 'supervisor']
+    );
+
+    const user = userResult.rows[0];
+
+    // Log audit event
+    await query(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',
+      ['users', user.id, 'CREATE_SUPERVISOR', authReq.user.id, `Supervisor account created for: ${email}`]
+    );
+
+    const response: ApiResponse<{ user: Omit<User, 'password_hash'> }> = {
+      success: true,
+      message: 'Supervisor account created successfully',
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          is_active: user.is_active,
+          created_at: user.created_at,
+          updated_at: user.created_at
+        }
+      }
+    };
+
+    res.status(201).json(response);
+  } catch (error) {
+    console.error('Create supervisor error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error during supervisor creation'
+    });
+  }
+};
+
+// Create new administrator (super admin only)
+export const createAdministrator = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array()
+      });
+      return;
+    }
+
+    const { name, email, password }: RegisterInput = req.body;
+
+    // Validate password strength
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.isValid) {
+      res.status(400).json({
+        success: false,
+        error: 'Password does not meet requirements',
+        details: passwordValidation.errors
+      });
+      return;
+    }
+
+    // Check if user already exists
+    const existingUserResult = await query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (existingUserResult.rows.length > 0) {
+      res.status(409).json({
+        success: false,
+        error: 'User with this email already exists'
+      });
+      return;
+    }
+
+    // Hash password
+    const passwordHash = await hashPassword(password);
+
+    // Create administrator user
+    const userResult = await query(
+      `INSERT INTO users (name, email, password_hash, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, name, email, role, is_active, created_at`,
+      [name, email, passwordHash, 'administrator']
+    );
+
+    const user = userResult.rows[0];
+
+    // Log audit event
+    await query(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',
+      ['users', user.id, 'CREATE_ADMINISTRATOR', authReq.user.id, `Administrator account created for: ${email}`]
+    );
+
+    const response: ApiResponse<{ user: Omit<User, 'password_hash'> }> = {
+      success: true,
+      message: 'Administrator account created successfully',
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          is_active: user.is_active,
+          created_at: user.created_at,
+          updated_at: user.created_at
+        }
+      }
+    };
+
+    res.status(201).json(response);
+  } catch (error) {
+    console.error('Create administrator error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error during administrator creation'
+    });
+  }
+};
+
 // Create new engineer (supervisor only)
 export const createEngineer = async (req: Request, res: Response): Promise<void> => {
   const authReq = req as any;
@@ -428,16 +602,18 @@ export const deleteUser = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    // Prevent deletion of production supervisors (but allow test accounts)
-    if (user.role === 'supervisor') {
-      const isTestAccount = user.email.toLowerCase().includes('test') ||
-                           user.email.toLowerCase().includes('example') ||
-                           user.name.toLowerCase().includes('test');
+    // Check if current user is super admin
+    const SUPER_ADMIN_EMAIL = 'marwanhelal5@gmail.com';
+    const isSuperAdmin = authReq.user.email === SUPER_ADMIN_EMAIL;
 
-      if (!isTestAccount) {
-        res.status(400).json({
+    // Super admin can delete anyone (except themselves)
+    // Regular supervisors have restrictions
+    if (!isSuperAdmin) {
+      // Prevent deletion of supervisor and administrator accounts by regular supervisors
+      if (user.role === 'supervisor' || user.role === 'administrator') {
+        res.status(403).json({
           success: false,
-          error: 'Cannot delete production supervisor accounts'
+          error: 'Only the super admin can delete supervisor or administrator accounts'
         });
         return;
       }
