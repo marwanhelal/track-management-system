@@ -23,9 +23,6 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
-  FileCopy as DuplicateIcon,
-  ArrowUpward as MoveUpIcon,
-  ArrowDownward as MoveDownIcon,
   PlayArrow as StartIcon,
   Stop as StopIcon,
   CheckCircle as CompleteIcon,
@@ -40,13 +37,8 @@ export interface PhaseActionMenuProps {
   phase: ProjectPhase;
   onEdit: (phaseId: number, updates: Partial<ProjectPhase>) => Promise<void>;
   onDelete: (phaseId: number) => Promise<void>;
-  onDuplicate: (phaseId: number) => Promise<void>;
-  onMoveUp: (phaseId: number) => void;
-  onMoveDown: (phaseId: number) => void;
   onStart: (phaseId: number, note?: string) => Promise<void>;
   onComplete: (phaseId: number, note?: string) => Promise<void>;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
   disabled?: boolean;
 }
 
@@ -62,13 +54,8 @@ const PhaseActionMenu: React.FC<PhaseActionMenuProps> = ({
   phase,
   onEdit,
   onDelete,
-  onDuplicate,
-  onMoveUp,
-  onMoveDown,
   onStart,
   onComplete,
-  canMoveUp,
-  canMoveDown,
   disabled = false
 }) => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -136,15 +123,6 @@ const PhaseActionMenu: React.FC<PhaseActionMenuProps> = ({
       setDeleteDialog(false);
     } catch (error) {
       console.error('Failed to delete phase:', error);
-    }
-  };
-
-  const handleDuplicate = async () => {
-    try {
-      await onDuplicate(phase.id);
-      handleMenuClose();
-    } catch (error) {
-      console.error('Failed to duplicate phase:', error);
     }
   };
 
@@ -234,30 +212,6 @@ const PhaseActionMenu: React.FC<PhaseActionMenuProps> = ({
             <ScheduleIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText primary="Set Dates" />
-        </MenuItem>
-
-        <MenuItem onClick={handleDuplicate}>
-          <ListItemIcon>
-            <DuplicateIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary="Duplicate Phase" />
-        </MenuItem>
-
-        <Divider />
-
-        {/* Movement Actions */}
-        <MenuItem onClick={() => { onMoveUp(phase.id); handleMenuClose(); }} disabled={!canMoveUp}>
-          <ListItemIcon>
-            <MoveUpIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary="Move Up" />
-        </MenuItem>
-
-        <MenuItem onClick={() => { onMoveDown(phase.id); handleMenuClose(); }} disabled={!canMoveDown}>
-          <ListItemIcon>
-            <MoveDownIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary="Move Down" />
         </MenuItem>
 
         <Divider />
