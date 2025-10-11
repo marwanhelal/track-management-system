@@ -14,6 +14,7 @@ import {
   searchProjects,
   searchTeamMembers,
   getTeamAnalytics,
+  exportTeamReport,
   getComprehensiveOverview,
 } from '@/controllers/projects';
 import { testGetProjects } from '@/controllers/test-projects';
@@ -67,5 +68,6 @@ router.get('/:id/team/search', canAccessProject, validateIdParam, searchTeamMemb
 
 // Team Analytics & Reports
 router.get('/analytics/team', getTeamAnalytics);
+router.get('/:id/team/export', canAccessProject, validateIdParam, exportTeamReport);
 
 export default router;

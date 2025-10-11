@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { query } from '@/database/connection';
+import { query, transaction } from '@/database/connection';
 import { ApiResponse, PredefinedPhase, ProjectPhase } from '@/types';
 
 // Get all predefined phases
@@ -323,6 +323,56 @@ export const updatePhaseHistorical = async (req: Request, res: Response): Promis
     });
   } catch (error) {
     console.error('Update historical phase error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+};
+
+export const reorderPhases = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const { projectId } = req.params;
+    const { phaseOrder } = req.body;
+
+    if (authReq.user.role !== 'supervisor') {
+      res.status(403).json({
+        success: false,
+        error: 'Only supervisors can reorder phases'
+      });
+      return;
+    }
+
+    if (!Array.isArray(phaseOrder)) {
+      res.status(400).json({
+        success: false,
+        error: 'phaseOrder must be an array'
+      });
+      return;
+    }
+
+    await transaction(async (client) => {
+      // Update each phase order
+      for (const phaseUpdate of phaseOrder) {
+        await client.query(
+          'UPDATE project_phases SET phase_order = $1, updated_at = NOW() WHERE id = $2 AND project_id = $3',
+          [phaseUpdate.order, phaseUpdate.phaseId, projectId]
+        );
+      }
+
+      await client.query(
+        'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',
+        ['projects', projectId, 'PHASE_REORDER', authReq.user.id, `Phase order updated for ${phaseOrder.length} phases`]
+      );
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Phases reordered successfully'
+    });
+  } catch (error) {
+    console.error('Reorder phases error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'

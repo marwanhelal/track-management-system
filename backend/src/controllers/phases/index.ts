@@ -7,7 +7,8 @@ export {
   createPhase,
   updatePhase,
   deletePhase,
-  updatePhaseHistorical
+  updatePhaseHistorical,
+  reorderPhases
 } from './phases.crud';
 
 // Lifecycle management

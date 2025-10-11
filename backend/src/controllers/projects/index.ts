@@ -23,7 +23,8 @@ export {
   getProjectMetrics,
   searchProjects,
   searchTeamMembers,
-  getTeamAnalytics
+  getTeamAnalytics,
+  exportTeamReport
 } from './projects.analytics';
 
 // Comprehensive overview

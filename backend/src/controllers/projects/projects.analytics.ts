@@ -289,3 +289,43 @@ export const getTeamAnalytics = async (req: Request, res: Response): Promise<voi
     });
   }
 };
+
+export const exportTeamReport = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { format = 'csv' } = req.query;
+
+    const result = await query(`
+      SELECT
+        u.name as engineer_name,
+        u.email,
+        COALESCE(SUM(wl.hours), 0) as total_hours,
+        COUNT(DISTINCT wl.id) as work_logs,
+        COUNT(DISTINCT pp.id) as phases_worked,
+        COALESCE(AVG(wl.hours), 0) as avg_daily_hours,
+        MIN(wl.date) as first_log,
+        MAX(wl.date) as last_log
+      FROM users u
+      LEFT JOIN work_logs wl ON u.id = wl.engineer_id
+      LEFT JOIN project_phases pp ON wl.phase_id = pp.id
+      WHERE pp.project_id = $1 AND u.role = 'engineer' AND u.is_active = true
+      GROUP BY u.id, u.name, u.email
+      ORDER BY total_hours DESC
+    `, [id]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        format: format,
+        report: result.rows,
+        exportedAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Export team report error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+};

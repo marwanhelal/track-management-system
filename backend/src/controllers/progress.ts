@@ -207,11 +207,11 @@ export const setPhaseEngineerProgress = async (req: Request, res: Response): Pro
 
     // Verify engineer exists and has worked on this phase
     const engineerResult = await query(
-      `SELECT u.*, COUNT(wl.id) as work_log_count
+      `SELECT u.id, u.name, u.email, u.role, u.is_active, COUNT(wl.id) as work_log_count
        FROM users u
        LEFT JOIN work_logs wl ON wl.engineer_id = u.id AND wl.phase_id = $1
        WHERE u.id = $2 AND u.role = 'engineer'
-       GROUP BY u.id`,
+       GROUP BY u.id, u.name, u.email, u.role, u.is_active`,
       [validPhaseId, validEngineerId]
     );
 
