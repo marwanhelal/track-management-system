@@ -24,7 +24,12 @@ import {
   CardContent,
   Menu,
   MenuItem,
-  Grid
+  Grid,
+  Select,
+  FormControl,
+  InputLabel,
+  InputAdornment,
+  Paper
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -35,7 +40,10 @@ import {
   Cancel as CancelIcon,
   Block as BlockIcon,
   DeleteForever as DeleteForeverIcon,
-  FileDownload as FileDownloadIcon
+  FileDownload as FileDownloadIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon,
+  Clear as ClearIcon
 } from '@mui/icons-material';
 import { apiService } from '../services/api';
 
@@ -109,6 +117,11 @@ interface TeamManagementState {
     loading: boolean;
     format: 'csv' | 'json' | 'pdf';
   };
+  filters: {
+    role: string;
+    status: string;
+    search: string;
+  };
   actionMenuAnchor: HTMLElement | null;
   selectedUser: User | null;
 }
@@ -171,6 +184,11 @@ const TeamManagementPage: React.FC = () => {
       open: false,
       loading: false,
       format: 'pdf'
+    },
+    filters: {
+      role: 'all',
+      status: 'all',
+      search: ''
     },
     actionMenuAnchor: null,
     selectedUser: null
@@ -669,7 +687,8 @@ const TeamManagementPage: React.FC = () => {
       }));
 
       const format = state.exportDialog.format;
-      const exportData = state.users.map(user => ({
+      const usersToExport = filteredUsers; // Use filtered users for export
+      const exportData = usersToExport.map(user => ({
         Name: user.name,
         Email: user.email,
         Role: user.role.charAt(0).toUpperCase() + user.role.slice(1),
@@ -847,19 +866,19 @@ const TeamManagementPage: React.FC = () => {
 
               <div class="summary">
                 <div class="summary-card">
-                  <h3>${state.users.length}</h3>
-                  <p>Total Users</p>
+                  <h3>${usersToExport.length}</h3>
+                  <p>Total Users (Filtered)</p>
                 </div>
                 <div class="summary-card">
-                  <h3>${state.users.filter(u => u.is_active).length}</h3>
+                  <h3>${usersToExport.filter(u => u.is_active).length}</h3>
                   <p>Active Users</p>
                 </div>
                 <div class="summary-card">
-                  <h3>${state.users.filter(u => u.role === 'engineer').length}</h3>
+                  <h3>${usersToExport.filter(u => u.role === 'engineer').length}</h3>
                   <p>Engineers</p>
                 </div>
                 <div class="summary-card">
-                  <h3>${state.users.filter(u => u.role === 'supervisor').length}</h3>
+                  <h3>${usersToExport.filter(u => u.role === 'supervisor').length}</h3>
                   <p>Supervisors</p>
                 </div>
               </div>
@@ -877,7 +896,7 @@ const TeamManagementPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  ${state.users.map(user => `
+                  ${usersToExport.map(user => `
                     <tr>
                       <td><strong>${user.name}</strong></td>
                       <td>${user.email}</td>
@@ -893,7 +912,7 @@ const TeamManagementPage: React.FC = () => {
 
               <div class="footer">
                 <p>Track Management System - Team Report</p>
-                <p>This report contains ${state.users.length} team members with a total of ${state.users.reduce((sum, u) => sum + (u.total_hours || 0), 0)} hours logged</p>
+                <p>This report contains ${usersToExport.length} team members with a total of ${usersToExport.reduce((sum, u) => sum + (u.total_hours || 0), 0)} hours logged</p>
               </div>
             </body>
             </html>
@@ -949,6 +968,57 @@ const TeamManagementPage: React.FC = () => {
     );
   };
 
+  const handleFilterChange = (filterName: keyof typeof state.filters, value: string) => {
+    setState(prev => ({
+      ...prev,
+      filters: {
+        ...prev.filters,
+        [filterName]: value
+      }
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setState(prev => ({
+      ...prev,
+      filters: {
+        role: 'all',
+        status: 'all',
+        search: ''
+      }
+    }));
+  };
+
+  const getFilteredUsers = () => {
+    return state.users.filter(user => {
+      // Role filter
+      if (state.filters.role !== 'all' && user.role !== state.filters.role) {
+        return false;
+      }
+
+      // Status filter
+      if (state.filters.status === 'active' && !user.is_active) {
+        return false;
+      }
+      if (state.filters.status === 'inactive' && user.is_active) {
+        return false;
+      }
+
+      // Search filter (name or email)
+      if (state.filters.search) {
+        const searchLower = state.filters.search.toLowerCase();
+        const matchesName = user.name.toLowerCase().includes(searchLower);
+        const matchesEmail = user.email.toLowerCase().includes(searchLower);
+        if (!matchesName && !matchesEmail) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  };
+
+  const filteredUsers = getFilteredUsers();
   const activeUsers = state.users.filter(user => user.is_active);
   const engineers = state.users.filter(user => user.role === 'engineer');
   const supervisors = state.users.filter(user => user.role === 'supervisor');
@@ -1066,6 +1136,73 @@ const TeamManagementPage: React.FC = () => {
         </Grid>
       </Grid>
 
+      {/* Filter Section */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+          <FilterListIcon color="action" />
+          <Typography variant="subtitle1" fontWeight="medium" sx={{ mr: 'auto' }}>
+            Filters
+          </Typography>
+
+          <TextField
+            size="small"
+            placeholder="Search by name or email..."
+            value={state.filters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
+            sx={{ minWidth: 250 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Role</InputLabel>
+            <Select
+              value={state.filters.role}
+              label="Role"
+              onChange={(e) => handleFilterChange('role', e.target.value)}
+            >
+              <MenuItem value="all">All Roles</MenuItem>
+              <MenuItem value="engineer">Engineer</MenuItem>
+              <MenuItem value="supervisor">Supervisor</MenuItem>
+              <MenuItem value="administrator">Administrator</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={state.filters.status}
+              label="Status"
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+            >
+              <MenuItem value="all">All Status</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </Select>
+          </FormControl>
+
+          {(state.filters.role !== 'all' || state.filters.status !== 'all' || state.filters.search) && (
+            <Button
+              size="small"
+              startIcon={<ClearIcon />}
+              onClick={handleClearFilters}
+              variant="outlined"
+            >
+              Clear Filters
+            </Button>
+          )}
+
+          <Typography variant="body2" color="text.secondary">
+            Showing {filteredUsers.length} of {state.users.length} users
+          </Typography>
+        </Box>
+      </Paper>
+
       {/* Loading Indicator */}
       {state.loading && <LinearProgress sx={{ mb: 2 }} />}
 
@@ -1086,7 +1223,7 @@ const TeamManagementPage: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {state.users.map((user) => (
+              {filteredUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <Typography variant="body2" fontWeight="medium">
@@ -1109,11 +1246,11 @@ const TeamManagementPage: React.FC = () => {
                   </TableCell>
                 </TableRow>
               ))}
-              {state.users.length === 0 && !state.loading && (
+              {filteredUsers.length === 0 && !state.loading && (
                 <TableRow>
                   <TableCell colSpan={8} align="center">
                     <Typography variant="body2" color="text.secondary">
-                      No users found
+                      {state.users.length === 0 ? 'No users found' : 'No users match the current filters'}
                     </Typography>
                   </TableCell>
                 </TableRow>
