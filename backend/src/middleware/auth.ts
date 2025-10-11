@@ -126,7 +126,7 @@ export const superAdminOnly = (req: Request, res: Response, next: NextFunction):
 
   // Check if user is the designated super admin
   // TODO: Move this to environment variable SUPER_ADMIN_EMAIL or add is_super_admin column to users table
-  const SUPER_ADMIN_EMAIL = 'marwanhelal5@gmail.com';
+  const SUPER_ADMIN_EMAIL = 'marwanhelal15@gmail.com';
 
   if (authReq.user.email !== SUPER_ADMIN_EMAIL) {
     res.status(403).json({

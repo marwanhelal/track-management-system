@@ -603,7 +603,7 @@ export const deleteUser = async (req: Request, res: Response): Promise<void> => 
     }
 
     // Check if current user is super admin
-    const SUPER_ADMIN_EMAIL = 'marwanhelal5@gmail.com';
+    const SUPER_ADMIN_EMAIL = 'marwanhelal15@gmail.com';
     const isSuperAdmin = authReq.user.email === SUPER_ADMIN_EMAIL;
 
     // Super admin can delete anyone (except themselves)

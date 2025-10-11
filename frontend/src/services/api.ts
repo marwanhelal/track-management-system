@@ -315,7 +315,7 @@ class ApiService {
 
     try {
       const user = JSON.parse(userStr);
-      return user.email === 'marwanhelal5@gmail.com';
+      return user.email === 'marwanhelal15@gmail.com';
     } catch {
       return false;
     }
