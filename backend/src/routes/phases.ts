@@ -12,7 +12,6 @@ import {
   updatePhase,
   updatePhaseHistorical,
   deletePhase,
-  reorderPhases,
   grantEarlyAccess,
   revokeEarlyAccess,
   getEarlyAccessOverview
@@ -44,7 +43,6 @@ router.post('/project/:projectId', supervisorOnly, validateIdParam, createPhase)
 router.put('/:phaseId', supervisorOnly, validatePhaseIdParam, updatePhase);
 router.put('/:phaseId/historical', supervisorOnly, validatePhaseIdParam, updatePhaseHistorical);
 router.delete('/:phaseId', supervisorOnly, validatePhaseIdParam, deletePhase);
-router.put('/project/:projectId/reorder', supervisorOnly, validateIdParam, reorderPhases);
 
 // Early Access Management (supervisors only)
 router.post('/:phaseId/grant-early-access', supervisorOnly, validatePhaseIdParam, grantEarlyAccess);

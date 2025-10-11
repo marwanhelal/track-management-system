@@ -34,7 +34,8 @@ import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   Block as BlockIcon,
-  DeleteForever as DeleteForeverIcon
+  DeleteForever as DeleteForeverIcon,
+  FileDownload as FileDownloadIcon
 } from '@mui/icons-material';
 import { apiService } from '../services/api';
 
@@ -83,6 +84,11 @@ interface TeamManagementState {
     open: boolean;
     user: User | null;
   };
+  exportDialog: {
+    open: boolean;
+    loading: boolean;
+    format: 'csv' | 'json' | 'pdf';
+  };
   actionMenuAnchor: HTMLElement | null;
   selectedUser: User | null;
 }
@@ -120,6 +126,11 @@ const TeamManagementPage: React.FC = () => {
     permanentDeleteDialog: {
       open: false,
       user: null
+    },
+    exportDialog: {
+      open: false,
+      loading: false,
+      format: 'pdf'
     },
     actionMenuAnchor: null,
     selectedUser: null
@@ -443,6 +454,269 @@ const TeamManagementPage: React.FC = () => {
     }));
   };
 
+  const handleExportReport = () => {
+    setState(prev => ({
+      ...prev,
+      exportDialog: { ...prev.exportDialog, open: true }
+    }));
+  };
+
+  const handleExportSubmit = async () => {
+    try {
+      setState(prev => ({
+        ...prev,
+        exportDialog: { ...prev.exportDialog, loading: true }
+      }));
+
+      const format = state.exportDialog.format;
+      const exportData = state.users.map(user => ({
+        Name: user.name,
+        Email: user.email,
+        Role: user.role.charAt(0).toUpperCase() + user.role.slice(1),
+        Status: user.is_active ? 'Active' : 'Inactive',
+        'Work Logs': user.total_work_logs || 0,
+        'Total Hours': user.total_hours || 0,
+        'Created Date': new Date(user.created_at).toLocaleDateString()
+      }));
+
+      if (format === 'json') {
+        // Export as JSON
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `team-report-${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else if (format === 'csv') {
+        // Export as CSV
+        const headers = Object.keys(exportData[0] || {});
+        const csvRows = [
+          headers.join(','),
+          ...exportData.map(row => headers.map(header => {
+            const value = row[header as keyof typeof row];
+            return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
+          }).join(','))
+        ];
+        const csvStr = csvRows.join('\n');
+        const dataBlob = new Blob([csvStr], { type: 'text/csv' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `team-report-${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else if (format === 'pdf') {
+        // Export as PDF - open a new window with printable view
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Team Report</title>
+              <style>
+                @media print {
+                  body { margin: 0; }
+                  .no-print { display: none; }
+                }
+                body {
+                  font-family: Arial, sans-serif;
+                  padding: 40px;
+                  color: #333;
+                }
+                .header {
+                  text-align: center;
+                  margin-bottom: 30px;
+                  border-bottom: 3px solid #1976d2;
+                  padding-bottom: 20px;
+                }
+                .header h1 {
+                  margin: 0;
+                  color: #1976d2;
+                  font-size: 28px;
+                }
+                .header p {
+                  margin: 10px 0 0 0;
+                  color: #666;
+                  font-size: 14px;
+                }
+                .summary {
+                  display: grid;
+                  grid-template-columns: repeat(4, 1fr);
+                  gap: 20px;
+                  margin-bottom: 30px;
+                }
+                .summary-card {
+                  background: #f5f5f5;
+                  padding: 20px;
+                  border-radius: 8px;
+                  text-align: center;
+                  border-left: 4px solid #1976d2;
+                }
+                .summary-card h3 {
+                  margin: 0;
+                  font-size: 32px;
+                  color: #1976d2;
+                }
+                .summary-card p {
+                  margin: 10px 0 0 0;
+                  color: #666;
+                  font-size: 14px;
+                }
+                table {
+                  width: 100%;
+                  border-collapse: collapse;
+                  margin-top: 20px;
+                  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }
+                th {
+                  background: #1976d2;
+                  color: white;
+                  padding: 12px;
+                  text-align: left;
+                  font-weight: 600;
+                  font-size: 14px;
+                }
+                td {
+                  padding: 12px;
+                  border-bottom: 1px solid #ddd;
+                  font-size: 13px;
+                }
+                tr:hover {
+                  background: #f5f5f5;
+                }
+                .status-active {
+                  color: #4caf50;
+                  font-weight: 600;
+                }
+                .status-inactive {
+                  color: #f44336;
+                  font-weight: 600;
+                }
+                .role-supervisor {
+                  background: #1976d2;
+                  color: white;
+                  padding: 4px 8px;
+                  border-radius: 4px;
+                  font-size: 11px;
+                  display: inline-block;
+                }
+                .role-engineer {
+                  background: #757575;
+                  color: white;
+                  padding: 4px 8px;
+                  border-radius: 4px;
+                  font-size: 11px;
+                  display: inline-block;
+                }
+                .footer {
+                  margin-top: 40px;
+                  text-align: center;
+                  color: #999;
+                  font-size: 12px;
+                  border-top: 1px solid #ddd;
+                  padding-top: 20px;
+                }
+                .print-button {
+                  position: fixed;
+                  top: 20px;
+                  right: 20px;
+                  background: #1976d2;
+                  color: white;
+                  border: none;
+                  padding: 12px 24px;
+                  border-radius: 4px;
+                  cursor: pointer;
+                  font-size: 14px;
+                  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                }
+                .print-button:hover {
+                  background: #1565c0;
+                }
+              </style>
+            </head>
+            <body>
+              <button class="print-button no-print" onclick="window.print()">Print / Save as PDF</button>
+
+              <div class="header">
+                <h1>Team Management Report</h1>
+                <p>Generated on ${new Date().toLocaleString()}</p>
+              </div>
+
+              <div class="summary">
+                <div class="summary-card">
+                  <h3>${state.users.length}</h3>
+                  <p>Total Users</p>
+                </div>
+                <div class="summary-card">
+                  <h3>${state.users.filter(u => u.is_active).length}</h3>
+                  <p>Active Users</p>
+                </div>
+                <div class="summary-card">
+                  <h3>${state.users.filter(u => u.role === 'engineer').length}</h3>
+                  <p>Engineers</p>
+                </div>
+                <div class="summary-card">
+                  <h3>${state.users.filter(u => u.role === 'supervisor').length}</h3>
+                  <p>Supervisors</p>
+                </div>
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Work Logs</th>
+                    <th>Total Hours</th>
+                    <th>Created Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${state.users.map(user => `
+                    <tr>
+                      <td><strong>${user.name}</strong></td>
+                      <td>${user.email}</td>
+                      <td><span class="role-${user.role}">${user.role.charAt(0).toUpperCase() + user.role.slice(1)}</span></td>
+                      <td class="status-${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</td>
+                      <td>${user.total_work_logs || 0}</td>
+                      <td>${user.total_hours || 0}</td>
+                      <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+
+              <div class="footer">
+                <p>Track Management System - Team Report</p>
+                <p>This report contains ${state.users.length} team members with a total of ${state.users.reduce((sum, u) => sum + (u.total_hours || 0), 0)} hours logged</p>
+              </div>
+            </body>
+            </html>
+          `;
+          printWindow.document.write(htmlContent);
+          printWindow.document.close();
+        }
+      }
+
+      setState(prev => ({
+        ...prev,
+        exportDialog: { open: false, loading: false, format: 'pdf' }
+      }));
+    } catch (error) {
+      console.error('Export error:', error);
+      setState(prev => ({
+        ...prev,
+        exportDialog: { ...prev.exportDialog, loading: false },
+        error: 'Failed to export report'
+      }));
+    }
+  };
+
   const getStatusChip = (user: User) => {
     if (user.is_active) {
       return (
@@ -494,6 +768,14 @@ const TeamManagementPage: React.FC = () => {
             disabled={state.loading}
           >
             Refresh
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<FileDownloadIcon />}
+            onClick={handleExportReport}
+            disabled={state.loading}
+          >
+            Export Report
           </Button>
           <Button
             variant="contained"
@@ -870,6 +1152,91 @@ const TeamManagementPage: React.FC = () => {
             disabled={state.loading}
           >
             Delete Permanently
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Export Report Dialog */}
+      <Dialog open={state.exportDialog.open} onClose={() => setState(prev => ({ ...prev, exportDialog: { ...prev.exportDialog, open: false } }))}>
+        <DialogTitle>Export Team Report</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Select the export format for the team report
+          </Typography>
+
+          <Box display="flex" flexDirection="column" gap={2}>
+            <Box
+              onClick={() => setState(prev => ({ ...prev, exportDialog: { ...prev.exportDialog, format: 'pdf' } }))}
+              sx={{
+                p: 2,
+                border: state.exportDialog.format === 'pdf' ? '2px solid' : '1px solid',
+                borderColor: state.exportDialog.format === 'pdf' ? 'primary.main' : 'divider',
+                borderRadius: 1,
+                cursor: 'pointer',
+                bgcolor: state.exportDialog.format === 'pdf' ? 'action.selected' : 'transparent',
+                '&:hover': { bgcolor: 'action.hover' }
+              }}
+            >
+              <Typography variant="subtitle1" fontWeight="medium">
+                PDF (Professional)
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Formatted report with professional layout, perfect for printing
+              </Typography>
+            </Box>
+
+            <Box
+              onClick={() => setState(prev => ({ ...prev, exportDialog: { ...prev.exportDialog, format: 'csv' } }))}
+              sx={{
+                p: 2,
+                border: state.exportDialog.format === 'csv' ? '2px solid' : '1px solid',
+                borderColor: state.exportDialog.format === 'csv' ? 'primary.main' : 'divider',
+                borderRadius: 1,
+                cursor: 'pointer',
+                bgcolor: state.exportDialog.format === 'csv' ? 'action.selected' : 'transparent',
+                '&:hover': { bgcolor: 'action.hover' }
+              }}
+            >
+              <Typography variant="subtitle1" fontWeight="medium">
+                CSV (Spreadsheet)
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Comma-separated values, import into Excel or Google Sheets
+              </Typography>
+            </Box>
+
+            <Box
+              onClick={() => setState(prev => ({ ...prev, exportDialog: { ...prev.exportDialog, format: 'json' } }))}
+              sx={{
+                p: 2,
+                border: state.exportDialog.format === 'json' ? '2px solid' : '1px solid',
+                borderColor: state.exportDialog.format === 'json' ? 'primary.main' : 'divider',
+                borderRadius: 1,
+                cursor: 'pointer',
+                bgcolor: state.exportDialog.format === 'json' ? 'action.selected' : 'transparent',
+                '&:hover': { bgcolor: 'action.hover' }
+              }}
+            >
+              <Typography variant="subtitle1" fontWeight="medium">
+                JSON (Data)
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Structured data format for developers and integrations
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setState(prev => ({ ...prev, exportDialog: { ...prev.exportDialog, open: false } }))}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleExportSubmit}
+            variant="contained"
+            startIcon={<FileDownloadIcon />}
+            disabled={state.exportDialog.loading}
+          >
+            Export
           </Button>
         </DialogActions>
       </Dialog>
