@@ -96,9 +96,10 @@ import { useSocket } from '../contexts/SocketContext';
 import ExportDialog from '../components/projects/ExportDialog';
 import EditProjectDialog from '../components/projects/EditProjectDialog';
 import AddPhaseDialog from '../components/projects/AddPhaseDialog';
-import ReorderPhasesDialog from '../components/projects/ReorderPhasesDialog';
 import PhaseActionMenu from '../components/projects/PhaseActionMenu';
+import PhaseProgressSummary from '../components/progress/PhaseProgressSummary';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
+import EditPhaseDatesDialog from '../components/phases/EditPhaseDatesDialog';
 
 interface ProjectDetailsState {
   project: Project | null;
@@ -152,11 +153,12 @@ interface ProjectDetailsState {
   addPhaseDialog: {
     open: boolean;
   };
-  reorderPhasesDialog: {
-    open: boolean;
-  };
   archiveConfirmDialog: {
     open: boolean;
+  };
+  editPhaseDatesDialog: {
+    open: boolean;
+    phase: ProjectPhase | null;
   };
   snackbar: {
     open: boolean;
@@ -199,6 +201,11 @@ const ProjectDetailsPage: React.FC = () => {
   const urlHighlight = searchParams.get('highlight');
   const urlSection = searchParams.get('section');
   const urlFocus = searchParams.get('focus');
+
+  // Progress Management State
+  const [progressSummaryOpen, setProgressSummaryOpen] = useState(false);
+  const [selectedPhaseForProgress, setSelectedPhaseForProgress] = useState<ProjectPhase | null>(null);
+
   const [state, setState] = useState<ProjectDetailsState>({
     project: null,
     phases: [],
@@ -251,11 +258,12 @@ const ProjectDetailsPage: React.FC = () => {
     addPhaseDialog: {
       open: false
     },
-    reorderPhasesDialog: {
-      open: false
-    },
     archiveConfirmDialog: {
       open: false
+    },
+    editPhaseDatesDialog: {
+      open: false,
+      phase: null
     },
     snackbar: {
       open: false,
@@ -546,16 +554,6 @@ const ProjectDetailsPage: React.FC = () => {
 
   const handleTeamViewMode = (viewMode: 'cards' | 'table' | 'analytics') => {
     setState(prev => ({ ...prev, teamViewMode: viewMode }));
-  };
-
-  const handleExportTeamReport = async () => {
-    try {
-      const teamData = getFilteredAndSortedTeamMembers();
-      const csvContent = generateTeamReportCSV(teamData);
-      downloadCSV(csvContent, `team-report-${state.project?.name}-${new Date().toISOString().split('T')[0]}.csv`);
-    } catch (error) {
-      setState(prev => ({ ...prev, error: 'Failed to export team report' }));
-    }
   };
 
   // Early Access Handlers
@@ -913,37 +911,6 @@ const ProjectDetailsPage: React.FC = () => {
     };
   };
 
-  const generateTeamReportCSV = (teamData: any[]) => {
-    const headers = ['Name', 'Total Hours', 'Entries', 'Working Days', 'Avg Hours/Entry', 'Productivity', 'Recent Activity', 'Phases', 'Last Activity'];
-    const rows = teamData.map(member => [
-      member.name,
-      member.totalHours.toFixed(2),
-      member.entries,
-      member.workingDays,
-      member.avgHoursPerEntry.toFixed(2),
-      member.productivity.toFixed(2),
-      member.recentActivity.toFixed(2),
-      member.phases.join('; '),
-      member.lastActivity
-    ]);
-
-    return [headers, ...rows].map(row => row.join(',')).join('\n');
-  };
-
-  const downloadCSV = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  };
-
   const getPerformanceIndicator = (member: any) => {
     const avgHours = calculateTeamAnalytics().averageHoursPerDay;
     if (member.productivity > avgHours * 1.2) return { icon: TrendingUpIcon, color: 'success.main', label: 'High Performer' };
@@ -1012,9 +979,6 @@ const ProjectDetailsPage: React.FC = () => {
         </Box>
 
         <Box display="flex" gap={1}>
-          <Button variant="outlined" startIcon={<EditIcon />}>
-            Edit
-          </Button>
           <Button
             variant="outlined"
             color="error"
@@ -1178,6 +1142,27 @@ const ProjectDetailsPage: React.FC = () => {
                         <Typography variant="body2">
                           <strong>Actual End:</strong> {phase.actual_end_date ? new Date(phase.actual_end_date).toLocaleDateString() : 'Not completed'}
                         </Typography>
+                        <Typography variant="body2">
+                          <strong>Submitted Date:</strong> {(phase as any).submitted_date ? new Date((phase as any).submitted_date).toLocaleDateString() : 'Not submitted'}
+                        </Typography>
+                        <Typography variant="body2">
+                          <strong>Approved Date:</strong> {(phase as any).approved_date ? new Date((phase as any).approved_date).toLocaleDateString() : 'Not approved'}
+                        </Typography>
+                        {isSupervisor && (
+                          <Box sx={{ mt: 1 }}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<DateRangeIcon />}
+                              onClick={() => setState(prev => ({
+                                ...prev,
+                                editPhaseDatesDialog: { open: true, phase }
+                              }))}
+                            >
+                              Edit Phase Dates
+                            </Button>
+                          </Box>
+                        )}
                         {phase.early_access_granted && (
                           <>
                             <Divider sx={{ my: 1 }} />
@@ -1221,8 +1206,13 @@ const ProjectDetailsPage: React.FC = () => {
                           <strong>Actual Hours:</strong> {phase.actual_hours || 0}
                         </Typography>
                         <Typography variant="body2">
-                          <strong>Progress:</strong> {Math.round(calculatePhaseProgress(phase))}%
+                          <strong>Progress Hours:</strong> {Math.round(calculatePhaseProgress(phase))}%
                         </Typography>
+                        {phase.actual_progress !== undefined && phase.actual_progress !== null && (
+                          <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                            <strong>Actual Working Progress (Supervisor):</strong> {Math.round(phase.actual_progress)}%
+                          </Typography>
+                        )}
                         <Typography variant="body2">
                           <strong>Delay Reason:</strong> {phase.delay_reason === 'none' ? 'No delays' : phase.delay_reason}
                         </Typography>
@@ -1331,18 +1321,40 @@ const ProjectDetailsPage: React.FC = () => {
                       >
                         {phase.warning_flag ? 'Remove Warning' : 'Add Warning'}
                       </Button>
+
+                      {/* Manage Progress Button */}
+                      {isSupervisor && phase.predicted_hours && phase.predicted_hours > 0 && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="info"
+                          startIcon={<AssessmentIcon />}
+                          onClick={() => {
+                            setSelectedPhaseForProgress(phase);
+                            setProgressSummaryOpen(true);
+                          }}
+                        >
+                          Manage Progress
+                        </Button>
+                      )}
                     </Box>
 
                     {/* Progress Bar */}
                     <Box>
-                      <Typography variant="body2" gutterBottom>
-                        Phase Progress ({Math.round(calculatePhaseProgress(phase))}%)
-                      </Typography>
-
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                        <Typography variant="body2" gutterBottom sx={{ mb: 0 }}>
+                          Progress Hours: {Math.round(calculatePhaseProgress(phase))}%
+                        </Typography>
+                        {phase.actual_progress !== undefined && phase.actual_progress !== calculatePhaseProgress(phase) && (
+                          <Typography variant="body2" gutterBottom sx={{ mb: 0, fontWeight: 'bold', color: 'success.main' }}>
+                            Actual Work: {Math.round(phase.actual_progress)}%
+                          </Typography>
+                        )}
+                      </Box>
 
                       <LinearProgress
                         variant="determinate"
-                        value={calculatePhaseProgress(phase)}
+                        value={phase.actual_progress !== undefined ? phase.actual_progress : calculatePhaseProgress(phase)}
                         sx={{ height: 8, borderRadius: 4 }}
                       />
                     </Box>
@@ -1561,14 +1573,6 @@ const ProjectDetailsPage: React.FC = () => {
               </Box>
 
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<ExportIcon />}
-                  onClick={handleExportTeamReport}
-                  size="small"
-                >
-                  Export Report
-                </Button>
                 <Button
                   variant="outlined"
                   startIcon={<RefreshIcon />}
@@ -2451,13 +2455,13 @@ const ProjectDetailsPage: React.FC = () => {
                                   try {
                                     const originalPhase = state.phases.find(p => p.id === phaseId);
                                     if (originalPhase) {
-                                      const duplicateData = {
+                                      const maxOrder = Math.max(...state.phases.map(p => p.phase_order || 0));
+                                      const response = await apiService.createPhase(state.project!.id, {
                                         phase_name: `${originalPhase.phase_name} (Copy)`,
-                                        is_custom: true,
                                         planned_weeks: originalPhase.planned_weeks,
-                                        predicted_hours: originalPhase.predicted_hours
-                                      };
-                                      const response = await apiService.createPhase(state.project!.id, duplicateData);
+                                        predicted_hours: originalPhase.predicted_hours,
+                                        phase_order: maxOrder + 1
+                                      });
                                       if (response.success) {
                                         await fetchProjectDetails();
                                         setState(prev => ({
@@ -2481,40 +2485,82 @@ const ProjectDetailsPage: React.FC = () => {
                                     }));
                                   }
                                 }}
-                                onMoveUp={(phaseId) => {
-                                  const phaseIndex = state.phases.findIndex(p => p.id === phaseId);
-                                  if (phaseIndex > 0) {
-                                    const reorderedPhases = [...state.phases];
-                                    [reorderedPhases[phaseIndex], reorderedPhases[phaseIndex - 1]] =
-                                    [reorderedPhases[phaseIndex - 1], reorderedPhases[phaseIndex]];
+                                onMoveUp={async (phaseId) => {
+                                  try {
+                                    const phaseIndex = state.phases.findIndex(p => p.id === phaseId);
+                                    if (phaseIndex > 0) {
+                                      const reorderedPhases = [...state.phases];
+                                      [reorderedPhases[phaseIndex], reorderedPhases[phaseIndex - 1]] =
+                                        [reorderedPhases[phaseIndex - 1], reorderedPhases[phaseIndex]];
 
-                                    const phaseOrder = reorderedPhases.map((phase, index) => ({
-                                      phaseId: phase.id,
-                                      order: index + 1
+                                      const phaseOrder = reorderedPhases.map((p, index) => ({
+                                        phaseId: p.id,
+                                        order: index + 1
+                                      }));
+
+                                      const response = await apiService.reorderPhases(state.project!.id, phaseOrder);
+                                      if (response.success) {
+                                        await fetchProjectDetails();
+                                        setState(prev => ({
+                                          ...prev,
+                                          snackbar: {
+                                            open: true,
+                                            message: 'Phase moved up!',
+                                            severity: 'success'
+                                          }
+                                        }));
+                                      }
+                                    }
+                                  } catch (error) {
+                                    setState(prev => ({
+                                      ...prev,
+                                      snackbar: {
+                                        open: true,
+                                        message: 'Failed to move phase',
+                                        severity: 'error'
+                                      }
                                     }));
-
-                                    apiService.reorderPhases(state.project!.id, phaseOrder)
-                                      .then(() => fetchProjectDetails())
-                                      .catch(console.error);
                                   }
                                 }}
-                                onMoveDown={(phaseId) => {
-                                  const phaseIndex = state.phases.findIndex(p => p.id === phaseId);
-                                  if (phaseIndex < state.phases.length - 1) {
-                                    const reorderedPhases = [...state.phases];
-                                    [reorderedPhases[phaseIndex], reorderedPhases[phaseIndex + 1]] =
-                                    [reorderedPhases[phaseIndex + 1], reorderedPhases[phaseIndex]];
+                                onMoveDown={async (phaseId) => {
+                                  try {
+                                    const phaseIndex = state.phases.findIndex(p => p.id === phaseId);
+                                    if (phaseIndex < state.phases.length - 1) {
+                                      const reorderedPhases = [...state.phases];
+                                      [reorderedPhases[phaseIndex], reorderedPhases[phaseIndex + 1]] =
+                                        [reorderedPhases[phaseIndex + 1], reorderedPhases[phaseIndex]];
 
-                                    const phaseOrder = reorderedPhases.map((phase, index) => ({
-                                      phaseId: phase.id,
-                                      order: index + 1
+                                      const phaseOrder = reorderedPhases.map((p, index) => ({
+                                        phaseId: p.id,
+                                        order: index + 1
+                                      }));
+
+                                      const response = await apiService.reorderPhases(state.project!.id, phaseOrder);
+                                      if (response.success) {
+                                        await fetchProjectDetails();
+                                        setState(prev => ({
+                                          ...prev,
+                                          snackbar: {
+                                            open: true,
+                                            message: 'Phase moved down!',
+                                            severity: 'success'
+                                          }
+                                        }));
+                                      }
+                                    }
+                                  } catch (error) {
+                                    setState(prev => ({
+                                      ...prev,
+                                      snackbar: {
+                                        open: true,
+                                        message: 'Failed to move phase',
+                                        severity: 'error'
+                                      }
                                     }));
-
-                                    apiService.reorderPhases(state.project!.id, phaseOrder)
-                                      .then(() => fetchProjectDetails())
-                                      .catch(console.error);
                                   }
                                 }}
+                                canMoveUp={state.phases.findIndex(p => p.id === phase.id) > 0}
+                                canMoveDown={state.phases.findIndex(p => p.id === phase.id) < state.phases.length - 1}
                                 onStart={async (phaseId, note) => {
                                   try {
                                     const response = await apiService.startPhase(phaseId, note);
@@ -2565,8 +2611,6 @@ const ProjectDetailsPage: React.FC = () => {
                                     }));
                                   }
                                 }}
-                                canMoveUp={phase.phase_order > 1}
-                                canMoveDown={phase.phase_order < state.phases.length}
                               />
                             </TableCell>
                           </TableRow>
@@ -2583,13 +2627,6 @@ const ProjectDetailsPage: React.FC = () => {
                     onClick={() => setState(prev => ({ ...prev, addPhaseDialog: { open: true } }))}
                   >
                     Add Phase
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => setState(prev => ({ ...prev, reorderPhasesDialog: { open: true } }))}
-                  >
-                    Reorder Phases
                   </Button>
                 </Box>
               </CardContent>
@@ -2868,38 +2905,40 @@ const ProjectDetailsPage: React.FC = () => {
         loading={state.loading}
       />
 
-      <ReorderPhasesDialog
-        open={state.reorderPhasesDialog.open}
-        onClose={() => setState(prev => ({ ...prev, reorderPhasesDialog: { open: false } }))}
-        onSave={async (reorderedPhases) => {
-          try {
-            const response = await apiService.reorderPhases(state.project!.id, reorderedPhases);
-            if (response.success) {
-              await fetchProjectDetails();
-              setState(prev => ({
-                ...prev,
-                snackbar: {
-                  open: true,
-                  message: 'Phase order updated successfully!',
-                  severity: 'success'
-                }
-              }));
-            }
-          } catch (error) {
-            setState(prev => ({
-              ...prev,
-              snackbar: {
-                open: true,
-                message: 'Failed to reorder phases',
-                severity: 'error'
-              }
-            }));
-          }
-        }}
-        phases={state.phases}
-        loading={state.loading}
-      />
+      {/* Progress Summary Dialog */}
+      {selectedPhaseForProgress && (
+        <PhaseProgressSummary
+          open={progressSummaryOpen}
+          onClose={() => {
+            setProgressSummaryOpen(false);
+            setSelectedPhaseForProgress(null);
+          }}
+          phaseId={selectedPhaseForProgress.id}
+          phaseName={selectedPhaseForProgress.phase_name}
+          predictedHours={selectedPhaseForProgress.predicted_hours || 0}
+          isSupervisor={isSupervisor}
+          onProgressUpdated={fetchProjectDetails}
+        />
+      )}
 
+      {/* Edit Phase Dates Dialog */}
+      <EditPhaseDatesDialog
+        open={state.editPhaseDatesDialog.open}
+        phase={state.editPhaseDatesDialog.phase}
+        onClose={() => setState(prev => ({ ...prev, editPhaseDatesDialog: { open: false, phase: null } }))}
+        onSuccess={() => {
+          fetchProjectDetails();
+          setState(prev => ({
+            ...prev,
+            editPhaseDatesDialog: { open: false, phase: null },
+            snackbar: {
+              open: true,
+              message: 'Phase dates updated successfully!',
+              severity: 'success'
+            }
+          }));
+        }}
+      />
 
       {/* Early Access Notifications Snackbar */}
       <Snackbar
