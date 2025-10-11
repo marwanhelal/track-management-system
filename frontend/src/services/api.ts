@@ -398,6 +398,11 @@ class ApiService {
     return response.data;
   }
 
+  async reorderPhases(projectId: number, phaseOrder: { phaseId: number; order: number }[]): Promise<ApiResponse> {
+    const response = await this.api.put(`/phases/project/${projectId}/reorder`, { phaseOrder });
+    return response.data;
+  }
+
   // Team Analytics & Reports
   async getTeamAnalytics(projectId?: number, filters?: any): Promise<ApiResponse<any>> {
     const params = new URLSearchParams();
