@@ -78,7 +78,8 @@
       "WebSearch",
       "Bash(ls:*)",
       "Bash(git mv:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe\" -h localhost -p 5432 -U postgres -d track_management -c \"SELECT id, name, description, typical_duration_weeks, display_order FROM predefined_phases WHERE is_active = true ORDER BY display_order;\")"
     ],
     "deny": [],
     "ask": []

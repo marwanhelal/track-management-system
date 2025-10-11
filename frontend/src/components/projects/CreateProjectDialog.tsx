@@ -52,9 +52,13 @@ const CreateProjectDialog = ({
     try {
       const response = await apiService.getPredefinedPhases();
       if (response.success && response.data) {
-        setPredefinedPhases(response.data.phases);
+        // Remove duplicates by name (keep first occurrence)
+        const uniquePhases = response.data.phases.filter((phase, index, self) =>
+          index === self.findIndex((p) => p.name === phase.name)
+        );
+        setPredefinedPhases(uniquePhases);
         // Pre-select all phases with default values
-        const defaultPhases = response.data.phases.map(phase => ({
+        const defaultPhases = uniquePhases.map(phase => ({
           phase_name: phase.name,
           is_custom: false,
           planned_weeks: phase.typical_duration_weeks,
