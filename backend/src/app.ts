@@ -46,9 +46,32 @@ class App {
     // Trust proxy for rate limiting behind reverse proxy (Coolify)
     this.app.set('trust proxy', 1);
 
-    // Security middleware
+    // Security middleware - Enhanced security headers
     this.app.use(helmet({
-      crossOriginResourcePolicy: { policy: 'cross-origin' }
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          connectSrc: ["'self'"],
+          fontSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          mediaSrc: ["'self'"],
+          frameSrc: ["'none'"],
+        },
+      },
+      crossOriginEmbedderPolicy: false, // Allow embedding resources from different origins
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      hsts: {
+        maxAge: 31536000, // 1 year
+        includeSubDomains: true,
+        preload: true
+      },
+      noSniff: true,
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      xssFilter: true,
+      hidePoweredBy: true,
     }));
 
     // CORS configuration
