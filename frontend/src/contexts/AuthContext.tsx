@@ -36,12 +36,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize auth state from localStorage
+  // Initialize auth state from sessionStorage (clears on browser close)
   useEffect(() => {
     const initializeAuth = () => {
       try {
-        const accessToken = localStorage.getItem('accessToken');
-        const storedUser = localStorage.getItem('user');
+        const accessToken = sessionStorage.getItem('accessToken');
+        const storedUser = sessionStorage.getItem('user');
 
         if (accessToken && storedUser) {
           setUser(JSON.parse(storedUser));
@@ -49,9 +49,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } catch (error) {
         console.error('Error initializing auth:', error);
         // Clear corrupted data
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
+        sessionStorage.removeItem('accessToken');
+        sessionStorage.removeItem('refreshToken');
+        sessionStorage.removeItem('user');
       } finally {
         setLoading(false);
       }
@@ -70,10 +70,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.success && response.data) {
         const { user: userData, tokens } = response.data;
 
-        // Store tokens and user data
-        localStorage.setItem('accessToken', tokens.accessToken);
-        localStorage.setItem('refreshToken', tokens.refreshToken);
-        localStorage.setItem('user', JSON.stringify(userData));
+        // Store tokens and user data in sessionStorage (clears on browser close for security)
+        sessionStorage.setItem('accessToken', tokens.accessToken);
+        sessionStorage.setItem('refreshToken', tokens.refreshToken);
+        sessionStorage.setItem('user', JSON.stringify(userData));
 
         setUser(userData);
         return true;
@@ -100,10 +100,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.success && response.data) {
         const { user: newUser, tokens } = response.data;
 
-        // Store tokens and user data
-        localStorage.setItem('accessToken', tokens.accessToken);
-        localStorage.setItem('refreshToken', tokens.refreshToken);
-        localStorage.setItem('user', JSON.stringify(newUser));
+        // Store tokens and user data in sessionStorage (clears on browser close for security)
+        sessionStorage.setItem('accessToken', tokens.accessToken);
+        sessionStorage.setItem('refreshToken', tokens.refreshToken);
+        sessionStorage.setItem('user', JSON.stringify(newUser));
 
         setUser(newUser);
         return true;
@@ -127,10 +127,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear user state and tokens from localStorage
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      // Clear user state and tokens from sessionStorage
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('refreshToken');
+      sessionStorage.removeItem('user');
 
       setUser(null);
       setError(null);
@@ -146,7 +146,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const updateUser = (userData: User) => {
     setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
+    sessionStorage.setItem('user', JSON.stringify(userData));
   };
 
   const value: AuthContextType = {

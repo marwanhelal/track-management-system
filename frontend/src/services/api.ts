@@ -47,7 +47,7 @@ class ApiService {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
       (config: any) => {
-        const token = localStorage.getItem('accessToken');
+        const token = sessionStorage.getItem('accessToken');
         if (token) {
           if (!config.headers) {
             config.headers = {};
@@ -70,7 +70,7 @@ class ApiService {
           originalRequest._retry = true;
 
           try {
-            const refreshToken = localStorage.getItem('refreshToken');
+            const refreshToken = sessionStorage.getItem('refreshToken');
             if (refreshToken) {
               // Mark this as a refresh request to prevent recursion
               const refreshResponse = await axios.post(`${this.baseURL}/auth/refresh`,
@@ -86,9 +86,9 @@ class ApiService {
                 const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data.data.tokens;
 
                 // Update stored tokens
-                localStorage.setItem('accessToken', accessToken);
+                sessionStorage.setItem('accessToken', accessToken);
                 if (newRefreshToken) {
-                  localStorage.setItem('refreshToken', newRefreshToken);
+                  sessionStorage.setItem('refreshToken', newRefreshToken);
                 }
 
                 // Retry original request with new token
@@ -135,9 +135,9 @@ class ApiService {
     } catch (error) {
       // Continue with logout even if API call fails
     } finally {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('refreshToken');
+      sessionStorage.removeItem('user');
     }
   }
 
@@ -310,7 +310,7 @@ class ApiService {
 
   // Check if current user is super admin
   isSuperAdmin(): boolean {
-    const userStr = localStorage.getItem('user');
+    const userStr = sessionStorage.getItem('user');
     if (!userStr) return false;
 
     try {

@@ -76,7 +76,7 @@ class SmartWarningService {
    * Get authorization headers with JWT token
    */
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('accessToken');
+    const token = sessionStorage.getItem('accessToken');
     return {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
