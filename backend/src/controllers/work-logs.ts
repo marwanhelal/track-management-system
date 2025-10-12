@@ -415,14 +415,14 @@ export const updateWorkLog = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// Delete work log - Soft delete with tracking
+// Delete work log - Permanent hard delete
 export const deleteWorkLog = async (req: Request, res: Response): Promise<void> => {
   const authReq = req as any;
   try {
     const { id } = req.params;
     const { delete_note } = req.body;
 
-    // Check if work log exists and is not already deleted
+    // Check if work log exists
     const existingLogResult = await query(
       'SELECT * FROM work_logs WHERE id = $1 AND deleted_at IS NULL',
       [id]
@@ -431,7 +431,7 @@ export const deleteWorkLog = async (req: Request, res: Response): Promise<void> 
     if (existingLogResult.rows.length === 0) {
       res.status(404).json({
         success: false,
-        error: 'Work log not found or already deleted'
+        error: 'Work log not found'
       });
       return;
     }
@@ -447,21 +447,21 @@ export const deleteWorkLog = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Soft delete the work log
-    await query(`
-      UPDATE work_logs
-      SET deleted_at = NOW(),
-          deleted_by = $1,
-          delete_note = $2,
-          updated_at = NOW()
-      WHERE id = $3
-    `, [authReq.user.id, delete_note || 'Deleted by user', id]);
-
-    // Log audit event
+    // Log audit event BEFORE deleting (important for audit trail)
     await query(
-      'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',
-      ['work_logs', id, 'DELETE', authReq.user.id, `Work log soft-deleted: ${existingLog.hours} hours on ${existingLog.date}. Reason: ${delete_note || 'No reason provided'}`]
+      'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note, old_values) VALUES ($1, $2, $3, $4, $5, $6)',
+      [
+        'work_logs',
+        id,
+        'DELETE',
+        authReq.user.id,
+        `Work log permanently deleted: ${existingLog.hours} hours on ${existingLog.date}. Reason: ${delete_note || 'No reason provided'}`,
+        JSON.stringify(existingLog)
+      ]
     );
+
+    // HARD DELETE - Permanently remove from database
+    await query('DELETE FROM work_logs WHERE id = $1', [id]);
 
     // Emit Socket.IO event for real-time updates
     try {
@@ -479,7 +479,7 @@ export const deleteWorkLog = async (req: Request, res: Response): Promise<void> 
 
     const response: ApiResponse = {
       success: true,
-      message: 'Work log deleted successfully'
+      message: 'Work log deleted permanently'
     };
 
     res.status(200).json(response);

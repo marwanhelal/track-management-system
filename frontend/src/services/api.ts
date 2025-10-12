@@ -260,8 +260,10 @@ class ApiService {
     return response.data;
   }
 
-  async deleteWorkLog(id: number): Promise<ApiResponse> {
-    const response = await this.api.delete(`/work-logs/${id}`);
+  async deleteWorkLog(id: number, delete_note?: string): Promise<ApiResponse> {
+    const response = await this.api.delete(`/work-logs/${id}`, {
+      data: { delete_note }
+    });
     return response.data;
   }
 

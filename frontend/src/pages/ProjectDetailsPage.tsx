@@ -100,6 +100,8 @@ import PhaseActionMenu from '../components/projects/PhaseActionMenu';
 import PhaseProgressSummary from '../components/progress/PhaseProgressSummary';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import EditPhaseDatesDialog from '../components/phases/EditPhaseDatesDialog';
+import EditWorkLogDialog from '../components/work-logs/EditWorkLogDialog';
+import DeleteWorkLogDialog from '../components/work-logs/DeleteWorkLogDialog';
 
 interface ProjectDetailsState {
   project: Project | null;
@@ -164,6 +166,14 @@ interface ProjectDetailsState {
     open: boolean;
     message: string;
     severity: 'success' | 'warning' | 'info' | 'error';
+  };
+  editWorkLogDialog: {
+    open: boolean;
+    workLog: WorkLog | null;
+  };
+  deleteWorkLogDialog: {
+    open: boolean;
+    workLog: WorkLog | null;
   };
 }
 
@@ -269,6 +279,14 @@ const ProjectDetailsPage: React.FC = () => {
       open: false,
       message: '',
       severity: 'info'
+    },
+    editWorkLogDialog: {
+      open: false,
+      workLog: null
+    },
+    deleteWorkLogDialog: {
+      open: false,
+      workLog: null
     }
   });
 
@@ -735,6 +753,106 @@ const ProjectDetailsPage: React.FC = () => {
     }
   };
 
+  // Work Log Handlers
+  const handleEditWorkLog = (workLog: WorkLog) => {
+    setState(prev => ({
+      ...prev,
+      editWorkLogDialog: {
+        open: true,
+        workLog
+      }
+    }));
+  };
+
+  const handleDeleteWorkLog = (workLog: WorkLog) => {
+    setState(prev => ({
+      ...prev,
+      deleteWorkLogDialog: {
+        open: true,
+        workLog
+      }
+    }));
+  };
+
+  const handleSaveWorkLog = async (id: number, updateData: { hours: number; description: string; date: string }) => {
+    try {
+      const response = await apiService.updateWorkLog(id, updateData);
+
+      if (response.success) {
+        setState(prev => ({
+          ...prev,
+          snackbar: {
+            open: true,
+            message: 'Work log updated successfully',
+            severity: 'success'
+          }
+        }));
+        await fetchProjectDetails();
+      } else {
+        throw new Error(response.error || 'Failed to update work log');
+      }
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        snackbar: {
+          open: true,
+          message: error.response?.data?.error || 'Failed to update work log',
+          severity: 'error'
+        }
+      }));
+      throw error;
+    }
+  };
+
+  const handleConfirmDeleteWorkLog = async (id: number, delete_note?: string) => {
+    try {
+      const response = await apiService.deleteWorkLog(id, delete_note);
+
+      if (response.success) {
+        setState(prev => ({
+          ...prev,
+          snackbar: {
+            open: true,
+            message: 'Work log deleted successfully',
+            severity: 'success'
+          }
+        }));
+        await fetchProjectDetails();
+      } else {
+        throw new Error(response.error || 'Failed to delete work log');
+      }
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        snackbar: {
+          open: true,
+          message: error.response?.data?.error || 'Failed to delete work log',
+          severity: 'error'
+        }
+      }));
+      throw error;
+    }
+  };
+
+  const handleCloseEditWorkLogDialog = () => {
+    setState(prev => ({
+      ...prev,
+      editWorkLogDialog: {
+        open: false,
+        workLog: null
+      }
+    }));
+  };
+
+  const handleCloseDeleteWorkLogDialog = () => {
+    setState(prev => ({
+      ...prev,
+      deleteWorkLogDialog: {
+        open: false,
+        workLog: null
+      }
+    }));
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -1518,9 +1636,29 @@ const ProjectDetailsPage: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Box display="flex" gap={1}>
-                        <IconButton size="small" title="Edit work log">
-                          <EditIcon fontSize="small" />
-                        </IconButton>
+                        {/* Supervisors can edit any log */}
+                        {isSupervisor && (
+                          <>
+                            <Tooltip title="Edit work log">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleEditWorkLog(log)}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete work log permanently">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteWorkLog(log)}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
                         {!log.supervisor_approved && (
                           <IconButton
                             size="small"
@@ -2828,6 +2966,22 @@ const ProjectDetailsPage: React.FC = () => {
             }
           }));
         }}
+      />
+
+      {/* Edit Work Log Dialog */}
+      <EditWorkLogDialog
+        open={state.editWorkLogDialog.open}
+        onClose={handleCloseEditWorkLogDialog}
+        workLog={state.editWorkLogDialog.workLog}
+        onSave={handleSaveWorkLog}
+      />
+
+      {/* Delete Work Log Confirmation Dialog */}
+      <DeleteWorkLogDialog
+        open={state.deleteWorkLogDialog.open}
+        onClose={handleCloseDeleteWorkLogDialog}
+        workLog={state.deleteWorkLogDialog.workLog}
+        onDelete={handleConfirmDeleteWorkLog}
       />
 
       {/* Early Access Notifications Snackbar */}
