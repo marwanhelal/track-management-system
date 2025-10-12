@@ -95,7 +95,7 @@ class App {
     // Global rate limiting
     const globalLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 100, // Limit each IP to 100 requests per windowMs
+      max: 300, // Limit each IP to 300 requests per windowMs (increased for active usage)
       message: 'Too many requests from this IP, please try again later',
       standardHeaders: true,
       legacyHeaders: false,
@@ -162,7 +162,7 @@ class App {
     // Strict rate limiting for authentication endpoints
     const authLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 5, // Limit each IP to 5 login attempts per 15 minutes
+      max: 12, // Limit each IP to 12 login attempts per 15 minutes
       message: 'Too many login attempts from this IP, please try again after 15 minutes',
       standardHeaders: true,
       legacyHeaders: false,
