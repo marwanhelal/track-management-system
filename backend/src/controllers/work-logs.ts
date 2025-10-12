@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { query, transaction } from '@/database/connection';
 import { ApiResponse, WorkLog, WorkLogCreateInput } from '@/types';
+import app from '@/app';
 
 // Get work logs for a specific phase
 export const getPhaseWorkLogs = async (req: Request, res: Response): Promise<void> => {
@@ -15,19 +16,21 @@ export const getPhaseWorkLogs = async (req: Request, res: Response): Promise<voi
         wl.*,
         u.name as engineer_name,
         pp.phase_name,
-        p.name as project_name
+        p.name as project_name,
+        editor.name as last_edited_by_name
       FROM work_logs wl
       JOIN users u ON wl.engineer_id = u.id
       JOIN project_phases pp ON wl.phase_id = pp.id
       JOIN projects p ON pp.project_id = p.id
-      WHERE wl.phase_id = $1
+      LEFT JOIN users editor ON wl.last_edited_by = editor.id
+      WHERE wl.phase_id = $1 AND wl.deleted_at IS NULL
       ORDER BY wl.date DESC, wl.created_at DESC
       LIMIT $2 OFFSET $3
     `, [phaseId, limit, offset]);
 
-    // Get total count for pagination
+    // Get total count for pagination (exclude soft-deleted)
     const countResult = await query(
-      'SELECT COUNT(*) FROM work_logs WHERE phase_id = $1',
+      'SELECT COUNT(*) FROM work_logs WHERE phase_id = $1 AND deleted_at IS NULL',
       [phaseId]
     );
 
@@ -103,23 +106,28 @@ export const getEngineerWorkLogs = async (req: Request, res: Response): Promise<
     const offset = (Number(page) - 1) * Number(limit);
     params.push(limit, offset);
 
+    // Add deleted_at filter
+    whereConditions.push('wl.deleted_at IS NULL');
+
     const result = await query(`
       SELECT
         wl.*,
         u.name as engineer_name,
         pp.phase_name,
         p.name as project_name,
-        p.id as project_id
+        p.id as project_id,
+        editor.name as last_edited_by_name
       FROM work_logs wl
       JOIN users u ON wl.engineer_id = u.id
       JOIN project_phases pp ON wl.phase_id = pp.id
       JOIN projects p ON pp.project_id = p.id
+      LEFT JOIN users editor ON wl.last_edited_by = editor.id
       WHERE ${whereConditions.join(' AND ')}
       ORDER BY wl.date DESC, wl.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `, params);
 
-    // Get total count
+    // Get total count (exclude soft-deleted)
     const countResult = await query(`
       SELECT COUNT(*)
       FROM work_logs wl
@@ -287,16 +295,16 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// Update work log
+// Update work log - Enhanced with edit tracking
 export const updateWorkLog = async (req: Request, res: Response): Promise<void> => {
   const authReq = req as any;
   try {
     const { id } = req.params;
     const { hours, description, date } = req.body;
 
-    // Check if work log exists
+    // Check if work log exists and is not deleted
     const existingLogResult = await query(
-      'SELECT * FROM work_logs WHERE id = $1',
+      'SELECT * FROM work_logs WHERE id = $1 AND deleted_at IS NULL',
       [id]
     );
 
@@ -352,7 +360,13 @@ export const updateWorkLog = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Add updated_at timestamp
+    // Add edit tracking fields
+    updateFields.push(`last_edited_at = NOW()`);
+    updateFields.push(`last_edited_by = $${paramIndex}`);
+    updateValues.push(authReq.user.id);
+    paramIndex++;
+
+    updateFields.push(`edit_count = COALESCE(edit_count, 0) + 1`);
     updateFields.push('updated_at = NOW()');
     updateValues.push(id);
 
@@ -371,6 +385,20 @@ export const updateWorkLog = async (req: Request, res: Response): Promise<void> 
       ['work_logs', id, 'UPDATE', authReq.user.id, `Work log updated: ${Object.keys(req.body).join(', ')}`]
     );
 
+    // Emit Socket.IO event for real-time updates
+    try {
+      app.emitToProject(existingLog.project_id, 'work_log_updated', {
+        workLogId: id,
+        phaseId: existingLog.phase_id,
+        projectId: existingLog.project_id,
+        updatedBy: authReq.user.name,
+        updatedFields: Object.keys(req.body)
+      });
+    } catch (socketError) {
+      console.error('Socket.IO emit error:', socketError);
+      // Continue even if socket fails
+    }
+
     const response: ApiResponse<{ workLog: WorkLog }> = {
       success: true,
       message: 'Work log updated successfully',
@@ -387,22 +415,23 @@ export const updateWorkLog = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// Delete work log
+// Delete work log - Soft delete with tracking
 export const deleteWorkLog = async (req: Request, res: Response): Promise<void> => {
   const authReq = req as any;
   try {
     const { id } = req.params;
+    const { delete_note } = req.body;
 
-    // Check if work log exists
+    // Check if work log exists and is not already deleted
     const existingLogResult = await query(
-      'SELECT * FROM work_logs WHERE id = $1',
+      'SELECT * FROM work_logs WHERE id = $1 AND deleted_at IS NULL',
       [id]
     );
 
     if (existingLogResult.rows.length === 0) {
       res.status(404).json({
         success: false,
-        error: 'Work log not found'
+        error: 'Work log not found or already deleted'
       });
       return;
     }
@@ -418,14 +447,35 @@ export const deleteWorkLog = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Delete the work log
-    await query('DELETE FROM work_logs WHERE id = $1', [id]);
+    // Soft delete the work log
+    await query(`
+      UPDATE work_logs
+      SET deleted_at = NOW(),
+          deleted_by = $1,
+          delete_note = $2,
+          updated_at = NOW()
+      WHERE id = $3
+    `, [authReq.user.id, delete_note || 'Deleted by user', id]);
 
     // Log audit event
     await query(
       'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',
-      ['work_logs', id, 'DELETE', authReq.user.id, `Work log deleted: ${existingLog.hours} hours on ${existingLog.date}`]
+      ['work_logs', id, 'DELETE', authReq.user.id, `Work log soft-deleted: ${existingLog.hours} hours on ${existingLog.date}. Reason: ${delete_note || 'No reason provided'}`]
     );
+
+    // Emit Socket.IO event for real-time updates
+    try {
+      app.emitToProject(existingLog.project_id, 'work_log_deleted', {
+        workLogId: id,
+        phaseId: existingLog.phase_id,
+        projectId: existingLog.project_id,
+        deletedBy: authReq.user.name,
+        hours: existingLog.hours
+      });
+    } catch (socketError) {
+      console.error('Socket.IO emit error:', socketError);
+      // Continue even if socket fails
+    }
 
     const response: ApiResponse = {
       success: true,
@@ -662,6 +712,61 @@ export const createWorkLogAdmin = async (req: Request, res: Response): Promise<v
     res.status(201).json(response);
   } catch (error) {
     console.error('Create work log admin error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+};
+
+// Get work log history - Shows all edits and deletions
+export const getWorkLogHistory = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const { id } = req.params;
+
+    // Check if work log exists
+    const workLogResult = await query(
+      'SELECT wl.*, u.name as engineer_name FROM work_logs wl JOIN users u ON wl.engineer_id = u.id WHERE wl.id = $1',
+      [id]
+    );
+
+    if (workLogResult.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: 'Work log not found'
+      });
+      return;
+    }
+
+    const workLog = workLogResult.rows[0];
+
+    // Get history from work_log_history table
+    const historyResult = await query(`
+      SELECT
+        wlh.*,
+        u.name as changed_by_name,
+        u.role as changed_by_role
+      FROM work_log_history wlh
+      JOIN users u ON wlh.changed_by = u.id
+      WHERE wlh.work_log_id = $1
+      ORDER BY wlh.changed_at DESC
+    `, [id]);
+
+    const response: ApiResponse<{
+      workLog: any;
+      history: any[];
+    }> = {
+      success: true,
+      data: {
+        workLog,
+        history: historyResult.rows
+      }
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Get work log history error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'

@@ -6,7 +6,8 @@ import {
   createWorkLogAdmin,
   updateWorkLog,
   deleteWorkLog,
-  getWorkLogsSummary
+  getWorkLogsSummary,
+  getWorkLogHistory
 } from '@/controllers/work-logs';
 import { authenticate, canAccessProject, supervisorOnly } from '@/middleware/auth';
 import { validateIdParam, validateWorkLogCreation, validateWorkLogUpdate } from '@/utils/validation';
@@ -30,6 +31,9 @@ router.post('/', validateWorkLogCreation, createWorkLog);
 
 // Admin endpoint for creating work logs with specified engineer (for historical imports)
 router.post('/admin', supervisorOnly, createWorkLogAdmin);
+
+// Get work log history
+router.get('/:id/history', validateIdParam, getWorkLogHistory);
 
 // Update work log
 router.put('/:id', validateIdParam, validateWorkLogUpdate, updateWorkLog);
