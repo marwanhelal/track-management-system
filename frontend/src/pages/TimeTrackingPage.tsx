@@ -82,6 +82,8 @@ const TimeTrackingPage: React.FC = () => {
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<WorkLog | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [logToDelete, setLogToDelete] = useState<number | null>(null);
 
   // Timer states
   const [timerSession, setTimerSession] = useState<TimerSession | null>(null);
@@ -239,17 +241,26 @@ const TimeTrackingPage: React.FC = () => {
     }
   };
 
-  const handleDeleteWorkLog = async (logId: number) => {
-    if (!window.confirm('Are you sure you want to delete this work log?')) return;
+  const openDeleteDialog = (logId: number) => {
+    setLogToDelete(logId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteWorkLog = async () => {
+    if (!logToDelete) return;
 
     try {
-      const response = await apiService.deleteWorkLog(logId);
+      const response = await apiService.deleteWorkLog(logToDelete);
       if (response.success) {
         setSuccess('Work log deleted successfully');
+        setDeleteDialogOpen(false);
+        setLogToDelete(null);
         fetchData();
       }
     } catch (err: any) {
       setError(err.message || 'Failed to delete work log');
+      setDeleteDialogOpen(false);
+      setLogToDelete(null);
     }
   };
 
@@ -572,7 +583,7 @@ const TimeTrackingPage: React.FC = () => {
                         </IconButton>
                         <IconButton
                           size="small"
-                          onClick={() => handleDeleteWorkLog(log.id)}
+                          onClick={() => openDeleteDialog(log.id)}
                           color="error"
                         >
                           <DeleteIcon />
@@ -649,6 +660,39 @@ const TimeTrackingPage: React.FC = () => {
               variant="contained"
             >
               {editingLog ? 'Update' : 'Create'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>
+            Confirm Delete
+          </DialogTitle>
+          <DialogContent>
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              This action cannot be undone!
+            </Alert>
+            <Typography>
+              Are you sure you want to delete this work log?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteWorkLog}
+              variant="contained"
+              color="error"
+              startIcon={<DeleteIcon />}
+            >
+              Delete
             </Button>
           </DialogActions>
         </Dialog>
