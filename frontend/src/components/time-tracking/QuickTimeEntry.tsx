@@ -106,8 +106,8 @@ const QuickTimeEntry = ({ onSuccess }: QuickTimeEntryProps) => {
     }
 
     const hoursNum = parseFloat(hours);
-    if (isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 24) {
-      setError('Hours must be between 0.25 and 24');
+    if (isNaN(hoursNum) || hoursNum <= 0) {
+      setError('Hours must be greater than 0');
       return;
     }
 
@@ -244,10 +244,9 @@ const QuickTimeEntry = ({ onSuccess }: QuickTimeEntryProps) => {
                   disabled={loading}
                   inputProps={{
                     min: 0.25,
-                    max: 24,
                     step: 0.25
                   }}
-                  helperText="Between 0.25 and 24 hours"
+                  helperText="Minimum 0.25 hours (no upper limit for catch-up logging)"
                 />
               </Box>
 

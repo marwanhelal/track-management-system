@@ -76,7 +76,7 @@ CREATE TABLE work_logs (
     phase_id INTEGER NOT NULL REFERENCES project_phases(id) ON DELETE CASCADE,
     engineer_id INTEGER NOT NULL REFERENCES users(id),
     date DATE NOT NULL DEFAULT CURRENT_DATE,
-    hours DECIMAL(4,2) NOT NULL CHECK (hours > 0 AND hours <= 24),
+    hours DECIMAL(10,2) NOT NULL CHECK (hours > 0),
     description TEXT,
     supervisor_approved BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT NOW(),
@@ -199,5 +199,5 @@ COMMENT ON TABLE project_settings IS 'Per-project configuration settings';
 
 COMMENT ON COLUMN project_phases.status IS 'Workflow status: not_started -> ready -> in_progress -> submitted -> approved -> completed';
 COMMENT ON COLUMN project_phases.delay_reason IS 'Delay attribution: none, client, company';
-COMMENT ON COLUMN work_logs.hours IS 'Hours worked (max 24 per day)';
+COMMENT ON COLUMN work_logs.hours IS 'Hours worked - for regular entries max 24/day recommended, for historical imports cumulative hours allowed';
 COMMENT ON COLUMN projects.status IS 'Overall project status: active, on_hold, completed, cancelled';

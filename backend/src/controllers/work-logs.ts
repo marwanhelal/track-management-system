@@ -197,11 +197,11 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Validate hours (positive number, max 24 hours per day)
-    if (hours <= 0 || hours > 24) {
+    // Validate hours (positive number, no upper limit to allow catch-up logging)
+    if (hours <= 0) {
       res.status(400).json({
         success: false,
-        error: 'Hours must be between 0 and 24'
+        error: 'Hours must be greater than 0'
       });
       return;
     }
@@ -218,14 +218,6 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
       // Update existing log by adding hours
       const existingLog = existingLogResult.rows[0];
       const newTotalHours = parseFloat(existingLog.hours) + hours;
-
-      if (newTotalHours > 24) {
-        res.status(400).json({
-          success: false,
-          error: `Total hours for this date would exceed 24 hours (current: ${parseFloat(existingLog.hours)}, adding: ${hours})`
-        });
-        return;
-      }
 
       const updateResult = await query(`
         UPDATE work_logs
@@ -328,10 +320,10 @@ export const updateWorkLog = async (req: Request, res: Response): Promise<void> 
     }
 
     // Validate hours if provided
-    if (hours !== undefined && (hours <= 0 || hours > 24)) {
+    if (hours !== undefined && hours <= 0) {
       res.status(400).json({
         success: false,
-        error: 'Hours must be between 0 and 24'
+        error: 'Hours must be greater than 0'
       });
       return;
     }

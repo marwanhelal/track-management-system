@@ -96,7 +96,7 @@ CREATE TABLE work_logs (
     phase_id INTEGER NOT NULL REFERENCES project_phases(id) ON DELETE CASCADE,
     engineer_id INTEGER NOT NULL REFERENCES users(id),
     date DATE NOT NULL DEFAULT CURRENT_DATE,
-    hours DECIMAL(4,2) NOT NULL CHECK (hours > 0 AND hours <= 24),
+    hours DECIMAL(10,2) NOT NULL CHECK (hours > 0),
     description TEXT,
     supervisor_approved BOOLEAN DEFAULT false,
     -- Progress tracking columns (migration 003)
@@ -423,7 +423,7 @@ COMMENT ON COLUMN project_phases.actual_progress IS 'Actual progress (manual ove
 COMMENT ON COLUMN project_phases.progress_variance IS 'Difference between actual and calculated progress';
 COMMENT ON COLUMN project_phases.submitted_date IS 'Date when the phase was submitted to the client for review';
 COMMENT ON COLUMN project_phases.approved_date IS 'Date when the client approved the phase';
-COMMENT ON COLUMN work_logs.hours IS 'Hours worked (max 24 per day)';
+COMMENT ON COLUMN work_logs.hours IS 'Hours worked - for regular entries max 24/day recommended, for historical imports cumulative hours allowed';
 COMMENT ON COLUMN work_logs.manual_progress_percentage IS 'Manual progress override for this work log entry';
 COMMENT ON COLUMN work_logs.progress_notes IS 'Reason for progress adjustment';
 COMMENT ON COLUMN progress_adjustments.adjustment_type IS 'Type of adjustment: work_log_entry (per log) or phase_overall (entire phase)';
