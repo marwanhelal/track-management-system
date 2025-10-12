@@ -141,7 +141,12 @@ const TimeTrackingPage: React.FC = () => {
           }
         }
       }
-      setPhases(allPhases);
+
+      // Filter to only show phases that engineers can work on (unlocked phases)
+      const workablePhases = allPhases.filter(phase =>
+        ['ready', 'in_progress', 'submitted'].includes(phase.status)
+      );
+      setPhases(workablePhases);
 
     } catch (err: any) {
       setError(err.message || 'Failed to fetch data');
@@ -175,8 +180,8 @@ const TimeTrackingPage: React.FC = () => {
       }
 
       const hours = parseFloat(formData.hours);
-      if (isNaN(hours) || hours <= 0 || hours > 24) {
-        setError('Hours must be a valid number between 0 and 24');
+      if (isNaN(hours) || hours <= 0) {
+        setError('Hours must be greater than 0');
         return;
       }
 
@@ -209,8 +214,8 @@ const TimeTrackingPage: React.FC = () => {
       }
 
       const hours = parseFloat(formData.hours);
-      if (isNaN(hours) || hours <= 0 || hours > 24) {
-        setError('Hours must be a valid number between 0 and 24');
+      if (isNaN(hours) || hours <= 0) {
+        setError('Hours must be greater than 0');
         return;
       }
 
@@ -603,8 +608,8 @@ const TimeTrackingPage: React.FC = () => {
                   type="number"
                   value={formData.hours}
                   onChange={(e) => setFormData(prev => ({ ...prev, hours: e.target.value }))}
-                  inputProps={{ min: 0, max: 24, step: 0.25 }}
-                  helperText="Enter hours worked (0.25 = 15 minutes)"
+                  inputProps={{ min: 0.25, step: 0.25 }}
+                  helperText="Minimum 0.25 hours (no upper limit for catch-up logging)"
                 />
               </Grid>
               <Grid item xs={12}>
