@@ -27,13 +27,14 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Autocomplete,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { Add, Remove, Delete, CheckCircle } from '@mui/icons-material';
 import dayjs, { Dayjs } from 'dayjs';
-import { Project, User } from '../../types';
+import { Project, User, PredefinedPhase } from '../../types';
 import apiService from '../../services/api';
 
 interface ImportHistoricalProjectDialogProps {
@@ -73,6 +74,7 @@ const ImportHistoricalProjectDialog = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [engineers, setEngineers] = useState<User[]>([]);
+  const [predefinedPhases, setPredefinedPhases] = useState<PredefinedPhase[]>([]);
 
   // Step 1: Project Details
   const [projectName, setProjectName] = useState('');
@@ -97,6 +99,7 @@ const ImportHistoricalProjectDialog = ({
   useEffect(() => {
     if (open) {
       loadEngineers();
+      loadPredefinedPhases();
     }
   }, [open]);
 
@@ -109,6 +112,21 @@ const ImportHistoricalProjectDialog = ({
       }
     } catch (error: any) {
       setError(error.message || 'Failed to load engineers');
+    }
+  };
+
+  const loadPredefinedPhases = async () => {
+    try {
+      const response = await apiService.getPredefinedPhases();
+      if (response.success && response.data) {
+        // Remove duplicates by name
+        const uniquePhases = response.data.phases.filter((phase, index, self) =>
+          index === self.findIndex((p) => p.name === phase.name)
+        );
+        setPredefinedPhases(uniquePhases);
+      }
+    } catch (error: any) {
+      console.error('Failed to load predefined phases:', error);
     }
   };
 
@@ -415,14 +433,34 @@ const ImportHistoricalProjectDialog = ({
 
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
-              <TextField
+              <Autocomplete
+                freeSolo
                 fullWidth
-                required
-                label="Phase Name"
+                options={predefinedPhases.map((p) => p.name)}
                 value={phase.phase_name}
-                onChange={(e) => handlePhaseUpdate(index, 'phase_name', e.target.value)}
+                onChange={(event, newValue) => {
+                  handlePhaseUpdate(index, 'phase_name', newValue || '');
+
+                  // Auto-fill weeks and hours if predefined phase is selected
+                  const predefinedPhase = predefinedPhases.find((p) => p.name === newValue);
+                  if (predefinedPhase) {
+                    handlePhaseUpdate(index, 'planned_weeks', predefinedPhase.typical_duration_weeks);
+                    handlePhaseUpdate(index, 'predicted_hours', predefinedPhase.typical_duration_weeks * 40);
+                  }
+                }}
+                onInputChange={(event, newInputValue) => {
+                  handlePhaseUpdate(index, 'phase_name', newInputValue);
+                }}
                 disabled={loading}
-                placeholder="e.g., Concept Generation"
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Phase Name"
+                    required
+                    placeholder="e.g., Concept Generation"
+                    helperText="Select from dropdown or type custom name"
+                  />
+                )}
               />
             </Grid>
 

@@ -18,7 +18,8 @@ import {
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { Add, Remove } from '@mui/icons-material';
+import { Add, Remove, DragIndicator, ArrowUpward, ArrowDownward } from '@mui/icons-material';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import dayjs from 'dayjs';
 import { Project, PredefinedPhase, ProjectPhaseInput } from '../../types';
 import apiService from '../../services/api';
@@ -106,6 +107,32 @@ const CreateProjectDialog = ({
 
   const removeCustomPhase = (index: number) => {
     setSelectedPhases(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) {
+      return;
+    }
+
+    const items = Array.from(selectedPhases);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    setSelectedPhases(items);
+  };
+
+  const movePhaseUp = (index: number) => {
+    if (index === 0) return;
+    const items = Array.from(selectedPhases);
+    [items[index - 1], items[index]] = [items[index], items[index - 1]];
+    setSelectedPhases(items);
+  };
+
+  const movePhaseDown = (index: number) => {
+    if (index === selectedPhases.length - 1) return;
+    const items = Array.from(selectedPhases);
+    [items[index], items[index + 1]] = [items[index + 1], items[index]];
+    setSelectedPhases(items);
   };
 
   const calculateTotals = () => {
@@ -212,118 +239,190 @@ const CreateProjectDialog = ({
                 Select Project Phases
               </Typography>
 
-              {/* Predefined Phases */}
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                {predefinedPhases.map((phase) => {
-                  const isSelected = selectedPhases.some(p => p.phase_name === phase.name);
-                  return (
-                    <Box key={phase.id} sx={{ flex: '1 1 400px', minWidth: '400px' }}>
-                      <Paper sx={{ p: 2 }}>
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={isSelected}
-                              onChange={() => handlePhaseToggle(phase)}
-                              disabled={loading}
-                            />
-                          }
-                          label={
-                            <Box>
-                              <Typography variant="body1" fontWeight="medium">
-                                {phase.name}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {phase.description}
-                              </Typography>
-                            </Box>
-                          }
-                        />
-                        {isSelected && (
-                          <Box mt={2}>
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                              <TextField
-                                size="small"
-                                label="Weeks"
-                                type="number"
-                                value={selectedPhases.find(p => p.phase_name === phase.name)?.planned_weeks || ''}
-                                onChange={(e) => {
-                                  const index = selectedPhases.findIndex(p => p.phase_name === phase.name);
-                                  if (index >= 0) {
-                                    handlePhaseUpdate(index, 'planned_weeks', parseInt(e.target.value) || 1);
-                                  }
-                                }}
-                                disabled={loading}
-                                sx={{ flex: 1 }}
-                              />
-                              <TextField
-                                size="small"
-                                label="Hours"
-                                type="number"
-                                value={selectedPhases.find(p => p.phase_name === phase.name)?.predicted_hours || ''}
-                                onChange={(e) => {
-                                  const index = selectedPhases.findIndex(p => p.phase_name === phase.name);
-                                  if (index >= 0) {
-                                    handlePhaseUpdate(index, 'predicted_hours', parseInt(e.target.value) || 0);
-                                  }
-                                }}
-                                disabled={loading}
-                                sx={{ flex: 1 }}
-                              />
-                            </Box>
-                          </Box>
-                        )}
-                      </Paper>
-                    </Box>
-                  );
-                })}
-              </Box>
+              {/* Predefined Phases - Selection Only */}
+              <Paper sx={{ p: 2, mb: 3, bgcolor: 'grey.50' }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Select phases to include in your project:
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
+                  {predefinedPhases.map((phase) => {
+                    const isSelected = selectedPhases.some(p => p.phase_name === phase.name);
+                    return (
+                      <FormControlLabel
+                        key={phase.id}
+                        control={
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={() => handlePhaseToggle(phase)}
+                            disabled={loading}
+                            size="small"
+                          />
+                        }
+                        label={
+                          <Typography variant="body2">
+                            {phase.name}
+                          </Typography>
+                        }
+                      />
+                    );
+                  })}
+                </Box>
+              </Paper>
 
-              {/* Custom Phases */}
-              {selectedPhases.filter(p => p.is_custom).map((phase, index) => {
-                const actualIndex = selectedPhases.findIndex(p => p === phase);
-                return (
-                  <Paper key={actualIndex} sx={{ p: 2, mt: 2 }}>
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <TextField
-                        label="Custom Phase Name"
-                        value={phase.phase_name}
-                        onChange={(e) => handlePhaseUpdate(actualIndex, 'phase_name', e.target.value)}
-                        disabled={loading}
-                        sx={{ flexGrow: 1 }}
-                      />
-                      <TextField
-                        label="Weeks"
-                        type="number"
-                        value={phase.planned_weeks}
-                        onChange={(e) => handlePhaseUpdate(actualIndex, 'planned_weeks', parseInt(e.target.value) || 1)}
-                        disabled={loading}
-                        sx={{ width: 100 }}
-                      />
-                      <TextField
-                        label="Hours"
-                        type="number"
-                        value={phase.predicted_hours}
-                        onChange={(e) => handlePhaseUpdate(actualIndex, 'predicted_hours', parseInt(e.target.value) || 0)}
-                        disabled={loading}
-                        sx={{ width: 100 }}
-                      />
-                      <IconButton
-                        onClick={() => removeCustomPhase(actualIndex)}
-                        disabled={loading}
-                        color="error"
-                      >
-                        <Remove />
-                      </IconButton>
+              {/* Selected Phases - Ordered List with Drag & Drop */}
+              <Typography variant="h6" gutterBottom>
+                Phase Sequence & Configuration
+              </Typography>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Drag phases to reorder them, or use arrow buttons. The order will determine the project workflow.
+              </Alert>
+
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable droppableId="phases">
+                  {(provided, snapshot) => (
+                    <Box
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      sx={{
+                        minHeight: 100,
+                        bgcolor: snapshot.isDraggingOver ? 'action.hover' : 'transparent',
+                        borderRadius: 1,
+                        transition: 'background-color 0.2s',
+                      }}
+                    >
+                      {selectedPhases.map((phase, index) => (
+                        <Draggable
+                          key={`${phase.phase_name}-${index}`}
+                          draggableId={`${phase.phase_name}-${index}`}
+                          index={index}
+                        >
+                          {(provided, snapshot) => (
+                            <Paper
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              sx={{
+                                p: 2,
+                                mb: 2,
+                                bgcolor: snapshot.isDragging ? 'action.selected' : 'background.paper',
+                                boxShadow: snapshot.isDragging ? 6 : 1,
+                                transition: 'box-shadow 0.2s',
+                              }}
+                            >
+                              <Box display="flex" alignItems="center" gap={2}>
+                                {/* Drag Handle */}
+                                <Box {...provided.dragHandleProps} sx={{ display: 'flex', cursor: 'grab' }}>
+                                  <DragIndicator color="action" />
+                                </Box>
+
+                                {/* Phase Order Number */}
+                                <Chip
+                                  label={index + 1}
+                                  size="small"
+                                  color="primary"
+                                  sx={{ minWidth: 40 }}
+                                />
+
+                                {/* Phase Name */}
+                                {phase.is_custom ? (
+                                  <TextField
+                                    size="small"
+                                    label="Phase Name"
+                                    value={phase.phase_name}
+                                    onChange={(e) => handlePhaseUpdate(index, 'phase_name', e.target.value)}
+                                    disabled={loading}
+                                    sx={{ flexGrow: 1 }}
+                                  />
+                                ) : (
+                                  <Typography variant="body1" fontWeight="medium" sx={{ flexGrow: 1 }}>
+                                    {phase.phase_name}
+                                  </Typography>
+                                )}
+
+                                {/* Weeks Input */}
+                                <TextField
+                                  size="small"
+                                  label="Weeks"
+                                  type="number"
+                                  value={phase.planned_weeks}
+                                  onChange={(e) => handlePhaseUpdate(index, 'planned_weeks', parseInt(e.target.value) || 1)}
+                                  disabled={loading}
+                                  sx={{ width: 100 }}
+                                  inputProps={{ min: 1 }}
+                                />
+
+                                {/* Hours Input */}
+                                <TextField
+                                  size="small"
+                                  label="Hours"
+                                  type="number"
+                                  value={phase.predicted_hours}
+                                  onChange={(e) => handlePhaseUpdate(index, 'predicted_hours', parseInt(e.target.value) || 0)}
+                                  disabled={loading}
+                                  sx={{ width: 100 }}
+                                  inputProps={{ min: 0 }}
+                                />
+
+                                {/* Move Up/Down Buttons */}
+                                <Box display="flex" flexDirection="column" gap={0.5}>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => movePhaseUp(index)}
+                                    disabled={loading || index === 0}
+                                    color="primary"
+                                  >
+                                    <ArrowUpward fontSize="small" />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => movePhaseDown(index)}
+                                    disabled={loading || index === selectedPhases.length - 1}
+                                    color="primary"
+                                  >
+                                    <ArrowDownward fontSize="small" />
+                                  </IconButton>
+                                </Box>
+
+                                {/* Remove Button */}
+                                <IconButton
+                                  onClick={() => {
+                                    if (phase.is_custom) {
+                                      removeCustomPhase(index);
+                                    } else {
+                                      const predefinedPhase = predefinedPhases.find(p => p.name === phase.phase_name);
+                                      if (predefinedPhase) {
+                                        handlePhaseToggle(predefinedPhase);
+                                      }
+                                    }
+                                  }}
+                                  disabled={loading}
+                                  color="error"
+                                  size="small"
+                                >
+                                  <Remove />
+                                </IconButton>
+                              </Box>
+                            </Paper>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
                     </Box>
-                  </Paper>
-                );
-              })}
+                  )}
+                </Droppable>
+              </DragDropContext>
+
+              {selectedPhases.length === 0 && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  Please select at least one phase from above to continue.
+                </Alert>
+              )}
 
               <Button
                 startIcon={<Add />}
                 onClick={addCustomPhase}
                 disabled={loading}
-                sx={{ mt: 2 }}
+                variant="outlined"
+                sx={{ mt: 1 }}
               >
                 Add Custom Phase
               </Button>
