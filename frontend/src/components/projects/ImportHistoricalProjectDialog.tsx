@@ -184,6 +184,17 @@ const ImportHistoricalProjectDialog = ({
 
   const handlePhaseUpdate = (index: number, field: keyof PhaseData, value: any) => {
     setPhases(phases.map((phase, i) => (i === index ? { ...phase, [field]: value } : phase)));
+
+    // Auto-clear phase name validation error when resolved
+    if (field === 'phase_name' && value && value.trim() && error === 'All phases must have a name') {
+      // Check if all phases now have names
+      const updatedPhases = phases.map((phase, i) =>
+        i === index ? { ...phase, [field]: value } : phase
+      );
+      if (updatedPhases.every(p => p.phase_name.trim())) {
+        setError(null);
+      }
+    }
   };
 
   const handleAddWorkLog = (phaseIndex: number) => {
@@ -374,7 +385,13 @@ const ImportHistoricalProjectDialog = ({
         required
         label="Project Name"
         value={projectName}
-        onChange={(e) => setProjectName(e.target.value)}
+        onChange={(e) => {
+          setProjectName(e.target.value);
+          // Auto-clear validation error when resolved
+          if (e.target.value.trim() && error === 'Project name is required') {
+            setError(null);
+          }
+        }}
         disabled={loading}
         placeholder="e.g., Mall Badr"
       />
@@ -459,6 +476,7 @@ const ImportHistoricalProjectDialog = ({
                     required
                     placeholder="e.g., Concept Generation"
                     helperText="Select from dropdown or type custom name"
+                    error={!phase.phase_name.trim() && error === 'All phases must have a name'}
                   />
                 )}
               />
