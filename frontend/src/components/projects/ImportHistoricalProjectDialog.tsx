@@ -183,14 +183,12 @@ const ImportHistoricalProjectDialog = ({
   };
 
   const handlePhaseUpdate = (index: number, field: keyof PhaseData, value: any) => {
-    setPhases(phases.map((phase, i) => (i === index ? { ...phase, [field]: value } : phase)));
+    const updatedPhases = phases.map((phase, i) => (i === index ? { ...phase, [field]: value } : phase));
+    setPhases(updatedPhases);
 
     // Auto-clear phase name validation error when resolved
     if (field === 'phase_name' && value && value.trim() && error === 'All phases must have a name') {
       // Check if all phases now have names
-      const updatedPhases = phases.map((phase, i) =>
-        i === index ? { ...phase, [field]: value } : phase
-      );
       if (updatedPhases.every(p => p.phase_name.trim())) {
         setError(null);
       }
@@ -456,17 +454,21 @@ const ImportHistoricalProjectDialog = ({
                 options={predefinedPhases.map((p) => p.name)}
                 value={phase.phase_name}
                 onChange={(event, newValue) => {
-                  handlePhaseUpdate(index, 'phase_name', newValue || '');
+                  const selectedValue = newValue || '';
+                  handlePhaseUpdate(index, 'phase_name', selectedValue);
 
                   // Auto-fill weeks and hours if predefined phase is selected
-                  const predefinedPhase = predefinedPhases.find((p) => p.name === newValue);
+                  const predefinedPhase = predefinedPhases.find((p) => p.name === selectedValue);
                   if (predefinedPhase) {
                     handlePhaseUpdate(index, 'planned_weeks', predefinedPhase.typical_duration_weeks);
                     handlePhaseUpdate(index, 'predicted_hours', predefinedPhase.typical_duration_weeks * 40);
                   }
                 }}
-                onInputChange={(event, newInputValue) => {
-                  handlePhaseUpdate(index, 'phase_name', newInputValue);
+                onInputChange={(event, newInputValue, reason) => {
+                  // Only update on typing, not on selection (onChange handles selection)
+                  if (reason === 'input') {
+                    handlePhaseUpdate(index, 'phase_name', newInputValue);
+                  }
                 }}
                 disabled={loading}
                 renderInput={(params) => (
