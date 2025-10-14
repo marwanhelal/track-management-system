@@ -455,13 +455,24 @@ const ImportHistoricalProjectDialog = ({
                 value={phase.phase_name}
                 onChange={(event, newValue) => {
                   const selectedValue = newValue || '';
-                  handlePhaseUpdate(index, 'phase_name', selectedValue);
+
+                  // Update phase name
+                  const updatedPhases = phases.map((p, i) =>
+                    i === index ? { ...p, phase_name: selectedValue } : p
+                  );
 
                   // Auto-fill weeks and hours if predefined phase is selected
                   const predefinedPhase = predefinedPhases.find((p) => p.name === selectedValue);
                   if (predefinedPhase) {
-                    handlePhaseUpdate(index, 'planned_weeks', predefinedPhase.typical_duration_weeks);
-                    handlePhaseUpdate(index, 'predicted_hours', predefinedPhase.typical_duration_weeks * 40);
+                    updatedPhases[index].planned_weeks = predefinedPhase.typical_duration_weeks;
+                    updatedPhases[index].predicted_hours = predefinedPhase.typical_duration_weeks * 40;
+                  }
+
+                  setPhases(updatedPhases);
+
+                  // Clear error if all phases now have names
+                  if (selectedValue.trim() && updatedPhases.every(p => p.phase_name.trim())) {
+                    setError(null);
                   }
                 }}
                 onInputChange={(event, newInputValue, reason) => {
