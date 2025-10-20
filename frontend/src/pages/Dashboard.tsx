@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -60,6 +60,22 @@ const Dashboard = () => {
 
   // Track which projects we've already joined to prevent duplicate joins
   const joinedProjectsRef = useRef<Set<number>>(new Set());
+
+  // ✅ OPTIMIZED: Memoize expensive calculations to prevent re-computation on every render
+  const totalHours = useMemo(() => {
+    return workLogSummary.projectSummary.reduce(
+      (sum: number, item: WorkLogSummary) => sum + parseFloat(item.total_hours),
+      0
+    );
+  }, [workLogSummary.projectSummary]);
+
+  const activeProjectsCount = useMemo(() => {
+    return projects.filter((p: Project) => p.status === 'active').length;
+  }, [projects]);
+
+  const onHoldProjectsCount = useMemo(() => {
+    return projects.filter((p: Project) => p.status === 'on_hold').length;
+  }, [projects]);
 
   // Load dashboard data
   useEffect(() => {
@@ -387,10 +403,7 @@ const Dashboard = () => {
                     Total Hours
                   </Typography>
                   <Typography variant="h4">
-                    {workLogSummary.projectSummary.reduce(
-                      (sum: number, item: WorkLogSummary) => sum + parseFloat(item.total_hours),
-                      0
-                    ).toFixed(1)}
+                    {totalHours.toFixed(1)}
                   </Typography>
                 </Box>
               </Box>
@@ -408,7 +421,7 @@ const Dashboard = () => {
                     Active Projects
                   </Typography>
                   <Typography variant="h4">
-                    {projects.filter((p: Project) => p.status === 'active').length}
+                    {activeProjectsCount}
                   </Typography>
                 </Box>
               </Box>
@@ -426,7 +439,7 @@ const Dashboard = () => {
                     On Hold
                   </Typography>
                   <Typography variant="h4">
-                    {projects.filter((p: Project) => p.status === 'on_hold').length}
+                    {onHoldProjectsCount}
                   </Typography>
                 </Box>
               </Box>
