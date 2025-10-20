@@ -92,13 +92,19 @@ class App {
       this.app.use(morgan('dev'));
     }
 
-    // Global rate limiting
+    // Global rate limiting - Balanced for dashboard usage with health checks
     const globalLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 300, // Limit each IP to 300 requests per windowMs (increased for active usage)
-      message: 'Too many requests from this IP, please try again later',
-      standardHeaders: true,
-      legacyHeaders: false,
+      max: 1000, // Limit each IP to 1000 requests per 15 min (~66 req/min, ~1 req/sec)
+      message: {
+        success: false,
+        error: 'Rate limit exceeded. Please slow down your requests.',
+        retryAfter: 'Check Retry-After header'
+      },
+      standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
+      legacyHeaders: false,  // Disable `X-RateLimit-*` headers
+      // Skip rate limiting for health checks
+      skip: (req) => req.path === '/health' || req.path === '/api/v1/health'
     });
     this.app.use(globalLimiter);
 
