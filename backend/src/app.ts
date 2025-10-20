@@ -159,6 +159,18 @@ class App {
       });
     });
 
+    // TEST CRASH ROUTE - For testing PM2 auto-restart (REMOVE IN PRODUCTION)
+    this.app.get('/test-crash', (req: Request, res: Response) => {
+      console.log('🧪 TEST CRASH TRIGGERED - PM2 should restart this process automatically');
+      res.send('Crashing server in 1 second... PM2 will restart it automatically!');
+
+      // Crash after sending response
+      setTimeout(() => {
+        console.log('💥 CRASH! Simulating unexpected error...');
+        process.exit(1); // Exit with error code
+      }, 1000);
+    });
+
     // Strict rate limiting for authentication endpoints
     const authLimiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
