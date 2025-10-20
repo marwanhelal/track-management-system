@@ -121,10 +121,10 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
         if (newCountdown <= 0) {
           this.performRefresh();
-          return prevState;
+          return null; // Don't update state, refresh is happening
         }
 
-        return { countdown: newCountdown };
+        return { ...prevState, countdown: newCountdown };
       });
     }, 1000);
   }
