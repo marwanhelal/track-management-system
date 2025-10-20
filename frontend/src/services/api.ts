@@ -65,7 +65,16 @@ class ApiService {
       async (error: any) => {
         const originalRequest = error.config;
 
-        // Prevent infinite retry loops by limiting retry attempts
+        // Check for critical backend errors that require page refresh
+        const isCriticalError = this.isCriticalBackendError(error);
+
+        if (isCriticalError) {
+          console.error('❌ Critical backend error detected:', error.message);
+          this.handleCriticalError(error);
+          return Promise.reject(error);
+        }
+
+        // Handle 401 authentication errors with token refresh
         if (error.response?.status === 401 && !originalRequest._retry && !originalRequest._isRefreshRequest) {
           originalRequest._retry = true;
 
@@ -111,6 +120,77 @@ class ApiService {
         return Promise.reject(error);
       }
     );
+  }
+
+  // Detect critical backend errors that require page refresh
+  private isCriticalBackendError(error: any): boolean {
+    // Network errors (backend not reachable)
+    if (!error.response) {
+      // No response means network failure, timeout, or backend crash
+      const isNetworkError =
+        error.code === 'ECONNREFUSED' ||
+        error.code === 'ENOTFOUND' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ERR_NETWORK' ||
+        error.message?.includes('Network Error') ||
+        error.message?.includes('timeout');
+
+      return isNetworkError;
+    }
+
+    // HTTP error codes indicating backend issues
+    const status = error.response.status;
+    const isCriticalStatus =
+      status === 500 ||  // Internal Server Error
+      status === 502 ||  // Bad Gateway
+      status === 503 ||  // Service Unavailable
+      status === 504;    // Gateway Timeout
+
+    return isCriticalStatus;
+  }
+
+  // Handle critical errors by refreshing the page
+  private handleCriticalError(error: any): void {
+    const attemptKey = 'apiCriticalErrorRefreshAttempts';
+    const timestampKey = 'apiCriticalErrorLastAttempt';
+    const maxAttempts = 3;
+    const resetWindow = 5 * 60 * 1000; // 5 minutes
+
+    // Get current attempts
+    const attempts = parseInt(sessionStorage.getItem(attemptKey) || '0', 10);
+    const lastAttempt = parseInt(sessionStorage.getItem(timestampKey) || '0', 10);
+    const now = Date.now();
+
+    // Reset counter if outside the time window
+    if (now - lastAttempt > resetWindow) {
+      sessionStorage.setItem(attemptKey, '1');
+      sessionStorage.setItem(timestampKey, now.toString());
+      this.schedulePageRefresh(error);
+      return;
+    }
+
+    // Check if we've exceeded max attempts
+    if (attempts >= maxAttempts) {
+      console.warn('⚠️ Max auto-refresh attempts reached for critical API errors. Please manually refresh the page.');
+      return;
+    }
+
+    // Increment attempts and schedule refresh
+    sessionStorage.setItem(attemptKey, (attempts + 1).toString());
+    sessionStorage.setItem(timestampKey, now.toString());
+    this.schedulePageRefresh(error);
+  }
+
+  // Schedule a page refresh after a short delay
+  private schedulePageRefresh(error: any): void {
+    const delay = 2000; // 2 seconds
+
+    console.log(`🔄 Critical backend error detected. Refreshing page in ${delay / 1000} seconds...`);
+    console.log('Error details:', error.message);
+
+    setTimeout(() => {
+      window.location.reload();
+    }, delay);
   }
 
   // Authentication

@@ -6,6 +6,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
+import ErrorBoundary from './components/common/ErrorBoundary';
+import ConnectionMonitor from './components/common/ConnectionMonitor';
 
 // Lazy-loaded pages for optimal performance
 const AuthPage = React.lazy(() => import('./pages/AuthPage'));
@@ -35,13 +37,15 @@ const PageLoader: React.FC = () => (
 
 function App() {
   return (
-    <ThemeProvider>
-      <CssBaseline />
-      <AuthProvider>
-        <SocketProvider>
-          <Router>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <CssBaseline />
+        <AuthProvider>
+          <SocketProvider>
+            <ConnectionMonitor />
+            <Router>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
                 {/* Public Routes */}
                 <Route path="/login" element={<AuthPage />} />
 
@@ -163,6 +167,7 @@ function App() {
         </SocketProvider>
       </AuthProvider>
     </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

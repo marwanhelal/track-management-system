@@ -49,6 +49,41 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const RECONNECT_DELAY = 2000; // 2 seconds
   const HEARTBEAT_INTERVAL = 30000; // 30 seconds
 
+  // Handle persistent socket reconnection failures by refreshing the page
+  const handleSocketReconnectionFailure = useCallback(() => {
+    const attemptKey = 'socketReconnectionFailureRefreshAttempts';
+    const timestampKey = 'socketReconnectionFailureLastAttempt';
+    const maxAttempts = 3;
+    const resetWindow = 5 * 60 * 1000; // 5 minutes
+    const refreshDelay = 3000; // 3 seconds
+
+    // Get current attempts
+    const attempts = parseInt(sessionStorage.getItem(attemptKey) || '0', 10);
+    const lastAttempt = parseInt(sessionStorage.getItem(timestampKey) || '0', 10);
+    const now = Date.now();
+
+    // Reset counter if outside the time window
+    if (now - lastAttempt > resetWindow) {
+      sessionStorage.setItem(attemptKey, '1');
+      sessionStorage.setItem(timestampKey, now.toString());
+      console.log(`🔄 Socket reconnection failed. Refreshing page in ${refreshDelay / 1000} seconds...`);
+      setTimeout(() => window.location.reload(), refreshDelay);
+      return;
+    }
+
+    // Check if we've exceeded max attempts
+    if (attempts >= maxAttempts) {
+      console.warn('⚠️ Max auto-refresh attempts reached for socket failures. Please manually refresh the page.');
+      return;
+    }
+
+    // Increment attempts and schedule refresh
+    sessionStorage.setItem(attemptKey, (attempts + 1).toString());
+    sessionStorage.setItem(timestampKey, now.toString());
+    console.log(`🔄 Socket reconnection failed. Refreshing page in ${refreshDelay / 1000} seconds... (Attempt ${attempts + 1}/${maxAttempts})`);
+    setTimeout(() => window.location.reload(), refreshDelay);
+  }, []);
+
   // Optimized socket initialization
   const initializeSocket = useCallback((): Socket | null => {
     if (!isAuthenticated || !user) return null;
@@ -137,6 +172,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     newSocket.on('reconnect_failed', () => {
       console.error('🚫 Socket reconnection failed - max attempts reached');
       setConnected(false);
+
+      // Auto-refresh page if socket fails to reconnect (indicates backend crash/restart)
+      handleSocketReconnectionFailure();
     });
 
     // Global notification handler with error handling
@@ -157,7 +195,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     setSocket(newSocket);
 
     return newSocket;
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, handleSocketReconnectionFailure]);
 
   // Heartbeat mechanism to keep connection alive
   const startHeartbeat = useCallback((socket: Socket) => {
