@@ -214,16 +214,16 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
             <Typography variant="body1" color="text.secondary" paragraph>
               {isCritical
-                ? 'We detected a connection issue with the server. The page will automatically refresh to restore your session.'
-                : 'An unexpected error occurred. You can try refreshing the page to continue.'}
+                ? 'The server is temporarily unavailable. This usually happens when the server is restarting and takes 5-10 seconds. You can click "Try Again" to reconnect without refreshing the page.'
+                : 'An unexpected error occurred. You can try to continue without refreshing or refresh the page.'}
             </Typography>
 
             {isCritical && canAutoRefresh && countdown > 0 && !isRefreshing && (
               <Box sx={{ marginY: 3 }}>
-                <Typography variant="h6" color="primary">
-                  Auto-refreshing in {countdown} seconds...
+                <Typography variant="body2" color="text.secondary">
+                  Auto-refreshing in {countdown} seconds if the issue persists...
                 </Typography>
-                <CircularProgress size={40} sx={{ marginTop: 2 }} />
+                <CircularProgress size={30} sx={{ marginTop: 1 }} />
               </Box>
             )}
 
@@ -242,27 +242,33 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               </Box>
             )}
 
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', marginTop: 3 }}>
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', marginTop: 3, flexWrap: 'wrap' }}>
               <Button
                 variant="contained"
                 color="primary"
                 startIcon={<RefreshIcon />}
-                onClick={this.handleManualRefresh}
+                onClick={this.handleTryAgain}
                 disabled={isRefreshing}
+                size="large"
               >
-                Refresh Now
+                Try Again
               </Button>
 
-              {!isCritical && (
-                <Button
-                  variant="outlined"
-                  onClick={this.handleTryAgain}
-                  disabled={isRefreshing}
-                >
-                  Try Again
-                </Button>
-              )}
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={<RefreshIcon />}
+                onClick={this.handleManualRefresh}
+                disabled={isRefreshing}
+                size="large"
+              >
+                Refresh Page
+              </Button>
             </Box>
+
+            <Typography variant="caption" color="text.secondary" sx={{ marginTop: 2, display: 'block' }}>
+              💡 Tip: Click "Try Again" first - it usually works without needing to refresh!
+            </Typography>
 
             {/* Error details for development */}
             {process.env.NODE_ENV === 'development' && (

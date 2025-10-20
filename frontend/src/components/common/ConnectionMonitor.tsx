@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Snackbar, Alert, Box, IconButton, Collapse, Typography } from '@mui/material';
+import { Snackbar, Alert, Box, IconButton, Collapse, Typography, Button } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import WifiOffIcon from '@mui/icons-material/WifiOff';
 import WifiIcon from '@mui/icons-material/Wifi';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import ReplayIcon from '@mui/icons-material/Replay';
 import axios from 'axios';
 
 interface ConnectionStatus {
@@ -28,8 +29,8 @@ const ConnectionMonitor: React.FC = () => {
 
   // Configuration
   const HEALTH_CHECK_INTERVAL = 30000; // Check every 30 seconds
-  const MAX_CONSECUTIVE_FAILURES = 3; // Auto-refresh after 3 consecutive failures
-  const AUTO_REFRESH_DELAY = 5; // Seconds before auto-refresh
+  const MAX_CONSECUTIVE_FAILURES = 5; // Auto-refresh after 5 consecutive failures (2.5 minutes)
+  const AUTO_REFRESH_DELAY = 10; // Seconds before auto-refresh (give PM2 time to restart)
   const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:5005/api/v1';
 
   // Check backend health
@@ -138,6 +139,14 @@ const ConnectionMonitor: React.FC = () => {
     window.location.reload();
   }, []);
 
+  // Retry connection (without full page reload)
+  const handleRetry = useCallback(async () => {
+    console.log('🔄 User triggered manual retry from connection monitor');
+    setStatus(prev => ({ ...prev, consecutiveFailures: 0 }));
+    stopAutoRefreshCountdown();
+    await checkHealth();
+  }, [checkHealth, stopAutoRefreshCountdown]);
+
   // Close banner
   const handleCloseBanner = useCallback(() => {
     setShowBanner(false);
@@ -192,30 +201,50 @@ const ConnectionMonitor: React.FC = () => {
             boxShadow: 3,
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <WifiOffIcon />
-            <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+            <WifiOffIcon sx={{ fontSize: 32 }} />
+            <Box sx={{ flex: 1 }}>
               <Typography variant="body1" fontWeight="bold">
-                Connection Lost
+                ⚠️ Connection Lost - Server Temporarily Unavailable
               </Typography>
               <Typography variant="body2">
-                Cannot connect to the server.
-                {autoRefreshCountdown !== null && !maxAttemptsReached && (
-                  <> Refreshing in {autoRefreshCountdown} seconds...</>
-                )}
-                {maxAttemptsReached && (
-                  <> Please refresh manually or contact support.</>
+                {status.consecutiveFailures < MAX_CONSECUTIVE_FAILURES ? (
+                  <>The server is restarting. This usually takes 5-10 seconds. Click "Try Again" to reconnect.</>
+                ) : (
+                  <>
+                    Cannot connect to the server.
+                    {autoRefreshCountdown !== null && !maxAttemptsReached && (
+                      <> Auto-refreshing in {autoRefreshCountdown} seconds...</>
+                    )}
+                    {maxAttemptsReached && (
+                      <> Multiple reconnection attempts failed. Please contact support if this persists.</>
+                    )}
+                  </>
                 )}
               </Typography>
             </Box>
           </Box>
 
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <Button
+              variant="contained"
+              color="inherit"
+              size="small"
+              startIcon={<ReplayIcon />}
+              onClick={handleRetry}
+              sx={{
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.3)' },
+                fontWeight: 'bold'
+              }}
+            >
+              Try Again
+            </Button>
             <IconButton
               size="small"
               color="inherit"
               onClick={handleManualRefresh}
-              title="Refresh Now"
+              title="Refresh Page"
             >
               <RefreshIcon />
             </IconButton>
@@ -223,7 +252,7 @@ const ConnectionMonitor: React.FC = () => {
               size="small"
               color="inherit"
               onClick={handleCloseBanner}
-              title="Close"
+              title="Dismiss"
             >
               <CloseIcon />
             </IconButton>

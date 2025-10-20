@@ -149,48 +149,30 @@ class ApiService {
     return isCriticalStatus;
   }
 
-  // Handle critical errors by refreshing the page
+  // Handle critical errors - Log but don't auto-refresh (ConnectionMonitor handles recovery)
   private handleCriticalError(error: any): void {
-    const attemptKey = 'apiCriticalErrorRefreshAttempts';
-    const timestampKey = 'apiCriticalErrorLastAttempt';
-    const maxAttempts = 3;
-    const resetWindow = 5 * 60 * 1000; // 5 minutes
+    // Log the error for debugging
+    console.error('⚠️ Critical backend error detected:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      code: error.code,
+      message: error.message,
+      url: error.config?.url
+    });
 
-    // Get current attempts
-    const attempts = parseInt(sessionStorage.getItem(attemptKey) || '0', 10);
-    const lastAttempt = parseInt(sessionStorage.getItem(timestampKey) || '0', 10);
-    const now = Date.now();
+    // Store error info for ConnectionMonitor to access
+    sessionStorage.setItem('lastCriticalError', JSON.stringify({
+      timestamp: Date.now(),
+      status: error.response?.status,
+      message: error.message,
+      url: error.config?.url
+    }));
 
-    // Reset counter if outside the time window
-    if (now - lastAttempt > resetWindow) {
-      sessionStorage.setItem(attemptKey, '1');
-      sessionStorage.setItem(timestampKey, now.toString());
-      this.schedulePageRefresh(error);
-      return;
-    }
-
-    // Check if we've exceeded max attempts
-    if (attempts >= maxAttempts) {
-      console.warn('⚠️ Max auto-refresh attempts reached for critical API errors. Please manually refresh the page.');
-      return;
-    }
-
-    // Increment attempts and schedule refresh
-    sessionStorage.setItem(attemptKey, (attempts + 1).toString());
-    sessionStorage.setItem(timestampKey, now.toString());
-    this.schedulePageRefresh(error);
-  }
-
-  // Schedule a page refresh after a short delay
-  private schedulePageRefresh(error: any): void {
-    const delay = 2000; // 2 seconds
-
-    console.log(`🔄 Critical backend error detected. Refreshing page in ${delay / 1000} seconds...`);
-    console.log('Error details:', error.message);
-
-    setTimeout(() => {
-      window.location.reload();
-    }, delay);
+    // Don't auto-refresh here - ConnectionMonitor will:
+    // 1. Show red banner with "Try Again" button for engineers
+    // 2. Auto-refresh only after multiple failures (giving PM2 time to restart)
+    // 3. Allow manual recovery without needing to call support
+    console.log('💡 Use the "Try Again" button in the banner to reconnect without refreshing');
   }
 
   // Authentication
