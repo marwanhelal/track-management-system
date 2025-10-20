@@ -116,12 +116,12 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     this.setState({ countdown: REFRESH_COUNTDOWN_SECONDS });
 
     this.countdownInterval = setInterval(() => {
-      this.setState(prevState => {
+      this.setState((prevState): ErrorBoundaryState => {
         const newCountdown = prevState.countdown - 1;
 
         if (newCountdown <= 0) {
           this.performRefresh();
-          return null; // Don't update state, refresh is happening
+          return prevState; // Don't update state, refresh is happening
         }
 
         return { ...prevState, countdown: newCountdown };
