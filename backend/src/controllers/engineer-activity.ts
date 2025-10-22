@@ -183,14 +183,6 @@ export const getDailyActivity = async (req: Request, res: Response): Promise<voi
           status = 'completely_inactive';
         }
 
-        // Get last work log date for this engineer
-        const lastWorkResult = query(
-          `SELECT MAX(date) as last_work_date
-           FROM work_logs
-           WHERE engineer_id = $1 AND deleted_at IS NULL`,
-          [engineer.id]
-        );
-
         inactiveEngineers.push({
           id: engineer.id,
           name: engineer.name,
