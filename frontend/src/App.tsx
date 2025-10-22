@@ -18,6 +18,7 @@ const TeamManagementPage = React.lazy(() => import('./pages/TeamManagementPage')
 const TimeTrackingPage = React.lazy(() => import('./pages/TimeTrackingPage'));
 const MyWorkLogsPage = React.lazy(() => import('./pages/MyWorkLogsPage'));
 const SmartWarningDashboard = React.lazy(() => import('./pages/SmartWarningDashboard'));
+const EngineerActivityPage = React.lazy(() => import('./pages/EngineerActivityPage'));
 const SettingsPage = React.lazy(() => import('./pages/SettingsPage'));
 
 // Loading component for Suspense fallback
@@ -97,6 +98,19 @@ function App() {
                       <AppLayout>
                         <Suspense fallback={<PageLoader />}>
                           <TeamManagementPage />
+                        </Suspense>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/engineer-activity"
+                  element={
+                    <ProtectedRoute requireRole={["supervisor", "administrator"]}>
+                      <AppLayout>
+                        <Suspense fallback={<PageLoader />}>
+                          <EngineerActivityPage />
                         </Suspense>
                       </AppLayout>
                     </ProtectedRoute>

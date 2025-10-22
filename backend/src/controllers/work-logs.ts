@@ -276,6 +276,24 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
       ['work_logs', workLog.id, 'CREATE', authReq.user.id, `Logged ${hours} hours on ${phase.phase_name}`]
     );
 
+    // Emit Socket.IO event for real-time updates to Engineer Activity page
+    try {
+      app.emitToAll('engineer_activity_updated', {
+        engineerId: authReq.user.id,
+        engineerName: authReq.user.name,
+        projectId: phase.project_id,
+        projectName: phase.project_name,
+        phaseId: phase_id,
+        phaseName: phase.phase_name,
+        hours,
+        date: date || new Date().toISOString().split('T')[0],
+        action: 'work_logged'
+      });
+    } catch (socketError) {
+      console.error('Socket.IO emit error:', socketError);
+      // Continue even if socket fails
+    }
+
     const response: ApiResponse<{ workLog: WorkLog; message: string }> = {
       success: true,
       message: existingLogResult.rows.length > 0 ? 'Work log updated successfully' : 'Work log created successfully',

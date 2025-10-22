@@ -627,6 +627,30 @@ class ApiService {
     return response.data;
   }
 
+  // Engineer Activity endpoints
+  async getDailyEngineerActivity(date?: string): Promise<ApiResponse<any>> {
+    const url = date ? `/engineer-activity/daily?date=${date}` : '/engineer-activity/daily';
+    const response = await this.api.get(url);
+    return response.data;
+  }
+
+  async getEngineerActivitySummary(startDate: string, endDate: string): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/engineer-activity/summary?startDate=${startDate}&endDate=${endDate}`);
+    return response.data;
+  }
+
+  async exportEngineerActivityPDF(date?: string): Promise<Blob> {
+    const url = date ? `/engineer-activity/export/pdf?date=${date}` : '/engineer-activity/export/pdf';
+    const response = await this.api.get(url, { responseType: 'blob' });
+    return response.data;
+  }
+
+  async exportEngineerActivityExcel(date?: string): Promise<Blob> {
+    const url = date ? `/engineer-activity/export/excel?date=${date}` : '/engineer-activity/export/excel';
+    const response = await this.api.get(url, { responseType: 'blob' });
+    return response.data;
+  }
+
   // Health check
   async healthCheck(): Promise<any> {
     const response = await this.api.get('/health');

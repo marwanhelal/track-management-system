@@ -156,10 +156,40 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       role: user.role
     });
 
+    // Get client IP address
+    const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
+                     req.socket.remoteAddress ||
+                     'unknown';
+
+    // Get user agent
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    // Record login session in user_sessions table
+    try {
+      await query(
+        `INSERT INTO user_sessions (user_id, login_time, ip_address, user_agent, session_token)
+         VALUES ($1, NOW(), $2, $3, $4)`,
+        [user.id, ipAddress, userAgent, tokens.accessToken.substring(0, 50)]
+      );
+    } catch (sessionError) {
+      // If user_sessions table doesn't exist yet, log but don't fail login
+      console.error('Error recording session (table may not exist yet):', sessionError);
+    }
+
+    // Update last_login in users table
+    try {
+      await query(
+        'UPDATE users SET last_login = NOW() WHERE id = $1',
+        [user.id]
+      );
+    } catch (updateError) {
+      console.error('Error updating last_login:', updateError);
+    }
+
     // Log audit event
     await query(
       'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',
-      ['users', user.id, 'LOGIN', user.id, 'User logged in']
+      ['users', user.id, 'LOGIN', user.id, `User logged in from IP: ${ipAddress}`]
     );
 
     const response: ApiResponse<{ user: Omit<User, 'password_hash'>; tokens: AuthTokens }> = {
@@ -303,6 +333,20 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
   const authReq = req as any;
   try {
     if (authReq.user) {
+      // Update the most recent session with logout time
+      try {
+        await query(
+          `UPDATE user_sessions
+           SET logout_time = NOW()
+           WHERE user_id = $1 AND logout_time IS NULL
+           ORDER BY login_time DESC
+           LIMIT 1`,
+          [authReq.user.id]
+        );
+      } catch (logoutError) {
+        console.error('Error updating logout time:', logoutError);
+      }
+
       // Log audit event
       await query(
         'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',

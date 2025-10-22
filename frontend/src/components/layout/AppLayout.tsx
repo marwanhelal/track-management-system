@@ -95,6 +95,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       roles: ['supervisor', 'engineer', 'administrator'],
     },
     {
+      text: 'Engineer Activity',
+      icon: <People />,
+      path: '/engineer-activity',
+      roles: ['supervisor', 'administrator'],
+    },
+    {
       text: 'Time Tracking',
       icon: <AccessTime />,
       path: '/time-tracking',
