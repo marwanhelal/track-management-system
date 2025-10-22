@@ -53,7 +53,7 @@ export const exportToPDF = async (req: Request, res: Response): Promise<void> =>
         user_id,
         login_time
        FROM user_sessions
-       WHERE DATE(login_time) = $1
+       WHERE login_time::date = $1::date
        ORDER BY user_id, login_time DESC`,
       [targetDate]
     );
@@ -312,7 +312,13 @@ export const exportToPDF = async (req: Request, res: Response): Promise<void> =>
     // Generate PDF using Puppeteer
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ]
     });
 
     const page = await browser.newPage();

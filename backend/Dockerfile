@@ -40,7 +40,7 @@ RUN apk add --no-cache \
 
 # Tell Puppeteer to use system Chromium instead of downloading its own
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
