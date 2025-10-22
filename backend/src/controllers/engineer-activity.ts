@@ -106,7 +106,7 @@ export const getDailyActivity = async (req: Request, res: Response): Promise<voi
         user_id,
         login_time
        FROM user_sessions
-       WHERE DATE(login_time) = $1
+       WHERE login_time::date = $1::date
        ORDER BY user_id, login_time DESC`,
       [targetDate]
     );
@@ -242,11 +242,13 @@ export const getDailyActivity = async (req: Request, res: Response): Promise<voi
     };
 
     res.status(200).json(response);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Get daily activity error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
-      error: 'Internal server error while fetching engineer activity'
+      error: 'Internal server error while fetching engineer activity',
+      ...(process.env.NODE_ENV === 'development' && { details: error.message, stack: error.stack })
     });
   }
 };
