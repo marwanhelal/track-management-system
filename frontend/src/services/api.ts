@@ -675,12 +675,6 @@ class ApiService {
     return response.data;
   }
 
-  async exportEngineerActivityPDF(date?: string): Promise<Blob> {
-    const url = date ? `/engineer-activity/export/pdf?date=${date}` : '/engineer-activity/export/pdf';
-    const response = await this.api.get(url, { responseType: 'blob' });
-    return response.data;
-  }
-
   async exportEngineerActivityExcel(date?: string): Promise<Blob> {
     const url = date ? `/engineer-activity/export/excel?date=${date}` : '/engineer-activity/export/excel';
     const response = await this.api.get(url, { responseType: 'blob' });

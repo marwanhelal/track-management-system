@@ -32,7 +32,6 @@ import {
 import {
   Assessment as AssessmentIcon,
   ExpandMore as ExpandMoreIcon,
-  PictureAsPdf as PdfIcon,
   TableChart as ExcelIcon,
   Groups as GroupsIcon,
   CheckCircle as ActiveIcon,
@@ -48,7 +47,6 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import apiService from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
-import ExportActivityDialog from '../components/engineer-activity/ExportActivityDialog';
 
 interface EngineerWorkLog {
   id: number;
@@ -101,7 +99,6 @@ const EngineerActivityPage: React.FC = () => {
   const [activityData, setActivityData] = useState<DailyActivityData | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const fetchActivityData = useCallback(async () => {
     try {
@@ -150,14 +147,6 @@ const EngineerActivityPage: React.FC = () => {
       };
     }
   }, [socket, connected, autoRefresh, selectedDate, fetchActivityData]);
-
-  const handleExportPDF = () => {
-    if (!activityData) {
-      setError('No data available to export');
-      return;
-    }
-    setExportDialogOpen(true);
-  };
 
   const handleExportExcel = async () => {
     try {
@@ -276,18 +265,7 @@ const EngineerActivityPage: React.FC = () => {
                 Refresh Data
               </Button>
             </Grid>
-            <Grid item xs={12} md={2}>
-              <Button
-                variant="outlined"
-                startIcon={<PdfIcon />}
-                onClick={handleExportPDF}
-                fullWidth
-                disabled={exporting || !activityData}
-              >
-                Export PDF
-              </Button>
-            </Grid>
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={3}>
               <Button
                 variant="outlined"
                 startIcon={<ExcelIcon />}
@@ -298,7 +276,7 @@ const EngineerActivityPage: React.FC = () => {
                 Export Excel
               </Button>
             </Grid>
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={3}>
               <FormControlLabel
                 control={
                   <Switch
@@ -506,15 +484,6 @@ const EngineerActivityPage: React.FC = () => {
               No engineer data available for {selectedDate.format('MMMM DD, YYYY')}
             </Typography>
           </Paper>
-        )}
-
-        {/* Export Dialog */}
-        {activityData && (
-          <ExportActivityDialog
-            open={exportDialogOpen}
-            onClose={() => setExportDialogOpen(false)}
-            data={activityData}
-          />
         )}
       </Box>
     </LocalizationProvider>
