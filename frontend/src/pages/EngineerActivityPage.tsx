@@ -48,6 +48,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import apiService from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
+import ExportActivityDialog from '../components/engineer-activity/ExportActivityDialog';
 
 interface EngineerWorkLog {
   id: number;
@@ -100,6 +101,7 @@ const EngineerActivityPage: React.FC = () => {
   const [activityData, setActivityData] = useState<DailyActivityData | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const fetchActivityData = useCallback(async () => {
     try {
@@ -149,28 +151,12 @@ const EngineerActivityPage: React.FC = () => {
     }
   }, [socket, connected, autoRefresh, selectedDate, fetchActivityData]);
 
-  const handleExportPDF = async () => {
-    try {
-      setExporting(true);
-      const blob = await apiService.exportEngineerActivityPDF(selectedDate.format('YYYY-MM-DD'));
-
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `engineer-activity-${selectedDate.format('YYYY-MM-DD')}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      setSuccess('PDF exported successfully');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      setError('Failed to export PDF: ' + err.message);
-    } finally {
-      setExporting(false);
+  const handleExportPDF = () => {
+    if (!activityData) {
+      setError('No data available to export');
+      return;
     }
+    setExportDialogOpen(true);
   };
 
   const handleExportExcel = async () => {
@@ -520,6 +506,15 @@ const EngineerActivityPage: React.FC = () => {
               No engineer data available for {selectedDate.format('MMMM DD, YYYY')}
             </Typography>
           </Paper>
+        )}
+
+        {/* Export Dialog */}
+        {activityData && (
+          <ExportActivityDialog
+            open={exportDialogOpen}
+            onClose={() => setExportDialogOpen(false)}
+            data={activityData}
+          />
         )}
       </Box>
     </LocalizationProvider>
