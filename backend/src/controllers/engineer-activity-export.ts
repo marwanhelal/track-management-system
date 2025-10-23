@@ -310,16 +310,48 @@ export const exportToPDF = async (req: Request, res: Response): Promise<void> =>
     `;
 
     // Generate PDF using Puppeteer
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu'
-      ]
-    });
+    // Try multiple possible Chromium paths
+    const chromiumPaths = [
+      process.env.PUPPETEER_EXECUTABLE_PATH,
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable'
+    ].filter(Boolean);
+
+    let browser;
+    let lastError;
+
+    for (const executablePath of chromiumPaths) {
+      try {
+        browser = await puppeteer.launch({
+          headless: true,
+          executablePath: executablePath as string,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-dev-tools'
+          ]
+        });
+        console.log(`✓ Successfully launched Chromium at: ${executablePath}`);
+        break;
+      } catch (error) {
+        console.warn(`✗ Failed to launch Chromium at ${executablePath}:`, error);
+        lastError = error;
+      }
+    }
+
+    if (!browser) {
+      console.error('Failed to launch Chromium at any path. Last error:', lastError);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to initialize PDF generator. Chromium not found.'
+      });
+      return;
+    }
 
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });

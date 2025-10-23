@@ -29,14 +29,22 @@ FROM node:18-alpine
 # - nss: required by Chromium for security
 # - freetype: font rendering
 # - harfbuzz: text shaping
+# - ca-certificates: SSL/TLS certificates
 # - ttf-freefont: basic fonts for PDF rendering
+# - font-noto: comprehensive Unicode font support
+# - udev: device management (required by Chromium)
+# - ttf-dejavu: additional fonts
 RUN apk add --no-cache \
     dumb-init \
     chromium \
     nss \
     freetype \
     harfbuzz \
-    ttf-freefont
+    ca-certificates \
+    ttf-freefont \
+    font-noto \
+    udev \
+    ttf-dejavu
 
 # Tell Puppeteer to use system Chromium instead of downloading its own
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
