@@ -257,29 +257,25 @@ const TimeTrackingPage: React.FC = () => {
         setElapsedTime(now - startTime);
       }, 1000);
     } else if (timerStatus === 'paused') {
-      // When paused, track pause duration
+      // When paused, stop the running timer but keep updating UI for pause duration display
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
 
-      const pauseInterval = setInterval(() => {
-        if (pauseStartTime > 0) {
-          const now = Date.now();
-          const currentPauseDuration = now - pauseStartTime;
-          setTotalPausedTime(totalPausedTime + currentPauseDuration);
-          setPauseStartTime(now);
-        }
+      // Update display every second to show pause duration incrementing
+      timerIntervalRef.current = setInterval(() => {
+        // Force re-render to update pause duration display
+        setElapsedTime(prev => prev); // Trigger re-render without changing elapsed time
       }, 1000);
-
-      return () => clearInterval(pauseInterval);
     }
 
     return () => {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
     };
-  }, [timerStatus, timerSession, pauseStartTime, totalPausedTime]);
+  }, [timerStatus, timerSession]);
 
   // Auto-save timer state every 30 seconds
   useEffect(() => {
@@ -448,12 +444,18 @@ const TimeTrackingPage: React.FC = () => {
 
   const resumeTimer = async () => {
     try {
-      if (!timerSession) return;
+      if (!timerSession || !pauseStartTime) return;
 
-      const response = await apiService.resumeTimerSession(timerSession.id, totalPausedTime);
+      // Calculate how long we've been paused
+      const now = Date.now();
+      const pauseDuration = now - pauseStartTime;
+      const newTotalPausedTime = totalPausedTime + pauseDuration;
+
+      const response = await apiService.resumeTimerSession(timerSession.id, newTotalPausedTime);
 
       if (response.success) {
         setTimerStatus('running');
+        setTotalPausedTime(newTotalPausedTime);
         setPausedAt(null);
         setPauseStartTime(0);
         saveTimerToLocalStorage();
@@ -626,7 +628,7 @@ const TimeTrackingPage: React.FC = () => {
                         <Grid item xs={12} sm={4}>
                           <Typography variant="caption" color="text.secondary">Paused Time</Typography>
                           <Typography variant="h4" color="warning.main">
-                            {formatTime(totalPausedTime)}
+                            {formatTime(pauseStartTime > 0 ? totalPausedTime + (Date.now() - pauseStartTime) : totalPausedTime)}
                           </Typography>
                         </Grid>
                         <Grid item xs={12} sm={4}>
