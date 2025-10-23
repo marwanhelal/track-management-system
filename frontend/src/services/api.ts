@@ -348,24 +348,14 @@ class ApiService {
     return response.data;
   }
 
-  // Timer Sessions (Pause/Resume Feature)
+  // Timer Sessions
   async startTimerSession(data: { phase_id: number; description: string }): Promise<ApiResponse<{ session: any; project_name: string; phase_name: string }>> {
     const response = await this.api.post('/timer-sessions', data);
     return response.data;
   }
 
-  async pauseTimerSession(sessionId: number, elapsed_time_ms: number): Promise<ApiResponse<{ session: any }>> {
-    const response = await this.api.put(`/timer-sessions/${sessionId}/pause`, { elapsed_time_ms });
-    return response.data;
-  }
-
-  async resumeTimerSession(sessionId: number, total_paused_ms: number): Promise<ApiResponse<{ session: any }>> {
-    const response = await this.api.put(`/timer-sessions/${sessionId}/resume`, { total_paused_ms });
-    return response.data;
-  }
-
-  async stopTimerSession(sessionId: number, elapsed_time_ms: number, total_paused_ms: number): Promise<ApiResponse<{ workLog: any; activeWorkHours: number; totalPausedHours: number }>> {
-    const response = await this.api.put(`/timer-sessions/${sessionId}/stop`, { elapsed_time_ms, total_paused_ms });
+  async stopTimerSession(sessionId: number, elapsed_time_ms: number): Promise<ApiResponse<{ workLog: any; hours: number }>> {
+    const response = await this.api.put(`/timer-sessions/${sessionId}/stop`, { elapsed_time_ms });
     return response.data;
   }
 

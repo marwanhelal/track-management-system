@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import {
   startTimerSession,
-  pauseTimerSession,
-  resumeTimerSession,
   stopTimerSession,
   getActiveTimerSession,
   cancelTimerSession,
@@ -35,35 +33,16 @@ const validateSessionId = [
     .withMessage('Session ID must be a positive integer')
 ];
 
-const validatePauseTimer = [
-  ...validateSessionId,
-  body('elapsed_time_ms')
-    .optional()
-    .isInt({ min: 0 })
-    .withMessage('Elapsed time must be a non-negative integer')
-];
-
-const validateResumeTimer = [
-  ...validateSessionId,
-  body('total_paused_ms')
-    .optional()
-    .isInt({ min: 0 })
-    .withMessage('Total paused time must be a non-negative integer')
-];
-
 const validateStopTimer = [
   ...validateSessionId,
   body('elapsed_time_ms')
     .isInt({ min: 0 })
-    .withMessage('Elapsed time must be a non-negative integer'),
-  body('total_paused_ms')
-    .isInt({ min: 0 })
-    .withMessage('Total paused time must be a non-negative integer')
+    .withMessage('Elapsed time must be a non-negative integer')
 ];
 
 // Routes
 
-// Get engineer's active/paused timer session
+// Get engineer's active timer session
 router.get('/active', getActiveTimerSession);
 
 // Get timer session history
@@ -71,12 +50,6 @@ router.get('/history', getTimerSessionHistory);
 
 // Start new timer session
 router.post('/', validateStartTimer, startTimerSession);
-
-// Pause timer session
-router.put('/:id/pause', validatePauseTimer, pauseTimerSession);
-
-// Resume timer session
-router.put('/:id/resume', validateResumeTimer, resumeTimerSession);
 
 // Stop timer session and create work log
 router.put('/:id/stop', validateStopTimer, stopTimerSession);

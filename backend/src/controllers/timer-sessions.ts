@@ -136,207 +136,12 @@ export const startTimerSession = async (req: Request, res: Response): Promise<vo
   }
 };
 
-// Pause an active timer session
-export const pauseTimerSession = async (req: Request, res: Response): Promise<void> => {
-  const authReq = req as any;
-  try {
-    const { id } = req.params;
-    const { elapsed_time_ms } = req.body;
-
-    // Check if session exists and belongs to the engineer
-    const sessionResult = await query(
-      `SELECT ts.*, pp.phase_name, p.name as project_name
-       FROM timer_sessions ts
-       JOIN project_phases pp ON ts.phase_id = pp.id
-       JOIN projects p ON ts.project_id = p.id
-       WHERE ts.id = $1`,
-      [id]
-    );
-
-    if (sessionResult.rows.length === 0) {
-      res.status(404).json({
-        success: false,
-        error: 'Timer session not found'
-      });
-      return;
-    }
-
-    const session = sessionResult.rows[0];
-
-    // Verify ownership
-    if (session.engineer_id !== authReq.user.id) {
-      res.status(403).json({
-        success: false,
-        error: 'You can only pause your own timer sessions'
-      });
-      return;
-    }
-
-    // Check if session is active
-    if (session.status !== 'active') {
-      res.status(400).json({
-        success: false,
-        error: `Cannot pause timer session with status: ${session.status}`
-      });
-      return;
-    }
-
-    // Update session to paused status
-    const updateResult = await query(`
-      UPDATE timer_sessions
-      SET status = 'paused',
-          paused_at = NOW(),
-          elapsed_time_ms = $1,
-          updated_at = NOW()
-      WHERE id = $2
-      RETURNING *
-    `, [elapsed_time_ms || session.elapsed_time_ms, id]);
-
-    const updatedSession = updateResult.rows[0];
-
-    // Log audit event
-    await query(
-      `INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note)
-       VALUES ($1, $2, $3, $4, $5)`,
-      ['timer_sessions', id, 'PAUSE', authReq.user.id, `Paused timer at ${Math.floor(elapsed_time_ms / 1000 / 60)} minutes`]
-    );
-
-    // Emit Socket.IO event
-    try {
-      app.emitToAll('timer_paused', {
-        sessionId: id,
-        engineerId: authReq.user.id,
-        engineerName: authReq.user.name,
-        projectId: session.project_id,
-        projectName: session.project_name,
-        phaseId: session.phase_id,
-        phaseName: session.phase_name,
-        pausedAt: updatedSession.paused_at,
-        elapsedTimeMs: elapsed_time_ms
-      });
-    } catch (socketError) {
-      console.error('Socket.IO emit error:', socketError);
-    }
-
-    const response: ApiResponse<{ session: TimerSession }> = {
-      success: true,
-      message: 'Timer session paused successfully',
-      data: { session: updatedSession }
-    };
-
-    res.status(200).json(response);
-  } catch (error) {
-    console.error('Pause timer session error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
-  }
-};
-
-// Resume a paused timer session
-export const resumeTimerSession = async (req: Request, res: Response): Promise<void> => {
-  const authReq = req as any;
-  try {
-    const { id } = req.params;
-    const { total_paused_ms } = req.body;
-
-    // Check if session exists and belongs to the engineer
-    const sessionResult = await query(
-      `SELECT ts.*, pp.phase_name, p.name as project_name
-       FROM timer_sessions ts
-       JOIN project_phases pp ON ts.phase_id = pp.id
-       JOIN projects p ON ts.project_id = p.id
-       WHERE ts.id = $1`,
-      [id]
-    );
-
-    if (sessionResult.rows.length === 0) {
-      res.status(404).json({
-        success: false,
-        error: 'Timer session not found'
-      });
-      return;
-    }
-
-    const session = sessionResult.rows[0];
-
-    // Verify ownership
-    if (session.engineer_id !== authReq.user.id) {
-      res.status(403).json({
-        success: false,
-        error: 'You can only resume your own timer sessions'
-      });
-      return;
-    }
-
-    // Check if session is paused
-    if (session.status !== 'paused') {
-      res.status(400).json({
-        success: false,
-        error: `Cannot resume timer session with status: ${session.status}`
-      });
-      return;
-    }
-
-    // Update session to active status
-    const updateResult = await query(`
-      UPDATE timer_sessions
-      SET status = 'active',
-          paused_at = NULL,
-          total_paused_ms = $1,
-          updated_at = NOW()
-      WHERE id = $2
-      RETURNING *
-    `, [total_paused_ms || session.total_paused_ms, id]);
-
-    const updatedSession = updateResult.rows[0];
-
-    // Log audit event
-    await query(
-      `INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note)
-       VALUES ($1, $2, $3, $4, $5)`,
-      ['timer_sessions', id, 'RESUME', authReq.user.id, `Resumed timer after ${Math.floor(total_paused_ms / 1000 / 60)} minutes total pause`]
-    );
-
-    // Emit Socket.IO event
-    try {
-      app.emitToAll('timer_resumed', {
-        sessionId: id,
-        engineerId: authReq.user.id,
-        engineerName: authReq.user.name,
-        projectId: session.project_id,
-        projectName: session.project_name,
-        phaseId: session.phase_id,
-        phaseName: session.phase_name,
-        totalPausedMs: total_paused_ms
-      });
-    } catch (socketError) {
-      console.error('Socket.IO emit error:', socketError);
-    }
-
-    const response: ApiResponse<{ session: TimerSession }> = {
-      success: true,
-      message: 'Timer session resumed successfully',
-      data: { session: updatedSession }
-    };
-
-    res.status(200).json(response);
-  } catch (error) {
-    console.error('Resume timer session error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
-  }
-};
-
 // Stop timer and create work log
 export const stopTimerSession = async (req: Request, res: Response): Promise<void> => {
   const authReq = req as any;
   try {
     const { id } = req.params;
-    const { elapsed_time_ms, total_paused_ms } = req.body;
+    const { elapsed_time_ms } = req.body;
 
     // Check if session exists and belongs to the engineer
     const sessionResult = await query(
@@ -367,8 +172,8 @@ export const stopTimerSession = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    // Check if session is active or paused
-    if (!['active', 'paused'].includes(session.status)) {
+    // Check if session is active
+    if (session.status !== 'active') {
       res.status(400).json({
         success: false,
         error: `Cannot stop timer session with status: ${session.status}`
@@ -376,21 +181,20 @@ export const stopTimerSession = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    // Calculate active work time (elapsed - paused)
-    const activeWorkTimeMs = elapsed_time_ms - total_paused_ms;
-    const activeWorkHours = activeWorkTimeMs / (1000 * 60 * 60);
-    const activeWorkMinutes = activeWorkTimeMs / (1000 * 60);
+    // Calculate work time
+    const workHours = elapsed_time_ms / (1000 * 60 * 60);
+    const workMinutes = elapsed_time_ms / (1000 * 60);
 
-    // Require at least 1 minute of active work (more lenient than before)
-    if (activeWorkMinutes < 1) {
+    // Require at least 1 minute of work
+    if (workMinutes < 1) {
       res.status(400).json({
         success: false,
-        error: 'Active work time must be at least 1 minute. Please work for at least 1 minute before stopping the timer.'
+        error: 'Work time must be at least 1 minute. Please work for at least 1 minute before stopping the timer.'
       });
       return;
     }
 
-    // Create work log with active work time only
+    // Create work log
     const workLogResult = await query(`
       INSERT INTO work_logs (project_id, engineer_id, phase_id, hours, description, date)
       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE)
@@ -399,7 +203,7 @@ export const stopTimerSession = async (req: Request, res: Response): Promise<voi
       session.project_id,
       authReq.user.id,
       session.phase_id,
-      activeWorkHours,
+      workHours,
       session.description
     ]);
 
@@ -410,23 +214,22 @@ export const stopTimerSession = async (req: Request, res: Response): Promise<voi
       UPDATE timer_sessions
       SET status = 'completed',
           elapsed_time_ms = $1,
-          total_paused_ms = $2,
           completed_at = NOW(),
           updated_at = NOW()
-      WHERE id = $3
-    `, [elapsed_time_ms, total_paused_ms, id]);
+      WHERE id = $2
+    `, [elapsed_time_ms, id]);
 
     // Log audit events
     await query(
       `INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note)
        VALUES ($1, $2, $3, $4, $5)`,
-      ['timer_sessions', id, 'STOP', authReq.user.id, `Stopped timer and created work log with ${activeWorkHours.toFixed(2)} hours`]
+      ['timer_sessions', id, 'STOP', authReq.user.id, `Stopped timer and created work log with ${workHours.toFixed(2)} hours`]
     );
 
     await query(
       `INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note)
        VALUES ($1, $2, $3, $4, $5)`,
-      ['work_logs', workLog.id, 'CREATE', authReq.user.id, `Created from timer session (Active: ${activeWorkHours.toFixed(2)}h, Paused: ${(total_paused_ms / (1000 * 60 * 60)).toFixed(2)}h)`]
+      ['work_logs', workLog.id, 'CREATE', authReq.user.id, `Created from timer session (${workHours.toFixed(2)}h)`]
     );
 
     // Emit Socket.IO events
@@ -440,8 +243,7 @@ export const stopTimerSession = async (req: Request, res: Response): Promise<voi
         phaseId: session.phase_id,
         phaseName: session.phase_name,
         workLogId: workLog.id,
-        activeWorkHours: activeWorkHours.toFixed(2),
-        totalPausedHours: (total_paused_ms / (1000 * 60 * 60)).toFixed(2)
+        hours: workHours.toFixed(2)
       });
 
       app.emitToAll('engineer_activity_updated', {
@@ -451,7 +253,7 @@ export const stopTimerSession = async (req: Request, res: Response): Promise<voi
         projectName: session.project_name,
         phaseId: session.phase_id,
         phaseName: session.phase_name,
-        hours: activeWorkHours,
+        hours: workHours,
         date: new Date().toISOString().split('T')[0],
         action: 'work_logged'
       });
@@ -459,13 +261,12 @@ export const stopTimerSession = async (req: Request, res: Response): Promise<voi
       console.error('Socket.IO emit error:', socketError);
     }
 
-    const response: ApiResponse<{ workLog: any; activeWorkHours: number; totalPausedHours: number }> = {
+    const response: ApiResponse<{ workLog: any; hours: number }> = {
       success: true,
       message: 'Timer stopped and work log created successfully',
       data: {
         workLog,
-        activeWorkHours: parseFloat(activeWorkHours.toFixed(2)),
-        totalPausedHours: parseFloat((total_paused_ms / (1000 * 60 * 60)).toFixed(2))
+        hours: parseFloat(workHours.toFixed(2))
       }
     };
 
@@ -479,7 +280,7 @@ export const stopTimerSession = async (req: Request, res: Response): Promise<voi
   }
 };
 
-// Get engineer's active or paused timer session
+// Get engineer's active timer session
 export const getActiveTimerSession = async (req: Request, res: Response): Promise<void> => {
   const authReq = req as any;
   try {
@@ -489,7 +290,7 @@ export const getActiveTimerSession = async (req: Request, res: Response): Promis
       JOIN project_phases pp ON ts.phase_id = pp.id
       JOIN projects p ON ts.project_id = p.id
       JOIN users u ON ts.engineer_id = u.id
-      WHERE ts.engineer_id = $1 AND ts.status IN ('active', 'paused')
+      WHERE ts.engineer_id = $1 AND ts.status = 'active'
       ORDER BY ts.created_at DESC
       LIMIT 1
     `, [authReq.user.id]);
@@ -515,15 +316,12 @@ export const getActiveTimerSession = async (req: Request, res: Response): Promis
     const isCorrupt =
       elapsedMs < 0 ||
       elapsedMs > maxElapsedMs ||
-      session.total_paused_ms > elapsedMs ||
-      session.total_paused_ms < 0 ||
       session.elapsed_time_ms < 0;
 
     if (isCorrupt) {
       console.error('❌ Corrupt timer session detected in database:', {
         sessionId: session.id,
         elapsedMs,
-        total_paused_ms: session.total_paused_ms,
         elapsed_time_ms: session.elapsed_time_ms
       });
 
