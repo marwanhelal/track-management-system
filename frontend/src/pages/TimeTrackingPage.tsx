@@ -192,22 +192,27 @@ const TimeTrackingPage: React.FC = () => {
         setWorkLogs(workLogsResponse.data.workLogs);
       }
 
-      // Get all phases for active projects
+      // Get all phases for active projects (in parallel for better performance)
       const allPhases: ProjectPhase[] = [];
       if (projectsResponse.success && projectsResponse.data) {
-        for (const project of projectsResponse.data.projects) {
+        const phasePromises = projectsResponse.data.projects.map(async (project) => {
           try {
             const phasesResponse = await apiService.getProjectPhases(project.id);
             if (phasesResponse.success && phasesResponse.data) {
-              allPhases.push(...phasesResponse.data.phases.map(phase => ({
+              return phasesResponse.data.phases.map(phase => ({
                 ...phase,
                 project_name: project.name
-              })));
+              }));
             }
           } catch (err) {
             // Continue if phases fetch fails for a project
+            return [];
           }
-        }
+          return [];
+        });
+
+        const phasesArrays = await Promise.all(phasePromises);
+        phasesArrays.forEach(phases => allPhases.push(...phases));
       }
 
       // Filter to only show phases that engineers can work on (unlocked phases)
