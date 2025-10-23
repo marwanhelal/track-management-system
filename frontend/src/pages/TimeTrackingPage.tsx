@@ -142,7 +142,7 @@ const TimeTrackingPage: React.FC = () => {
     try {
       // First, check backend for active session
       const response = await apiService.getActiveTimerSession();
-      if (response.success && response.data.session) {
+      if (response.success && response.data && response.data.session) {
         const session = response.data.session;
         setTimerSession(session);
 
