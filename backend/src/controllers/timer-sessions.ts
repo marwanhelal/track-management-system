@@ -17,10 +17,10 @@ export const startTimerSession = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Check if engineer already has an active or paused session
+    // Check if engineer already has an active session
     const existingSessionResult = await query(
       `SELECT * FROM timer_sessions
-       WHERE engineer_id = $1 AND status IN ('active', 'paused')
+       WHERE engineer_id = $1 AND status = 'active'
        LIMIT 1`,
       [authReq.user.id]
     );
@@ -66,9 +66,9 @@ export const startTimerSession = async (req: Request, res: Response): Promise<vo
     const result = await query(`
       INSERT INTO timer_sessions (
         engineer_id, phase_id, project_id, description,
-        start_time, status, elapsed_time_ms, total_paused_ms
+        start_time, status, elapsed_time_ms
       )
-      VALUES ($1, $2, $3, $4, NOW(), 'active', 0, 0)
+      VALUES ($1, $2, $3, $4, NOW(), 'active', 0)
       RETURNING *
     `, [authReq.user.id, phase_id, phase.project_id, description]);
 
