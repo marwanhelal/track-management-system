@@ -150,6 +150,38 @@ export interface WorkLogCreateInput {
   description?: string;
 }
 
+// Timer Session Types (Pause/Resume Feature)
+export interface TimerSession {
+  id: number;
+  engineer_id: number;
+  phase_id: number;
+  project_id: number;
+  start_time: string;
+  paused_at?: string;
+  total_paused_ms: number;
+  elapsed_time_ms: number;
+  description: string;
+  status: 'active' | 'paused' | 'completed' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+  // Joined data
+  project_name?: string;
+  phase_name?: string;
+  engineer_name?: string;
+}
+
+export interface TimerSessionCreateInput {
+  phase_id: number;
+  description: string;
+}
+
+export interface TimerSessionResponse {
+  session: TimerSession;
+  project_name: string;
+  phase_name: string;
+}
+
 // Dashboard Types
 export interface ProjectOverview {
   id: number;

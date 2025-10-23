@@ -124,6 +124,34 @@ CREATE TABLE progress_adjustments (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Timer Sessions table (migration 008)
+-- Stores active timer sessions for engineers with pause/resume support and automatic recovery
+CREATE TABLE timer_sessions (
+    id SERIAL PRIMARY KEY,
+    engineer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    phase_id INTEGER NOT NULL REFERENCES project_phases(id) ON DELETE CASCADE,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    -- Timer state
+    start_time TIMESTAMP NOT NULL DEFAULT NOW(),
+    paused_at TIMESTAMP,
+    total_paused_ms BIGINT DEFAULT 0 CHECK (total_paused_ms >= 0),
+    elapsed_time_ms BIGINT DEFAULT 0 CHECK (elapsed_time_ms >= 0),
+    -- Session data
+    description TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'cancelled')),
+    -- Metadata
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    completed_at TIMESTAMP
+);
+
+-- Create indexes for timer_sessions for performance
+CREATE INDEX idx_timer_sessions_engineer_id ON timer_sessions(engineer_id);
+CREATE INDEX idx_timer_sessions_status ON timer_sessions(status);
+CREATE INDEX idx_timer_sessions_phase_id ON timer_sessions(phase_id);
+CREATE INDEX idx_timer_sessions_created_at ON timer_sessions(created_at DESC);
+CREATE INDEX idx_timer_sessions_active_paused ON timer_sessions(engineer_id, status) WHERE status IN ('active', 'paused');
+
 -- Audit Logs (Complete history tracking)
 CREATE TABLE audit_logs (
     id SERIAL PRIMARY KEY,

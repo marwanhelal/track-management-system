@@ -718,3 +718,41 @@ export interface EngineerProgressDetail {
   adjustment_count: number;
   has_manual_adjustments: boolean;
 }
+
+// Timer Session Types (Pause/Resume Feature)
+export interface TimerSession {
+  id: number;
+  engineer_id: number;
+  phase_id: number;
+  project_id: number;
+  start_time: Date;
+  paused_at?: Date;
+  total_paused_ms: number;
+  elapsed_time_ms: number;
+  description: string;
+  status: 'active' | 'paused' | 'completed' | 'cancelled';
+  created_at: Date;
+  updated_at: Date;
+  completed_at?: Date;
+  // Joined data
+  project_name?: string;
+  phase_name?: string;
+  engineer_name?: string;
+}
+
+export interface TimerSessionCreateInput {
+  phase_id: number;
+  description: string;
+}
+
+export interface TimerSessionUpdateInput {
+  description?: string;
+  elapsed_time_ms?: number;
+  total_paused_ms?: number;
+}
+
+export interface TimerSessionResponse {
+  session: TimerSession;
+  project_name: string;
+  phase_name: string;
+}

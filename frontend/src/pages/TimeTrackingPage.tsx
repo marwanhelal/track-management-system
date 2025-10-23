@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -27,7 +27,8 @@ import {
   CircularProgress,
   Divider,
   FormHelperText,
-  Grid
+  Grid,
+  Tooltip
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -37,7 +38,9 @@ import {
   Stop as StopIcon,
   Timer as TimerIcon,
   AccessTime as AccessTimeIcon,
-  Work as WorkIcon
+  Work as WorkIcon,
+  Pause as PauseIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -45,7 +48,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import apiService from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { WorkLog } from '../types';
+import { WorkLog, TimerSession } from '../types';
 
 interface Project {
   id: number;
@@ -62,13 +65,9 @@ interface ProjectPhase {
   phase_order: number;
 }
 
-interface TimerSession {
-  phaseId: number;
-  projectName: string;
-  phaseName: string;
-  startTime: Date;
-  description: string;
-}
+// localStorage key for timer persistence
+const TIMER_STORAGE_KEY = 'cdtms_active_timer';
+const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 
 const TimeTrackingPage: React.FC = () => {
   const { user } = useAuth();
@@ -85,9 +84,16 @@ const TimeTrackingPage: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [logToDelete, setLogToDelete] = useState<number | null>(null);
 
-  // Timer states
+  // Enhanced Timer states for pause/resume
   const [timerSession, setTimerSession] = useState<TimerSession | null>(null);
+  const [timerStatus, setTimerStatus] = useState<'idle' | 'running' | 'paused'>('idle');
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [totalPausedTime, setTotalPausedTime] = useState(0);
+  const [pausedAt, setPausedAt] = useState<Date | null>(null);
+  const [pauseStartTime, setPauseStartTime] = useState<number>(0);
+
+  const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -103,6 +109,86 @@ const TimeTrackingPage: React.FC = () => {
     endDate: dayjs()
   });
   const [projectFilter, setProjectFilter] = useState('');
+
+  // Calculate active work time (elapsed - paused)
+  const getActiveWorkTime = useCallback(() => {
+    return elapsedTime - totalPausedTime;
+  }, [elapsedTime, totalPausedTime]);
+
+  // Save timer state to localStorage
+  const saveTimerToLocalStorage = useCallback(() => {
+    if (timerSession && timerStatus !== 'idle') {
+      const timerData = {
+        sessionId: timerSession.id,
+        phase_id: timerSession.phase_id,
+        project_name: timerSession.project_name,
+        phase_name: timerSession.phase_name,
+        description: timerSession.description,
+        start_time: timerSession.start_time,
+        paused_at: pausedAt?.toISOString() || null,
+        status: timerStatus,
+        elapsed_time_ms: elapsedTime,
+        total_paused_ms: totalPausedTime,
+        lastSaved: new Date().toISOString()
+      };
+      localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(timerData));
+    } else {
+      localStorage.removeItem(TIMER_STORAGE_KEY);
+    }
+  }, [timerSession, timerStatus, elapsedTime, totalPausedTime, pausedAt]);
+
+  // Load timer state from localStorage and backend
+  const recoverTimerSession = useCallback(async () => {
+    try {
+      // First, check backend for active session
+      const response = await apiService.getActiveTimerSession();
+      if (response.success && response.data.session) {
+        const session = response.data.session;
+        setTimerSession(session);
+
+        // Calculate elapsed time based on start_time
+        const startTime = new Date(session.start_time).getTime();
+        const now = Date.now();
+        let calculatedElapsed = now - startTime;
+
+        // Restore paused state if session is paused
+        if (session.status === 'paused') {
+          setTimerStatus('paused');
+          setPausedAt(new Date(session.paused_at));
+          setElapsedTime(session.elapsed_time_ms);
+          setTotalPausedTime(session.total_paused_ms);
+
+          // Calculate additional pause time since paused_at
+          const pausedTime = new Date(session.paused_at).getTime();
+          const additionalPausedTime = now - pausedTime;
+          setTotalPausedTime(session.total_paused_ms + additionalPausedTime);
+        } else if (session.status === 'active') {
+          setTimerStatus('running');
+          setElapsedTime(calculatedElapsed);
+          setTotalPausedTime(session.total_paused_ms);
+        }
+
+        console.log('✅ Timer session recovered from backend:', session);
+        return;
+      }
+
+      // Fallback to localStorage if backend has no active session
+      const savedTimer = localStorage.getItem(TIMER_STORAGE_KEY);
+      if (savedTimer) {
+        const timerData = JSON.parse(savedTimer);
+        console.log('📦 Found saved timer in localStorage:', timerData);
+        // Clear localStorage since backend has no active session
+        localStorage.removeItem(TIMER_STORAGE_KEY);
+      }
+    } catch (error) {
+      console.error('Error recovering timer session:', error);
+      // Try localStorage as fallback
+      const savedTimer = localStorage.getItem(TIMER_STORAGE_KEY);
+      if (savedTimer) {
+        localStorage.removeItem(TIMER_STORAGE_KEY);
+      }
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
@@ -159,20 +245,71 @@ const TimeTrackingPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    recoverTimerSession();
+  }, [fetchData, recoverTimerSession]);
 
+  // Timer interval effect
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (timerSession) {
-      interval = setInterval(() => {
-        setElapsedTime(Date.now() - timerSession.startTime.getTime());
+    if (timerStatus === 'running' && timerSession) {
+      timerIntervalRef.current = setInterval(() => {
+        const startTime = new Date(timerSession.start_time).getTime();
+        const now = Date.now();
+        setElapsedTime(now - startTime);
       }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [timerSession]);
+    } else if (timerStatus === 'paused') {
+      // When paused, track pause duration
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
 
+      const pauseInterval = setInterval(() => {
+        if (pauseStartTime > 0) {
+          const now = Date.now();
+          const currentPauseDuration = now - pauseStartTime;
+          setTotalPausedTime(totalPausedTime + currentPauseDuration);
+          setPauseStartTime(now);
+        }
+      }, 1000);
+
+      return () => clearInterval(pauseInterval);
+    }
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [timerStatus, timerSession, pauseStartTime, totalPausedTime]);
+
+  // Auto-save timer state every 30 seconds
+  useEffect(() => {
+    if (timerStatus !== 'idle') {
+      autoSaveIntervalRef.current = setInterval(() => {
+        saveTimerToLocalStorage();
+
+        // Also sync to backend
+        if (timerSession && timerStatus === 'running') {
+          // Auto-save to backend is handled by pause/resume actions
+        }
+      }, AUTO_SAVE_INTERVAL);
+    }
+
+    return () => {
+      if (autoSaveIntervalRef.current) {
+        clearInterval(autoSaveIntervalRef.current);
+      }
+    };
+  }, [timerStatus, saveTimerToLocalStorage, timerSession]);
+
+  // Save timer state before page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveTimerToLocalStorage();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveTimerToLocalStorage]);
 
   const handleCreateWorkLog = async () => {
     try {
@@ -264,39 +401,129 @@ const TimeTrackingPage: React.FC = () => {
     }
   };
 
-  const startTimer = () => {
-    if (!formData.phase_id || !formData.description) {
-      setError('Please select a phase and enter a description before starting the timer');
-      return;
+  const startTimer = async () => {
+    try {
+      if (!formData.phase_id || !formData.description) {
+        setError('Please select a phase and enter a description before starting the timer');
+        return;
+      }
+
+      const response = await apiService.startTimerSession({
+        phase_id: parseInt(formData.phase_id),
+        description: formData.description
+      });
+
+      if (response.success && response.data) {
+        const session = response.data.session;
+        setTimerSession(session);
+        setTimerStatus('running');
+        setElapsedTime(0);
+        setTotalPausedTime(0);
+        setPausedAt(null);
+        saveTimerToLocalStorage();
+        setSuccess('Timer started successfully!');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to start timer');
     }
-
-    const phase = phases.find(p => p.id === parseInt(formData.phase_id));
-    if (!phase) return;
-
-    setTimerSession({
-      phaseId: parseInt(formData.phase_id),
-      projectName: phase.project_name,
-      phaseName: phase.phase_name,
-      startTime: new Date(),
-      description: formData.description
-    });
-    setElapsedTime(0);
   };
 
-  const stopTimer = () => {
-    if (!timerSession) return;
+  const pauseTimer = async () => {
+    try {
+      if (!timerSession) return;
 
-    const hours = elapsedTime / (1000 * 60 * 60);
-    setFormData(prev => ({
-      ...prev,
-      hours: hours.toFixed(2),
-      phase_id: timerSession.phaseId.toString(),
-      description: timerSession.description
-    }));
+      const response = await apiService.pauseTimerSession(timerSession.id, elapsedTime);
 
-    setTimerSession(null);
-    setElapsedTime(0);
-    setDialogOpen(true);
+      if (response.success) {
+        setTimerStatus('paused');
+        setPausedAt(new Date());
+        setPauseStartTime(Date.now());
+        saveTimerToLocalStorage();
+        setSuccess('Timer paused');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to pause timer');
+    }
+  };
+
+  const resumeTimer = async () => {
+    try {
+      if (!timerSession) return;
+
+      const response = await apiService.resumeTimerSession(timerSession.id, totalPausedTime);
+
+      if (response.success) {
+        setTimerStatus('running');
+        setPausedAt(null);
+        setPauseStartTime(0);
+        saveTimerToLocalStorage();
+        setSuccess('Timer resumed');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to resume timer');
+    }
+  };
+
+  const stopTimer = async () => {
+    try {
+      if (!timerSession) return;
+
+      const activeWorkTime = getActiveWorkTime();
+      if (activeWorkTime <= 0) {
+        setError('Active work time must be greater than 0');
+        return;
+      }
+
+      const response = await apiService.stopTimerSession(
+        timerSession.id,
+        elapsedTime,
+        totalPausedTime
+      );
+
+      if (response.success && response.data) {
+        setSuccess(
+          `Work log created! Active time: ${response.data.activeWorkHours.toFixed(2)}h, Paused: ${response.data.totalPausedHours.toFixed(2)}h`
+        );
+
+        // Reset timer state
+        setTimerSession(null);
+        setTimerStatus('idle');
+        setElapsedTime(0);
+        setTotalPausedTime(0);
+        setPausedAt(null);
+        localStorage.removeItem(TIMER_STORAGE_KEY);
+
+        // Refresh work logs
+        fetchData();
+
+        // Reset form
+        resetForm();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to stop timer');
+    }
+  };
+
+  const cancelTimer = async () => {
+    try {
+      if (!timerSession) return;
+
+      if (window.confirm('Are you sure you want to cancel this timer session? This cannot be undone.')) {
+        const response = await apiService.cancelTimerSession(timerSession.id);
+
+        if (response.success) {
+          setTimerSession(null);
+          setTimerStatus('idle');
+          setElapsedTime(0);
+          setTotalPausedTime(0);
+          setPausedAt(null);
+          localStorage.removeItem(TIMER_STORAGE_KEY);
+          setSuccess('Timer cancelled');
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to cancel timer');
+    }
   };
 
   const resetForm = () => {
@@ -338,7 +565,6 @@ const TimeTrackingPage: React.FC = () => {
     return isNaN(total) ? 0 : total;
   };
 
-
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -367,26 +593,100 @@ const TimeTrackingPage: React.FC = () => {
           </Alert>
         )}
 
-        {/* Timer Section */}
+        {/* Enhanced Timer Section with Pause/Resume */}
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              <AccessTimeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-              Time Tracker
-            </Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">
+                <AccessTimeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                Time Tracker
+              </Typography>
+              {timerStatus !== 'idle' && (
+                <Chip
+                  label={timerStatus === 'running' ? 'Running' : 'Paused'}
+                  color={timerStatus === 'running' ? 'success' : 'warning'}
+                  size="small"
+                />
+              )}
+            </Box>
 
-            {timerSession ? (
+            {timerSession && timerStatus !== 'idle' ? (
               <Box>
-                <Typography variant="h3" color="primary" gutterBottom textAlign="center">
-                  {formatTime(elapsedTime)}
-                </Typography>
+                {/* Timer Display */}
+                <Box textAlign="center" mb={2}>
+                  {timerStatus === 'paused' ? (
+                    <Box>
+                      <Grid container spacing={2} justifyContent="center">
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="caption" color="text.secondary">Active Time</Typography>
+                          <Typography variant="h4" color="success.main">
+                            {formatTime(getActiveWorkTime())}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="caption" color="text.secondary">Paused Time</Typography>
+                          <Typography variant="h4" color="warning.main">
+                            {formatTime(totalPausedTime)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="caption" color="text.secondary">Total Elapsed</Typography>
+                          <Typography variant="h4" color="text.secondary">
+                            {formatTime(elapsedTime)}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                      {pausedAt && (
+                        <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
+                          ⏸️ Paused since: {pausedAt.toLocaleTimeString()}
+                        </Typography>
+                      )}
+                    </Box>
+                  ) : (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Active Work Time</Typography>
+                      <Typography variant="h3" color="success.main" gutterBottom>
+                        {formatTime(getActiveWorkTime())}
+                      </Typography>
+                      {totalPausedTime > 0 && (
+                        <Typography variant="body2" color="text.secondary">
+                          (Total paused: {formatTime(totalPausedTime)})
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+
                 <Typography variant="body1" gutterBottom textAlign="center">
-                  Working on: <strong>{timerSession.projectName}</strong> - {timerSession.phaseName}
+                  Working on: <strong>{timerSession.project_name}</strong> - {timerSession.phase_name}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" gutterBottom textAlign="center">
                   {timerSession.description}
                 </Typography>
-                <Box textAlign="center">
+
+                {/* Timer Control Buttons */}
+                <Box display="flex" gap={2} justifyContent="center" mt={2}>
+                  {timerStatus === 'running' ? (
+                    <Button
+                      variant="contained"
+                      color="warning"
+                      startIcon={<PauseIcon />}
+                      onClick={pauseTimer}
+                      size="large"
+                    >
+                      Pause
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="contained"
+                      color="success"
+                      startIcon={<PlayIcon />}
+                      onClick={resumeTimer}
+                      size="large"
+                    >
+                      Resume
+                    </Button>
+                  )}
                   <Button
                     variant="contained"
                     color="error"
@@ -396,6 +696,14 @@ const TimeTrackingPage: React.FC = () => {
                   >
                     Stop Timer
                   </Button>
+                  <Tooltip title="Cancel timer session">
+                    <IconButton
+                      color="error"
+                      onClick={cancelTimer}
+                    >
+                      <CancelIcon />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
               </Box>
             ) : (
