@@ -98,6 +98,13 @@ export const startTimerSession = async (req: Request, res: Response): Promise<vo
       ['timer_sessions', session.id, 'START', authReq.user.id, `Started timer for ${phase.phase_name}`]
     );
 
+    // Add project and phase names to session object for frontend
+    const sessionWithNames = {
+      ...session,
+      project_name: phase.project_name,
+      phase_name: phase.phase_name
+    };
+
     // Emit Socket.IO event for real-time updates
     try {
       app.emitToAll('timer_started', {
@@ -120,7 +127,7 @@ export const startTimerSession = async (req: Request, res: Response): Promise<vo
       success: true,
       message: 'Timer session started successfully',
       data: {
-        session,
+        session: sessionWithNames,
         project_name: phase.project_name,
         phase_name: phase.phase_name
       }
