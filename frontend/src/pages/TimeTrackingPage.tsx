@@ -144,12 +144,35 @@ const TimeTrackingPage: React.FC = () => {
       const response = await apiService.getActiveTimerSession();
       if (response.success && response.data && response.data.session) {
         const session = response.data.session;
-        setTimerSession(session);
 
-        // Calculate elapsed time based on start_time
+        // Validate session data before using it
         const startTime = new Date(session.start_time).getTime();
         const now = Date.now();
         let calculatedElapsed = now - startTime;
+
+        // Sanity check: elapsed time should be reasonable (not negative, not > 24 hours)
+        const MAX_SESSION_HOURS = 24;
+        const maxElapsedMs = MAX_SESSION_HOURS * 60 * 60 * 1000;
+
+        if (calculatedElapsed < 0 || calculatedElapsed > maxElapsedMs) {
+          console.error('❌ Invalid timer session detected (elapsed time out of range). Cancelling session.');
+          // Cancel the corrupt session
+          await apiService.cancelTimerSession(session.id);
+          localStorage.removeItem(TIMER_STORAGE_KEY);
+          setError('Previous timer session was invalid and has been cancelled. Please start a new timer.');
+          return;
+        }
+
+        // Validate stored pause time isn't larger than elapsed time
+        if (session.total_paused_ms > calculatedElapsed) {
+          console.error('❌ Invalid timer session detected (paused > elapsed). Cancelling session.');
+          await apiService.cancelTimerSession(session.id);
+          localStorage.removeItem(TIMER_STORAGE_KEY);
+          setError('Previous timer session had invalid pause data and has been cancelled. Please start a new timer.');
+          return;
+        }
+
+        setTimerSession(session);
 
         // Restore paused state if session is paused
         if (session.status === 'paused') {
