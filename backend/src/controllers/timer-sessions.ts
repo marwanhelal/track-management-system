@@ -379,11 +379,13 @@ export const stopTimerSession = async (req: Request, res: Response): Promise<voi
     // Calculate active work time (elapsed - paused)
     const activeWorkTimeMs = elapsed_time_ms - total_paused_ms;
     const activeWorkHours = activeWorkTimeMs / (1000 * 60 * 60);
+    const activeWorkMinutes = activeWorkTimeMs / (1000 * 60);
 
-    if (activeWorkHours <= 0) {
+    // Require at least 1 minute of active work (more lenient than before)
+    if (activeWorkMinutes < 1) {
       res.status(400).json({
         success: false,
-        error: 'Active work time must be greater than 0'
+        error: 'Active work time must be at least 1 minute. Please work for at least 1 minute before stopping the timer.'
       });
       return;
     }

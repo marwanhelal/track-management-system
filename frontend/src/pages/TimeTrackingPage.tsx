@@ -155,17 +155,17 @@ const TimeTrackingPage: React.FC = () => {
         if (session.status === 'paused') {
           setTimerStatus('paused');
           setPausedAt(new Date(session.paused_at));
+          // Use the elapsed time from when it was paused
           setElapsedTime(session.elapsed_time_ms);
           setTotalPausedTime(session.total_paused_ms);
-
-          // Calculate additional pause time since paused_at
-          const pausedTime = new Date(session.paused_at).getTime();
-          const additionalPausedTime = now - pausedTime;
-          setTotalPausedTime(session.total_paused_ms + additionalPausedTime);
+          // Set pause start time to now for tracking current pause duration
+          setPauseStartTime(Date.now());
         } else if (session.status === 'active') {
           setTimerStatus('running');
+          // Calculate elapsed time from start
           setElapsedTime(calculatedElapsed);
           setTotalPausedTime(session.total_paused_ms);
+          setPauseStartTime(0);
         }
 
         console.log('✅ Timer session recovered from backend:', session);
@@ -428,14 +428,16 @@ const TimeTrackingPage: React.FC = () => {
     try {
       if (!timerSession) return;
 
+      // Simply pause - backend will handle the timestamp
       const response = await apiService.pauseTimerSession(timerSession.id, elapsedTime);
 
       if (response.success) {
         setTimerStatus('paused');
         setPausedAt(new Date());
+        // Record when we paused for calculating pause duration later
         setPauseStartTime(Date.now());
         saveTimerToLocalStorage();
-        setSuccess('Timer paused');
+        setSuccess('Timer paused - Take your break!');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to pause timer');
@@ -444,12 +446,14 @@ const TimeTrackingPage: React.FC = () => {
 
   const resumeTimer = async () => {
     try {
-      if (!timerSession || !pauseStartTime) return;
+      if (!timerSession) return;
 
-      // Calculate how long we've been paused
-      const now = Date.now();
-      const pauseDuration = now - pauseStartTime;
-      const newTotalPausedTime = totalPausedTime + pauseDuration;
+      // Calculate pause duration if we have a pause start time
+      let newTotalPausedTime = totalPausedTime;
+      if (pauseStartTime > 0) {
+        const pauseDuration = Date.now() - pauseStartTime;
+        newTotalPausedTime = totalPausedTime + pauseDuration;
+      }
 
       const response = await apiService.resumeTimerSession(timerSession.id, newTotalPausedTime);
 
@@ -459,7 +463,7 @@ const TimeTrackingPage: React.FC = () => {
         setPausedAt(null);
         setPauseStartTime(0);
         saveTimerToLocalStorage();
-        setSuccess('Timer resumed');
+        setSuccess('Timer resumed - Welcome back!');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to resume timer');
@@ -470,9 +474,13 @@ const TimeTrackingPage: React.FC = () => {
     try {
       if (!timerSession) return;
 
-      const activeWorkTime = getActiveWorkTime();
-      if (activeWorkTime <= 0) {
-        setError('Active work time must be greater than 0');
+      // Calculate active work time
+      const activeWorkTimeMs = elapsedTime - totalPausedTime;
+      const activeWorkMinutes = activeWorkTimeMs / (1000 * 60);
+
+      // Minimum 1 minute of work required (more lenient than before)
+      if (activeWorkMinutes < 1) {
+        setError('You need at least 1 minute of active work time to create a work log');
         return;
       }
 
@@ -484,7 +492,7 @@ const TimeTrackingPage: React.FC = () => {
 
       if (response.success && response.data) {
         setSuccess(
-          `Work log created! Active time: ${response.data.activeWorkHours.toFixed(2)}h, Paused: ${response.data.totalPausedHours.toFixed(2)}h`
+          `Work log created! ✅ Active time: ${response.data.activeWorkHours.toFixed(2)}h${response.data.totalPausedHours > 0 ? `, Paused: ${response.data.totalPausedHours.toFixed(2)}h` : ''}`
         );
 
         // Reset timer state
@@ -493,6 +501,7 @@ const TimeTrackingPage: React.FC = () => {
         setElapsedTime(0);
         setTotalPausedTime(0);
         setPausedAt(null);
+        setPauseStartTime(0);
         localStorage.removeItem(TIMER_STORAGE_KEY);
 
         // Refresh work logs
