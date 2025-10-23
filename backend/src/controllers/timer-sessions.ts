@@ -502,9 +502,58 @@ export const getActiveTimerSession = async (req: Request, res: Response): Promis
       return;
     }
 
+    const session = result.rows[0];
+
+    // Validate session data before returning it
+    const startTime = new Date(session.start_time).getTime();
+    const now = Date.now();
+    const elapsedMs = now - startTime;
+    const MAX_SESSION_HOURS = 24;
+    const maxElapsedMs = MAX_SESSION_HOURS * 60 * 60 * 1000;
+
+    // Check for corrupt data
+    const isCorrupt =
+      elapsedMs < 0 ||
+      elapsedMs > maxElapsedMs ||
+      session.total_paused_ms > elapsedMs ||
+      session.total_paused_ms < 0 ||
+      session.elapsed_time_ms < 0;
+
+    if (isCorrupt) {
+      console.error('❌ Corrupt timer session detected in database:', {
+        sessionId: session.id,
+        elapsedMs,
+        total_paused_ms: session.total_paused_ms,
+        elapsed_time_ms: session.elapsed_time_ms
+      });
+
+      // Auto-cancel the corrupt session
+      await query(
+        `UPDATE timer_sessions SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
+        [session.id]
+      );
+
+      // Log audit event
+      await query(
+        `INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note)
+         VALUES ($1, $2, $3, $4, $5)`,
+        ['timer_sessions', session.id, 'AUTO_CANCEL', authReq.user.id, 'Auto-cancelled corrupt session with invalid time data']
+      );
+
+      console.log('✅ Corrupt session auto-cancelled:', session.id);
+
+      // Return null session so user can start fresh
+      res.status(200).json({
+        success: true,
+        data: { session: null },
+        message: 'Previous session was corrupt and has been cancelled'
+      });
+      return;
+    }
+
     const response: ApiResponse<{ session: TimerSession }> = {
       success: true,
-      data: { session: result.rows[0] }
+      data: { session: session }
     };
 
     res.status(200).json(response);
