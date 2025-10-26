@@ -385,6 +385,28 @@ class ApiService {
     return response.data;
   }
 
+  async getUserProjectBreakdown(id: number): Promise<ApiResponse<{
+    user: { id: number; name: string; email: string; role: string };
+    summary: { total_projects: number; total_phases: number; total_work_logs: number; total_hours: number };
+    projects: Array<{
+      project_id: number;
+      project_name: string;
+      project_status: string;
+      total_hours: number;
+      work_log_count: number;
+      phases: Array<{
+        phase_id: number;
+        phase_name: string;
+        phase_status: string;
+        total_hours: number;
+        work_log_count: number;
+      }>;
+    }>;
+  }>> {
+    const response = await this.api.get(`/users/${id}/project-breakdown`);
+    return response.data;
+  }
+
   async createEngineer(userData: { name: string; email: string; password: string }): Promise<ApiResponse<{ user: any }>> {
     const response = await this.api.post('/users/engineers', userData);
     return response.data;

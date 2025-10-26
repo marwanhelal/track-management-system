@@ -43,9 +43,11 @@ import {
   FileDownload as FileDownloadIcon,
   Search as SearchIcon,
   FilterList as FilterListIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { apiService } from '../services/api';
+import EngineerDetailsDialog from '../components/team-management/EngineerDetailsDialog';
 
 interface User {
   id: number;
@@ -117,6 +119,10 @@ interface TeamManagementState {
     loading: boolean;
     format: 'csv' | 'json' | 'pdf';
   };
+  detailsDialog: {
+    open: boolean;
+    user: User | null;
+  };
   filters: {
     role: string;
     status: string;
@@ -184,6 +190,10 @@ const TeamManagementPage: React.FC = () => {
       open: false,
       loading: false,
       format: 'pdf'
+    },
+    detailsDialog: {
+      open: false,
+      user: null
     },
     filters: {
       role: 'all',
@@ -669,6 +679,22 @@ const TeamManagementPage: React.FC = () => {
       ...prev,
       actionMenuAnchor: null,
       selectedUser: null
+    }));
+  };
+
+  const handleViewDetails = (user: User) => {
+    setState(prev => ({
+      ...prev,
+      detailsDialog: { open: true, user },
+      actionMenuAnchor: null,
+      selectedUser: null
+    }));
+  };
+
+  const handleCloseDetailsDialog = () => {
+    setState(prev => ({
+      ...prev,
+      detailsDialog: { open: false, user: null }
     }));
   };
 
@@ -1266,6 +1292,10 @@ const TeamManagementPage: React.FC = () => {
         open={Boolean(state.actionMenuAnchor)}
         onClose={handleActionClose}
       >
+        <MenuItem onClick={() => state.selectedUser && handleViewDetails(state.selectedUser)}>
+          <VisibilityIcon sx={{ mr: 1 }} />
+          View Details
+        </MenuItem>
         <MenuItem onClick={() => state.selectedUser && handleEditUser(state.selectedUser)}>
           <EditIcon sx={{ mr: 1 }} />
           Edit
@@ -1760,6 +1790,16 @@ const TeamManagementPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Engineer Details Dialog */}
+      {state.detailsDialog.user && (
+        <EngineerDetailsDialog
+          open={state.detailsDialog.open}
+          onClose={handleCloseDetailsDialog}
+          userId={state.detailsDialog.user.id}
+          userName={state.detailsDialog.user.name}
+        />
+      )}
     </Box>
   );
 };

@@ -726,3 +726,137 @@ export const reactivateUser = async (req: Request, res: Response): Promise<void>
     });
   }
 };
+
+// Get engineer's project breakdown with detailed hours per project and phase
+export const getUserProjectBreakdown = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        error: 'User ID is required'
+      });
+      return;
+    }
+
+    // Only supervisors and administrators can view breakdown, or users can view their own
+    if (authReq.user.role !== 'supervisor' &&
+        authReq.user.role !== 'administrator' &&
+        authReq.user.id !== parseInt(id as string)) {
+      res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+      return;
+    }
+
+    // Check if user exists
+    const userResult = await query(
+      'SELECT id, name, email, role FROM users WHERE id = $1',
+      [id]
+    );
+
+    if (userResult.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+      return;
+    }
+
+    const user = userResult.rows[0];
+
+    // Get project breakdown with phase details
+    const breakdownResult = await query(
+      `
+      SELECT
+        p.id as project_id,
+        p.name as project_name,
+        p.status as project_status,
+        pp.id as phase_id,
+        pp.phase_name,
+        pp.status as phase_status,
+        COUNT(wl.id) as work_log_count,
+        COALESCE(SUM(wl.hours), 0) as total_hours
+      FROM projects p
+      INNER JOIN project_phases pp ON pp.project_id = p.id
+      INNER JOIN work_logs wl ON wl.phase_id = pp.id AND wl.engineer_id = $1
+      GROUP BY p.id, p.name, p.status, pp.id, pp.phase_name, pp.status
+      ORDER BY p.name, pp.phase_order
+      `,
+      [id]
+    );
+
+    // Get summary statistics
+    const summaryResult = await query(
+      `
+      SELECT
+        COUNT(DISTINCT wl.project_id) as total_projects,
+        COUNT(DISTINCT wl.phase_id) as total_phases,
+        COUNT(wl.id) as total_work_logs,
+        COALESCE(SUM(wl.hours), 0) as total_hours
+      FROM work_logs wl
+      WHERE wl.engineer_id = $1
+      `,
+      [id]
+    );
+
+    // Group phases by project
+    const projectsMap = new Map();
+
+    breakdownResult.rows.forEach((row: any) => {
+      if (!projectsMap.has(row.project_id)) {
+        projectsMap.set(row.project_id, {
+          project_id: row.project_id,
+          project_name: row.project_name,
+          project_status: row.project_status,
+          total_hours: 0,
+          work_log_count: 0,
+          phases: []
+        });
+      }
+
+      const project = projectsMap.get(row.project_id);
+      project.total_hours += parseFloat(row.total_hours);
+      project.work_log_count += parseInt(row.work_log_count);
+      project.phases.push({
+        phase_id: row.phase_id,
+        phase_name: row.phase_name,
+        phase_status: row.phase_status,
+        total_hours: parseFloat(row.total_hours),
+        work_log_count: parseInt(row.work_log_count)
+      });
+    });
+
+    const projects = Array.from(projectsMap.values());
+
+    const response: ApiResponse<any> = {
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        },
+        summary: {
+          total_projects: parseInt(summaryResult.rows[0]?.total_projects || 0),
+          total_phases: parseInt(summaryResult.rows[0]?.total_phases || 0),
+          total_work_logs: parseInt(summaryResult.rows[0]?.total_work_logs || 0),
+          total_hours: parseFloat(summaryResult.rows[0]?.total_hours || 0)
+        },
+        projects
+      }
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Get user project breakdown error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+};

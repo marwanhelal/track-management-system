@@ -8,9 +8,10 @@ import {
   updateUser,
   deactivateUser,
   deleteUser,
-  reactivateUser
+  reactivateUser,
+  getUserProjectBreakdown
 } from '@/controllers/users';
-import { authenticate, supervisorOnly, superAdminOnly } from '@/middleware/auth';
+import { authenticate, supervisorOnly, superAdminOnly, viewerAccess } from '@/middleware/auth';
 import {
   validateUserRegistration,
   validateEngineerCreation,
@@ -29,6 +30,9 @@ router.get('/', supervisorOnly, getUsers);
 
 // Get single user
 router.get('/:id', validateIdParam, getUser);
+
+// Get user project breakdown (detailed hours per project and phase)
+router.get('/:id/project-breakdown', validateIdParam, viewerAccess, getUserProjectBreakdown);
 
 // Create engineer (supervisor only)
 router.post('/engineers', supervisorOnly, validateEngineerCreation, handleValidationErrors, createEngineer);
