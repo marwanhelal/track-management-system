@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -69,6 +69,10 @@ interface ProjectsPageState {
 const ProjectsPage: React.FC = () => {
   const navigate = useNavigate();
   const { isSupervisor } = useAuth();
+
+  // ✅ OPTIMIZED: Use ref to track search timeout for proper debouncing
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [state, setState] = useState<ProjectsPageState>({
     projects: [],
     loading: true,
@@ -158,13 +162,30 @@ const ProjectsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.page, state.statusFilter, state.sortBy, state.sortOrder, state.searchTerm]);
 
-  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setState(prev => ({ ...prev, searchTerm: event.target.value }));
-    // Debounce search
-    setTimeout(() => {
+  // ✅ OPTIMIZED: Cleanup search timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // ✅ OPTIMIZED: Proper search debouncing with cleanup
+  const handleSearch = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const term = event.target.value;
+    setState(prev => ({ ...prev, searchTerm: term }));
+
+    // Cancel previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set new timeout (only the last one will execute)
+    searchTimeoutRef.current = setTimeout(() => {
       fetchProjects();
-    }, 300);
-  };
+    }, 500); // Increased to 500ms for better debouncing
+  }, [fetchProjects]);
 
   const handleStatusFilter = (status: string) => {
     setState(prev => ({ ...prev, statusFilter: status, page: 1 }));

@@ -257,9 +257,9 @@ const TimeTrackingPage: React.FC = () => {
       autoSaveIntervalRef.current = setInterval(() => {
         saveTimerToLocalStorage();
 
-        // Also sync to backend
+        // Timer state is persisted to localStorage
         if (timerSession && timerStatus === 'running') {
-          // Auto-save to backend is handled by pause/resume actions
+          // Backend sync happens when timer is stopped
         }
       }, AUTO_SAVE_INTERVAL);
     }
@@ -523,7 +523,7 @@ const TimeTrackingPage: React.FC = () => {
           </Alert>
         )}
 
-        {/* Enhanced Timer Section with Pause/Resume */}
+        {/* Timer Section */}
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>

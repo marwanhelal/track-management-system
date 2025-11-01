@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -40,14 +40,21 @@ const ProjectCard = ({ project }: ProjectCardProps) => {
     }
   };
 
-  const calculateProgress = () => {
+  // ✅ OPTIMIZED: Memoize progress calculation
+  const progress = useMemo(() => {
     if (project.predicted_hours === 0) return 0;
     return Math.min((project.actual_hours / project.predicted_hours) * 100, 100);
-  };
+  }, [project.predicted_hours, project.actual_hours]);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
+  // ✅ OPTIMIZED: Memoize date formatting
+  const formattedStartDate = useMemo(() => {
+    return new Date(project.start_date).toLocaleDateString();
+  }, [project.start_date]);
+
+  // ✅ OPTIMIZED: Memoize navigation handler
+  const handleViewDetails = useCallback(() => {
+    navigate(`/projects/${project.id}`);
+  }, [navigate, project.id]);
 
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -66,7 +73,7 @@ const ProjectCard = ({ project }: ProjectCardProps) => {
         <Box display="flex" alignItems="center" mb={1}>
           <Schedule fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
           <Typography variant="body2" color="text.secondary">
-            Started: {formatDate(project.start_date)}
+            Started: {formattedStartDate}
           </Typography>
         </Box>
 
@@ -86,10 +93,10 @@ const ProjectCard = ({ project }: ProjectCardProps) => {
               {project.actual_hours}/{project.predicted_hours}h
             </Typography>
           </Box>
-          <Tooltip title={`${calculateProgress().toFixed(1)}% complete`}>
+          <Tooltip title={`${progress.toFixed(1)}% complete`}>
             <LinearProgress
               variant="determinate"
-              value={calculateProgress()}
+              value={progress}
               sx={{ height: 8, borderRadius: 1 }}
             />
           </Tooltip>
@@ -106,7 +113,7 @@ const ProjectCard = ({ project }: ProjectCardProps) => {
         <Button
           size="small"
           startIcon={<Visibility />}
-          onClick={() => navigate(`/projects/${project.id}`)}
+          onClick={handleViewDetails}
           fullWidth
         >
           View Details
@@ -116,4 +123,5 @@ const ProjectCard = ({ project }: ProjectCardProps) => {
   );
 };
 
-export default ProjectCard;
+// ✅ OPTIMIZED: Wrap with React.memo to prevent unnecessary re-renders
+export default React.memo(ProjectCard);
