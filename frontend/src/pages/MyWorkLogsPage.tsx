@@ -78,9 +78,9 @@ const MyWorkLogsPage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
-  // Filter states
+  // Filter states - Show ALL historical work logs by default (last 2 years)
   const [dateFilter, setDateFilter] = useState({
-    startDate: dayjs().startOf('month'),
+    startDate: dayjs().subtract(2, 'years'),
     endDate: dayjs()
   });
   const [projectFilter, setProjectFilter] = useState('');
