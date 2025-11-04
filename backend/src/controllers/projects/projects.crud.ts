@@ -7,6 +7,7 @@ import {
   ProjectUpdateInput,
   ApiResponse
 } from '@/types';
+import { createChecklistForPhase } from '@/controllers/checklists';
 
 // Get all projects with filters and pagination
 export const getProjects = async (req: Request, res: Response): Promise<void> => {
@@ -275,6 +276,16 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
         VALUES ($1, $2, $3)
       `, [project.id, true, false]);
 
+      // Auto-create checklists for each phase
+      for (const phase of phases) {
+        try {
+          await createChecklistForPhase(client, project.id, phase.id, phase.phase_name);
+        } catch (error) {
+          console.error(`Failed to create checklist for phase ${phase.phase_name}:`, error);
+          // Continue with other phases even if one fails
+        }
+      }
+
       // Log audit event
       await client.query(`
         INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note)
@@ -284,7 +295,7 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
         project.id,
         'CREATE',
         authReq.user.id,
-        `Project created with ${selectedPhases.length} phases`
+        `Project created with ${selectedPhases.length} phases and checklists`
       ]);
 
       return { project, phases };

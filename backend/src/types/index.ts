@@ -518,6 +518,10 @@ export interface SocketEvents {
   'early_access:revoked': { phase: ProjectPhase; project_id: number; revoked_by: number };
   'work_log:created': WorkLog;
   'work_log:updated': WorkLog;
+  'checklist:item_approved': { item_id: number; level: number; approved_by: number; project_id: number };
+  'checklist:client_notes_updated': { instance_id: number; updated_by: number; project_id: number };
+  'checklist:item_added': { item: ChecklistInstanceItem; project_id: number };
+  'checklist:item_removed': { item_id: number; project_id: number };
 }
 
 // Error Types
@@ -752,4 +756,183 @@ export interface TimerSessionResponse {
   session: TimerSession;
   project_name: string;
   phase_name: string;
+}
+
+// Checklist System Types
+export interface ChecklistTemplate {
+  id: number;
+  phase_type: string;
+  display_order: number;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ChecklistTemplateSubsection {
+  id: number;
+  template_id: number;
+  name_ar: string;
+  name_en?: string;
+  display_order: number;
+  is_active: boolean;
+  created_at: Date;
+}
+
+export interface ChecklistTemplateItem {
+  id: number;
+  subsection_id: number;
+  name_ar: string;
+  name_en?: string;
+  display_order: number;
+  is_required: boolean;
+  is_active: boolean;
+  created_at: Date;
+}
+
+export interface ChecklistInstance {
+  id: number;
+  project_id: number;
+  phase_id: number;
+  template_id: number;
+  client_notes?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ChecklistInstanceSubsection {
+  id: number;
+  instance_id: number;
+  template_subsection_id?: number;
+  name_ar: string;
+  name_en?: string;
+  display_order: number;
+  is_custom: boolean;
+  created_at: Date;
+}
+
+export interface ChecklistInstanceItem {
+  id: number;
+  instance_subsection_id: number;
+  template_item_id?: number;
+  name_ar: string;
+  name_en?: string;
+  display_order: number;
+  is_required: boolean;
+  is_custom: boolean;
+  // Level 1: Engineer
+  approval_level_1: boolean;
+  approval_level_1_by?: number;
+  approval_level_1_at?: Date;
+  approval_level_1_note?: string;
+  // Level 2: Supervisor 1
+  approval_level_2: boolean;
+  approval_level_2_by?: number;
+  approval_level_2_at?: Date;
+  approval_level_2_note?: string;
+  // Level 3: Supervisor 2
+  approval_level_3: boolean;
+  approval_level_3_by?: number;
+  approval_level_3_at?: Date;
+  approval_level_3_note?: string;
+  // Level 4: Supervisor 3 (Final)
+  approval_level_4: boolean;
+  approval_level_4_by?: number;
+  approval_level_4_at?: Date;
+  approval_level_4_note?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Checklist with populated data
+export interface ChecklistInstanceWithItems {
+  id: number;
+  project_id: number;
+  phase_id: number;
+  template_id: number;
+  client_notes?: string;
+  subsections: ChecklistSubsectionWithItems[];
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ChecklistSubsectionWithItems {
+  id: number;
+  instance_id: number;
+  name_ar: string;
+  name_en?: string;
+  display_order: number;
+  is_custom: boolean;
+  items: ChecklistInstanceItemWithUser[];
+}
+
+export interface ChecklistInstanceItemWithUser extends ChecklistInstanceItem {
+  approval_level_1_user?: string;
+  approval_level_2_user?: string;
+  approval_level_3_user?: string;
+  approval_level_4_user?: string;
+}
+
+// Checklist Progress Summary
+export interface ChecklistProgressSummary {
+  instance_id: number;
+  total_items: number;
+  required_items: number;
+  level_1_completed: number;
+  level_2_completed: number;
+  level_3_completed: number;
+  level_4_completed: number;
+  level_1_percentage: number;
+  level_2_percentage: number;
+  level_3_percentage: number;
+  level_4_percentage: number;
+}
+
+// Checklist Input Types
+export interface ChecklistApprovalInput {
+  level: 1 | 2 | 3 | 4;
+  note?: string;
+}
+
+export interface ChecklistClientNotesInput {
+  client_notes: string;
+}
+
+export interface ChecklistAddItemInput {
+  instance_subsection_id: number;
+  name_ar: string;
+  name_en?: string;
+  is_required: boolean;
+}
+
+export interface ChecklistAddSubsectionInput {
+  instance_id: number;
+  name_ar: string;
+  name_en?: string;
+  display_order: number;
+}
+
+export interface ProjectDetailsInput {
+  land_area?: string;
+  building_type?: string;
+  floors_count?: number;
+  location?: string;
+  client_name?: string;
+}
+
+// Enhanced Project Type with Details
+export interface ProjectWithDetails extends Project {
+  land_area?: string;
+  building_type?: string;
+  floors_count?: number;
+  location?: string;
+  client_name?: string;
+}
+
+// Project Creation with Details
+export interface ProjectCreateWithDetailsInput extends ProjectCreateInput {
+  land_area?: string;
+  building_type?: string;
+  floors_count?: number;
+  location?: string;
+  client_name?: string;
 }

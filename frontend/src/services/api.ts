@@ -698,6 +698,127 @@ class ApiService {
     const response = await this.api.get('/health');
     return response.data;
   }
+
+  // ========================================
+  // CHECKLIST API METHODS
+  // ========================================
+
+  // Template Methods
+  async getChecklistTemplates(): Promise<ApiResponse<{ templates: any[] }>> {
+    const response = await this.api.get('/checklists/templates');
+    return response.data;
+  }
+
+  async getChecklistTemplateByPhaseType(phaseType: string): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/checklists/templates/phase/${phaseType}`);
+    return response.data;
+  }
+
+  async getAllTemplatesWithStructure(): Promise<ApiResponse<{ templates: any[] }>> {
+    const response = await this.api.get('/checklists/templates/structure');
+    return response.data;
+  }
+
+  async addTemplateItem(data: { subsection_id: number; name_ar: string; name_en?: string; is_required: boolean }): Promise<ApiResponse<{ item: any }>> {
+    const response = await this.api.post('/checklists/templates/items', data);
+    return response.data;
+  }
+
+  async addTemplateSubsection(data: { template_id: number; name_ar: string; name_en?: string }): Promise<ApiResponse<{ subsection: any }>> {
+    const response = await this.api.post('/checklists/templates/subsections', data);
+    return response.data;
+  }
+
+  async updateTemplateItem(itemId: number, data: { name_ar?: string; name_en?: string; is_required?: boolean }): Promise<ApiResponse<{ item: any }>> {
+    const response = await this.api.put(`/checklists/templates/items/${itemId}`, data);
+    return response.data;
+  }
+
+  async deleteTemplateItem(itemId: number): Promise<ApiResponse> {
+    const response = await this.api.delete(`/checklists/templates/items/${itemId}`);
+    return response.data;
+  }
+
+  // Instance Methods
+  async getAllProjectsWithChecklists(): Promise<ApiResponse<{ projects: any[] }>> {
+    const response = await this.api.get('/checklists/projects');
+    return response.data;
+  }
+
+  async getProjectChecklists(projectId: number): Promise<ApiResponse<{ checklists: any[] }>> {
+    const response = await this.api.get(`/checklists/projects/${projectId}`);
+    return response.data;
+  }
+
+  async getPhaseChecklist(phaseId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/checklists/phases/${phaseId}`);
+    return response.data;
+  }
+
+  async getChecklistProgress(instanceId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/checklists/instances/${instanceId}/progress`);
+    return response.data;
+  }
+
+  async updateChecklistClientNotes(instanceId: number, clientNotes: string): Promise<ApiResponse<{ instance: any }>> {
+    const response = await this.api.put(`/checklists/instances/${instanceId}/client-notes`, {
+      client_notes: clientNotes
+    });
+    return response.data;
+  }
+
+  async addCustomChecklistItem(data: {
+    instance_subsection_id: number;
+    name_ar: string;
+    name_en?: string;
+    is_required: boolean;
+  }): Promise<ApiResponse<{ item: any }>> {
+    const response = await this.api.post('/checklists/instances/items', data);
+    return response.data;
+  }
+
+  async addCustomChecklistSubsection(data: {
+    instance_id: number;
+    name_ar: string;
+    name_en?: string;
+    display_order: number;
+  }): Promise<ApiResponse<{ subsection: any }>> {
+    const response = await this.api.post('/checklists/instances/subsections', data);
+    return response.data;
+  }
+
+  async deleteChecklistItem(itemId: number): Promise<ApiResponse> {
+    const response = await this.api.delete(`/checklists/items/${itemId}`);
+    return response.data;
+  }
+
+  // Approval Methods
+  async approveChecklistItem(itemId: number, level: 1 | 2 | 3 | 4, note?: string): Promise<ApiResponse<{ item: any }>> {
+    const response = await this.api.post(`/checklists/items/${itemId}/approve`, { level, note });
+    return response.data;
+  }
+
+  async revokeChecklistApproval(itemId: number, level: 1 | 2 | 3 | 4): Promise<ApiResponse<{ item: any }>> {
+    const response = await this.api.post(`/checklists/items/${itemId}/revoke`, { level });
+    return response.data;
+  }
+
+  async bulkApproveChecklistItems(itemIds: number[], level: 1 | 2 | 3 | 4, note?: string): Promise<ApiResponse<{ items: any[]; count: number }>> {
+    const response = await this.api.post('/checklists/items/bulk-approve', { item_ids: itemIds, level, note });
+    return response.data;
+  }
+
+  // Project Details Methods
+  async updateProjectDetails(projectId: number, data: {
+    land_area?: string;
+    building_type?: string;
+    floors_count?: number;
+    location?: string;
+    client_name?: string;
+  }): Promise<ApiResponse<any>> {
+    const response = await this.api.put(`/projects/${projectId}`, data);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();
