@@ -97,4 +97,20 @@ export const healthCheck = async (): Promise<any> => {
   }
 };
 
+// Monitor connection pool every minute to detect leaks
+setInterval(() => {
+  const poolStats = {
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    waiting: pool.waitingCount
+  };
+
+  // Warn if connection pool is getting exhausted
+  if (pool.totalCount > 15) {
+    console.warn('⚠️  High DB connection usage:', poolStats);
+  } else {
+    console.log('✓ DB Pool:', poolStats);
+  }
+}, 60000); // Check every minute
+
 export default pool;
