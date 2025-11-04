@@ -33,6 +33,12 @@ interface ChecklistPageState {
   loading: boolean;
   error: string | null;
   searchTerm: string;
+  projectProgress: Record<number, {
+    level1: number;
+    level2: number;
+    level3: number;
+    level4: number;
+  }>;
 }
 
 const ChecklistPage: React.FC = () => {
@@ -43,7 +49,8 @@ const ChecklistPage: React.FC = () => {
     projects: [],
     loading: true,
     error: null,
-    searchTerm: ''
+    searchTerm: '',
+    projectProgress: {}
   });
 
   const fetchProjects = useCallback(async () => {
@@ -52,9 +59,71 @@ const ChecklistPage: React.FC = () => {
       const response = await apiService.getAllProjectsWithChecklists();
 
       if (response.success && response.data) {
+        const projects = response.data.projects;
+
+        // Fetch progress for each project
+        const progressData: Record<number, any> = {};
+        await Promise.all(
+          projects.map(async (project: any) => {
+            try {
+              // Get checklists for this project
+              const checklistsResponse = await apiService.getProjectChecklists(project.id);
+              if (checklistsResponse.success && checklistsResponse.data?.checklists) {
+                const checklists = checklistsResponse.data.checklists;
+
+                // Get progress for each checklist
+                const progressPromises = checklists.map(async (checklist: any) => {
+                  try {
+                    const progressResponse = await apiService.getChecklistProgress(checklist.id);
+                    if (progressResponse.success && progressResponse.data) {
+                      return {
+                        level1: progressResponse.data.level_1_percentage || 0,
+                        level2: progressResponse.data.level_2_percentage || 0,
+                        level3: progressResponse.data.level_3_percentage || 0,
+                        level4: progressResponse.data.level_4_percentage || 0
+                      };
+                    }
+                  } catch (error) {
+                    console.error(`Error fetching progress for checklist ${checklist.id}:`, error);
+                  }
+                  return { level1: 0, level2: 0, level3: 0, level4: 0 };
+                });
+
+                const progressResults = await Promise.all(progressPromises);
+
+                // Calculate average progress across all checklists
+                if (progressResults.length > 0) {
+                  const avgProgress = progressResults.reduce(
+                    (acc, curr) => ({
+                      level1: acc.level1 + curr.level1,
+                      level2: acc.level2 + curr.level2,
+                      level3: acc.level3 + curr.level3,
+                      level4: acc.level4 + curr.level4
+                    }),
+                    { level1: 0, level2: 0, level3: 0, level4: 0 }
+                  );
+
+                  progressData[project.id] = {
+                    level1: Math.round(avgProgress.level1 / progressResults.length),
+                    level2: Math.round(avgProgress.level2 / progressResults.length),
+                    level3: Math.round(avgProgress.level3 / progressResults.length),
+                    level4: Math.round(avgProgress.level4 / progressResults.length)
+                  };
+                } else {
+                  progressData[project.id] = { level1: 0, level2: 0, level3: 0, level4: 0 };
+                }
+              }
+            } catch (error) {
+              console.error(`Error fetching progress for project ${project.id}:`, error);
+              progressData[project.id] = { level1: 0, level2: 0, level3: 0, level4: 0 };
+            }
+          })
+        );
+
         setState(prev => ({
           ...prev,
-          projects: response.data.projects,
+          projects,
+          projectProgress: progressData,
           loading: false
         }));
       } else {
@@ -209,59 +278,66 @@ const ChecklistPage: React.FC = () => {
                       </Typography>
 
                       {/* Progress Bars for each level */}
-                      <Box sx={{ mt: 2 }}>
-                        <Box sx={{ mb: 1.5 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                            <Typography variant="caption">Level 1 (Engineer)</Typography>
-                            <Typography variant="caption">0%</Typography>
+                      {state.projectProgress[project.id] ? (
+                        <Box sx={{ mt: 2 }}>
+                          <Box sx={{ mb: 1.5 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant="caption">Level 1 (Engineer)</Typography>
+                              <Typography variant="caption">{state.projectProgress[project.id].level1}%</Typography>
+                            </Box>
+                            <LinearProgress
+                              variant="determinate"
+                              value={state.projectProgress[project.id].level1}
+                              color={getProgressColor(state.projectProgress[project.id].level1)}
+                              sx={{ height: 6, borderRadius: 1 }}
+                            />
                           </Box>
-                          <LinearProgress
-                            variant="determinate"
-                            value={0}
-                            color={getProgressColor(0)}
-                            sx={{ height: 6, borderRadius: 1 }}
-                          />
-                        </Box>
 
-                        <Box sx={{ mb: 1.5 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                            <Typography variant="caption">Level 2 (Supervisor 1)</Typography>
-                            <Typography variant="caption">0%</Typography>
+                          <Box sx={{ mb: 1.5 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant="caption">Level 2 (Supervisor 1)</Typography>
+                              <Typography variant="caption">{state.projectProgress[project.id].level2}%</Typography>
+                            </Box>
+                            <LinearProgress
+                              variant="determinate"
+                              value={state.projectProgress[project.id].level2}
+                              color={getProgressColor(state.projectProgress[project.id].level2)}
+                              sx={{ height: 6, borderRadius: 1 }}
+                            />
                           </Box>
-                          <LinearProgress
-                            variant="determinate"
-                            value={0}
-                            color={getProgressColor(0)}
-                            sx={{ height: 6, borderRadius: 1 }}
-                          />
-                        </Box>
 
-                        <Box sx={{ mb: 1.5 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                            <Typography variant="caption">Level 3 (Supervisor 2)</Typography>
-                            <Typography variant="caption">0%</Typography>
+                          <Box sx={{ mb: 1.5 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant="caption">Level 3 (Supervisor 2)</Typography>
+                              <Typography variant="caption">{state.projectProgress[project.id].level3}%</Typography>
+                            </Box>
+                            <LinearProgress
+                              variant="determinate"
+                              value={state.projectProgress[project.id].level3}
+                              color={getProgressColor(state.projectProgress[project.id].level3)}
+                              sx={{ height: 6, borderRadius: 1 }}
+                            />
                           </Box>
-                          <LinearProgress
-                            variant="determinate"
-                            value={0}
-                            color={getProgressColor(0)}
-                            sx={{ height: 6, borderRadius: 1 }}
-                          />
-                        </Box>
 
-                        <Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                            <Typography variant="caption">Level 4 (Final)</Typography>
-                            <Typography variant="caption">0%</Typography>
+                          <Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant="caption">Level 4 (Final)</Typography>
+                              <Typography variant="caption">{state.projectProgress[project.id].level4}%</Typography>
+                            </Box>
+                            <LinearProgress
+                              variant="determinate"
+                              value={state.projectProgress[project.id].level4}
+                              color={getProgressColor(state.projectProgress[project.id].level4)}
+                              sx={{ height: 6, borderRadius: 1 }}
+                            />
                           </Box>
-                          <LinearProgress
-                            variant="determinate"
-                            value={0}
-                            color={getProgressColor(0)}
-                            sx={{ height: 6, borderRadius: 1 }}
-                          />
                         </Box>
-                      </Box>
+                      ) : (
+                        <Box sx={{ mt: 2, textAlign: 'center' }}>
+                          <LinearProgress />
+                          <Typography variant="caption" color="text.secondary">Loading progress...</Typography>
+                        </Box>
+                      )}
                     </Box>
                   ) : (
                     <Alert severity="info" sx={{ mt: 1 }}>

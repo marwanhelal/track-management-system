@@ -55,6 +55,11 @@ export interface ProjectUpdateInput {
   planned_total_weeks?: number;
   predicted_hours?: number;
   status?: 'active' | 'on_hold' | 'completed' | 'cancelled';
+  land_area?: string;
+  building_type?: string;
+  floors_count?: number;
+  location?: string;
+  client_name?: string;
 }
 
 // Predefined Phase Types

@@ -17,21 +17,23 @@ import {
   CheckCircle as CheckCircleIcon,
   RadioButtonUnchecked as UncheckedIcon,
   Person as PersonIcon,
-  AccessTime as TimeIcon
+  AccessTime as TimeIcon,
+  Undo as UndoIcon
 } from '@mui/icons-material';
-import { ChecklistInstanceItemWithUser } from '../../types';
+import { ChecklistInstanceItem } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiService } from '../../services/api';
 import { format } from 'date-fns';
 
 interface ChecklistItemProps {
-  item: ChecklistInstanceItemWithUser;
+  item: ChecklistInstanceItem;
   onUpdate: () => void;
 }
 
 const ChecklistItem: React.FC<ChecklistItemProps> = ({ item, onUpdate }) => {
   const { user, isSupervisor } = useAuth();
   const [approvalDialog, setApprovalDialog] = useState<{ open: boolean; level: 1 | 2 | 3 | 4 | null }>({ open: false, level: null });
+  const [revokeDialog, setRevokeDialog] = useState<{ open: boolean; level: 1 | 2 | 3 | 4 | null }>({ open: false, level: null });
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -70,10 +72,10 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({ item, onUpdate }) => {
   };
 
   const getApprovalStatus = (level: 1 | 2 | 3 | 4) => {
-    const approved = item[`approval_level_${level}` as keyof ChecklistInstanceItemWithUser] as boolean;
-    const approvedBy = item[`approval_level_${level}_user` as keyof ChecklistInstanceItemWithUser] as string | undefined;
-    const approvedAt = item[`approval_level_${level}_at` as keyof ChecklistInstanceItemWithUser] as string | undefined;
-    const approvalNote = item[`approval_level_${level}_note` as keyof ChecklistInstanceItemWithUser] as string | undefined;
+    const approved = item[`approval_level_${level}` as keyof ChecklistInstanceItem] as boolean;
+    const approvedBy = item[`approval_level_${level}_user` as keyof ChecklistInstanceItem] as string | undefined;
+    const approvedAt = item[`approval_level_${level}_at` as keyof ChecklistInstanceItem] as string | undefined;
+    const approvalNote = item[`approval_level_${level}_note` as keyof ChecklistInstanceItem] as string | undefined;
 
     return { approved, approvedBy, approvedAt, approvalNote };
   };
@@ -86,6 +88,29 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({ item, onUpdate }) => {
       4: 'Final'
     };
     return labels[level];
+  };
+
+  const handleRevokeClick = (level: 1 | 2 | 3 | 4) => {
+    if (!isSupervisor) return;
+    setRevokeDialog({ open: true, level });
+  };
+
+  const handleRevokeConfirm = async () => {
+    if (!revokeDialog.level) return;
+
+    try {
+      setLoading(true);
+      const response = await apiService.revokeApproval(item.id, revokeDialog.level);
+
+      if (response.success) {
+        setRevokeDialog({ open: false, level: null });
+        onUpdate();
+      }
+    } catch (error) {
+      console.error('Error revoking approval:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -112,30 +137,42 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({ item, onUpdate }) => {
             const canApprove = canApproveLevel(level);
 
             return (
-              <Tooltip
-                key={level}
-                title={
-                  approved
-                    ? `${getLevelLabel(level)} - Approved by ${approvedBy || 'Unknown'} ${approvedAt ? `on ${format(new Date(approvedAt), 'MMM dd, yyyy HH:mm')}` : ''}${approvalNote ? `\nNote: ${approvalNote}` : ''}`
-                    : canApprove
-                    ? `Click to approve as ${getLevelLabel(level)}`
-                    : `${getLevelLabel(level)} - Requires supervisor`
-                }
-              >
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={() => !approved && handleApproveClick(level)}
-                    disabled={approved || !canApprove}
-                    sx={{
-                      color: approved ? 'success.main' : 'action.disabled',
-                      '&:hover': !approved && canApprove ? { bgcolor: 'action.hover' } : {}
-                    }}
-                  >
-                    {approved ? <CheckCircleIcon /> : <UncheckedIcon />}
-                  </IconButton>
-                </span>
-              </Tooltip>
+              <Box key={level} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Tooltip
+                  title={
+                    approved
+                      ? `${getLevelLabel(level)} - Approved by ${approvedBy || 'Unknown'} ${approvedAt ? `on ${format(new Date(approvedAt), 'MMM dd, yyyy HH:mm')}` : ''}${approvalNote ? `\nNote: ${approvalNote}` : ''}`
+                      : canApprove
+                      ? `Click to approve as ${getLevelLabel(level)}`
+                      : `${getLevelLabel(level)} - Requires supervisor`
+                  }
+                >
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() => !approved && handleApproveClick(level)}
+                      disabled={approved || !canApprove}
+                      sx={{
+                        color: approved ? 'success.main' : 'action.disabled',
+                        '&:hover': !approved && canApprove ? { bgcolor: 'action.hover' } : {}
+                      }}
+                    >
+                      {approved ? <CheckCircleIcon /> : <UncheckedIcon />}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                {approved && isSupervisor && (
+                  <Tooltip title="Revoke approval">
+                    <IconButton
+                      size="small"
+                      onClick={() => handleRevokeClick(level)}
+                      sx={{ color: 'error.main', mt: -1, p: 0.25 }}
+                    >
+                      <UndoIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Box>
             );
           })}
         </Stack>
@@ -166,6 +203,29 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({ item, onUpdate }) => {
           </Button>
           <Button onClick={handleApproveConfirm} variant="contained" disabled={loading}>
             {loading ? 'Approving...' : 'Approve'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Revoke Approval Dialog */}
+      <Dialog open={revokeDialog.open} onClose={() => setRevokeDialog({ open: false, level: null })} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Revoke Approval - {revokeDialog.level && getLevelLabel(revokeDialog.level)}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+            Are you sure you want to revoke this approval? This action cannot be undone.
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            {item.name_ar}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRevokeDialog({ open: false, level: null })}>
+            Cancel
+          </Button>
+          <Button onClick={handleRevokeConfirm} variant="contained" color="error" disabled={loading}>
+            {loading ? 'Revoking...' : 'Revoke'}
           </Button>
         </DialogActions>
       </Dialog>

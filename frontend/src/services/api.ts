@@ -803,6 +803,34 @@ class ApiService {
     return response.data;
   }
 
+  // Alias methods for convenience
+  async revokeApproval(itemId: number, level: 1 | 2 | 3 | 4): Promise<ApiResponse<{ item: any }>> {
+    return this.revokeChecklistApproval(itemId, level);
+  }
+
+  async updateClientNotes(instanceId: number, clientNotes: string): Promise<ApiResponse<{ instance: any }>> {
+    return this.updateChecklistClientNotes(instanceId, clientNotes);
+  }
+
+  async addCustomItem(data: {
+    instance_subsection_id: number;
+    name_ar: string;
+    name_en?: string;
+    is_required?: boolean;
+  }): Promise<ApiResponse<{ item: any }>> {
+    const normalizedData = { ...data, is_required: data.is_required ?? false };
+    return this.addCustomChecklistItem(normalizedData);
+  }
+
+  async addCustomSubsection(data: {
+    instance_id: number;
+    name_ar: string;
+    name_en?: string;
+  }): Promise<ApiResponse<{ subsection: any }>> {
+    const normalizedData = { ...data, display_order: 999 }; // Backend will assign correct order
+    return this.addCustomChecklistSubsection(normalizedData);
+  }
+
   async bulkApproveChecklistItems(itemIds: number[], level: 1 | 2 | 3 | 4, note?: string): Promise<ApiResponse<{ items: any[]; count: number }>> {
     const response = await this.api.post('/checklists/items/bulk-approve', { item_ids: itemIds, level, note });
     return response.data;

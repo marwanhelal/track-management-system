@@ -5,10 +5,12 @@ import {
   AccordionDetails,
   Typography,
   Box,
-  Chip
+  Chip,
+  Button
 } from '@mui/material';
 import {
-  ExpandMore as ExpandMoreIcon
+  ExpandMore as ExpandMoreIcon,
+  Add as AddIcon
 } from '@mui/icons-material';
 import { ChecklistInstanceSubsection } from '../../types';
 import ChecklistItem from './ChecklistItem';
@@ -16,9 +18,10 @@ import ChecklistItem from './ChecklistItem';
 interface ChecklistSubsectionProps {
   subsection: ChecklistInstanceSubsection & { items?: any[] };
   onUpdate: () => void;
+  onAddCustomItem?: (subsectionId: number) => void;
 }
 
-const ChecklistSubsection: React.FC<ChecklistSubsectionProps> = ({ subsection, onUpdate }) => {
+const ChecklistSubsection: React.FC<ChecklistSubsectionProps> = ({ subsection, onUpdate, onAddCustomItem }) => {
   const items = subsection.items || [];
 
   // Calculate progress
@@ -68,11 +71,32 @@ const ChecklistSubsection: React.FC<ChecklistSubsectionProps> = ({ subsection, o
             {items.map((item) => (
               <ChecklistItem key={item.id} item={item} onUpdate={onUpdate} />
             ))}
+            {onAddCustomItem && (
+              <Button
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() => onAddCustomItem(subsection.id)}
+                sx={{ mt: 2 }}
+              >
+                Add Custom Item
+              </Button>
+            )}
           </Box>
         ) : (
-          <Typography variant="body2" color="text.secondary">
-            No items in this subsection
-          </Typography>
+          <Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              No items in this subsection
+            </Typography>
+            {onAddCustomItem && (
+              <Button
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() => onAddCustomItem(subsection.id)}
+              >
+                Add Custom Item
+              </Button>
+            )}
+          </Box>
         )}
       </AccordionDetails>
     </Accordion>
