@@ -20,6 +20,7 @@ const MyWorkLogsPage = React.lazy(() => import('./pages/MyWorkLogsPage'));
 const SmartWarningDashboard = React.lazy(() => import('./pages/SmartWarningDashboard'));
 const EngineerActivityPage = React.lazy(() => import('./pages/EngineerActivityPage'));
 const SettingsPage = React.lazy(() => import('./pages/SettingsPage'));
+const ChecklistPage = React.lazy(() => import('./pages/ChecklistPage'));
 
 // Loading component for Suspense fallback
 const PageLoader: React.FC = () => (
@@ -152,6 +153,20 @@ function App() {
                       <AppLayout>
                         <Suspense fallback={<PageLoader />}>
                           <SmartWarningDashboard />
+                        </Suspense>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Checklist - Available to all authenticated users */}
+                <Route
+                  path="/checklist"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <Suspense fallback={<PageLoader />}>
+                          <ChecklistPage />
                         </Suspense>
                       </AppLayout>
                     </ProtectedRoute>
