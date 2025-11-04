@@ -28,6 +28,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { apiService } from '../services/api';
 import { ProjectWithDetails } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import ChecklistSubsection from '../components/checklist/ChecklistSubsection';
 
 interface ProjectChecklistPageState {
   project: ProjectWithDetails | null;
@@ -287,10 +288,22 @@ const ProjectChecklistPage: React.FC = () => {
 
                 <Divider sx={{ my: 2 }} />
 
-                {/* Placeholder for Checklist Items */}
-                <Alert severity="info">
-                  Checklist items will be displayed here. This is where subsections and items with 4-level approvals will appear.
-                </Alert>
+                {/* Checklist Subsections and Items */}
+                {state.checklists[state.activeTab].subsections && state.checklists[state.activeTab].subsections.length > 0 ? (
+                  <Box>
+                    {state.checklists[state.activeTab].subsections.map((subsection: any) => (
+                      <ChecklistSubsection
+                        key={subsection.id}
+                        subsection={subsection}
+                        onUpdate={fetchProjectAndChecklists}
+                      />
+                    ))}
+                  </Box>
+                ) : (
+                  <Alert severity="info">
+                    No checklist items found for this phase
+                  </Alert>
+                )}
               </Box>
             )}
           </Box>
