@@ -29,7 +29,7 @@ export const approveChecklistItem = async (req: Request, res: Response): Promise
     }
 
     // Update approval
-    const result = await query(`
+    const updateQuery = `
       UPDATE checklist_instance_items
       SET
         approval_level_${level} = true,
@@ -39,7 +39,8 @@ export const approveChecklistItem = async (req: Request, res: Response): Promise
         updated_at = NOW()
       WHERE id = $3
       RETURNING *
-    `, [authReq.user.id, note || null, itemId]);
+    `;
+    const result = await query(updateQuery, [authReq.user.id, note || null, itemId]);
 
     if (result.rows.length === 0) {
       res.status(404).json({
@@ -126,7 +127,7 @@ export const revokeApproval = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const result = await query(`
+    const revokeQuery = `
       UPDATE checklist_instance_items
       SET
         approval_level_${level} = false,
@@ -136,7 +137,8 @@ export const revokeApproval = async (req: Request, res: Response): Promise<void>
         updated_at = NOW()
       WHERE id = $1
       RETURNING *
-    `, [itemId]);
+    `;
+    const result = await query(revokeQuery, [itemId]);
 
     if (result.rows.length === 0) {
       res.status(404).json({
@@ -229,7 +231,7 @@ export const bulkApproveItems = async (req: Request, res: Response): Promise<voi
     }
 
     // Update all items
-    const result = await query(`
+    const bulkQuery = `
       UPDATE checklist_instance_items
       SET
         approval_level_${level} = true,
@@ -239,7 +241,8 @@ export const bulkApproveItems = async (req: Request, res: Response): Promise<voi
         updated_at = NOW()
       WHERE id = ANY($3::int[])
       RETURNING *
-    `, [authReq.user.id, note || null, item_ids]);
+    `;
+    const result = await query(bulkQuery, [authReq.user.id, note || null, item_ids]);
 
     // Get project_id for socket event
     const projectResult = await query(`
