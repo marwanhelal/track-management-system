@@ -16,8 +16,8 @@ module.exports = {
     wait_ready: false,                    // Don't wait for process.send('ready')
 
     // ====== PRODUCTION SETTINGS ======
-    instances: 2,                         // Run 2 instances for high availability
-    exec_mode: 'cluster',                 // Cluster mode for load balancing
+    instances: 1,                         // Single instance (Socket.IO doesn't work in cluster without Redis)
+    exec_mode: 'fork',                    // Fork mode (required for Socket.IO without Redis adapter)
     max_memory_restart: '1G',             // Restart if memory exceeds 1GB
 
     // ====== ENVIRONMENT ======
