@@ -66,7 +66,7 @@ export const approveChecklistItem = async (req: Request, res: Response): Promise
     const io = (req as any).app.get('io');
     if (io && projectId) {
       io.to(`project_${projectId}`).emit('checklist:item_approved', {
-        item_id: parseInt(itemId),
+        item_id: parseInt(itemId!),
         level,
         approved_by: authReq.user.id,
         project_id: projectId
@@ -161,7 +161,7 @@ export const revokeApproval = async (req: Request, res: Response): Promise<void>
     const io = (req as any).app.get('io');
     if (io && projectId) {
       io.to(`project_${projectId}`).emit('checklist:approval_revoked', {
-        item_id: parseInt(itemId),
+        item_id: parseInt(itemId!),
         level,
         revoked_by: authReq.user.id,
         project_id: projectId
