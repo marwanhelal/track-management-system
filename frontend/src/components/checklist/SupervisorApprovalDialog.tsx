@@ -95,33 +95,22 @@ const SupervisorApprovalDialog = ({
   const getLevelTitle = () => {
     switch (level) {
       case 1:
-        return 'موافقة المشرف - المستوى 1 / Supervisor Approval - Level 1';
+        return 'Supervisor Approval - Level 1';
       case 2:
-        return 'موافقة المشرف - المستوى 2 / Supervisor Approval - Level 2';
+        return 'Supervisor Approval - Level 2';
       case 3:
-        return 'موافقة المشرف - المستوى 3 / Supervisor Approval - Level 3';
+        return 'Supervisor Approval - Level 3';
     }
   };
 
   const getLevelDescription = () => {
     switch (level) {
       case 1:
-        return 'هذه المهام تم اعتمادها من قبل المهندس وتحتاج إلى الموافقة الإشرافية الأولى';
-      case 2:
-        return 'هذه المهام تم اعتمادها من قبل المشرف 1 وتحتاج إلى الموافقة الإشرافية الثانية';
-      case 3:
-        return 'هذه المهام تم اعتمادها من قبل المشرف 2 وتحتاج إلى الموافقة الإشرافية النهائية';
-    }
-  };
-
-  const getLevelDescriptionEN = () => {
-    switch (level) {
-      case 1:
         return 'These tasks have been approved by the engineer and need first supervisor approval';
       case 2:
-        return 'These tasks have been approved by Supervisor 1 and need second supervisor approval';
+        return 'These tasks have been approved by Supervisor L1 and need second supervisor approval';
       case 3:
-        return 'These tasks have been approved by Supervisor 2 and need final supervisor approval';
+        return 'These tasks have been approved by Supervisor L2 and need final supervisor approval';
     }
   };
 
@@ -135,7 +124,7 @@ const SupervisorApprovalDialog = ({
               {getLevelTitle()}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              المرحلة: {phaseName}
+              Phase: {phaseName}
             </Typography>
           </Box>
         </Box>
@@ -151,29 +140,25 @@ const SupervisorApprovalDialog = ({
         <Alert severity="info" icon={<CheckCircle />} sx={{ mb: 2 }}>
           <Typography variant="body2">
             {getLevelDescription()}
-            <br />
-            {getLevelDescriptionEN()}
           </Typography>
         </Alert>
 
         {items.length === 0 ? (
           <Alert severity="warning" icon={<Warning />}>
-            لا توجد مهام متاحة للموافقة في هذا المستوى
-            <br />
             No tasks available for approval at this level
           </Alert>
         ) : (
           <>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="subtitle2">
-                المهام الجاهزة للموافقة ({items.length}):
+                Tasks Ready for Approval ({items.length}):
               </Typography>
               <Box>
                 <Button size="small" onClick={handleSelectAll} disabled={loading}>
-                  تحديد الكل / Select All
+                  Select All
                 </Button>
                 <Button size="small" onClick={handleDeselectAll} disabled={loading}>
-                  إلغاء التحديد / Deselect All
+                  Deselect All
                 </Button>
               </Box>
             </Box>
@@ -236,11 +221,9 @@ const SupervisorApprovalDialog = ({
 
             <Box mt={2} p={2} bgcolor="secondary.50" borderRadius={1}>
               <Typography variant="body2" fontWeight="medium">
-                الملخص / Summary:
+                Summary:
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                تم تحديد {selectedItems.length} من أصل {items.length} مهمة للموافقة في المستوى {level}
-                <br />
                 {selectedItems.length} of {items.length} tasks selected for Level {level} approval
               </Typography>
             </Box>
@@ -250,7 +233,7 @@ const SupervisorApprovalDialog = ({
 
       <DialogActions>
         <Button onClick={handleClose} disabled={loading}>
-          إلغاء / Cancel
+          Cancel
         </Button>
         <Button
           onClick={handleSubmit}
@@ -258,7 +241,7 @@ const SupervisorApprovalDialog = ({
           disabled={loading || selectedItems.length === 0}
           color="secondary"
         >
-          {loading ? 'جاري الموافقة... / Approving...' : `موافقة L${level} (${selectedItems.length}) / Approve`}
+          {loading ? 'Approving...' : `Approve L${level} (${selectedItems.length})`}
         </Button>
       </DialogActions>
     </Dialog>

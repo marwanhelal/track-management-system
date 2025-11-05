@@ -3,20 +3,24 @@ import {
   Box,
   Paper,
   Typography,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   LinearProgress,
   Chip,
   Button,
   Divider,
   Grid,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Checkbox,
 } from '@mui/material';
 import {
-  ExpandMore,
   CheckCircle,
-  PendingActions,
   HowToReg,
+  SupervisorAccount,
+  Person,
 } from '@mui/icons-material';
 import {
   ChecklistPhaseName,
@@ -44,34 +48,12 @@ const ProjectChecklistView = ({
   onUpdate,
 }: ProjectChecklistViewProps) => {
   const { user } = useAuth();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['all']));
   const [engineerDialogOpen, setEngineerDialogOpen] = useState(false);
   const [supervisorDialogOpen, setSupervisorDialogOpen] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<1 | 2 | 3>(1);
 
   const isEngineer = user?.role === 'engineer';
   const isSupervisor = user?.role === 'supervisor';
-
-  const handleSectionToggle = (sectionName: string) => {
-    setExpandedSections((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(sectionName)) {
-        newSet.delete(sectionName);
-      } else {
-        newSet.add(sectionName);
-      }
-      return newSet;
-    });
-  };
-
-  const handleExpandAll = () => {
-    const allSections = (sections || []).map((s) => s.section_name || 'general');
-    setExpandedSections(new Set(allSections));
-  };
-
-  const handleCollapseAll = () => {
-    setExpandedSections(new Set());
-  };
 
   const handleEngineerApproval = () => {
     setEngineerDialogOpen(true);
@@ -86,7 +68,7 @@ const ProjectChecklistView = ({
   const allItems = (sections || []).flatMap((section) => section.items || []);
 
   // Get completed items for engineer approval
-  const completedItems = allItems.filter((item) => item.is_completed);
+  const completedItems = allItems.filter((item) => item.is_completed && !item.engineer_approved_by);
 
   // Get items ready for supervisor approval at each level
   const itemsReadyForSupervisor1 = allItems.filter(
@@ -100,30 +82,31 @@ const ProjectChecklistView = ({
   );
 
   return (
-    <Paper sx={{ mb: 3, overflow: 'hidden' }}>
+    <Paper elevation={3} sx={{ mb: 4, overflow: 'hidden', borderRadius: 2 }}>
       {/* Phase Header */}
       <Box
         sx={{
-          p: 2,
+          p: 3,
           bgcolor: 'primary.main',
-          color: 'primary.contrastText',
+          color: 'white',
         }}
       >
         <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} md={6}>
-            <Typography variant="h6" fontWeight="bold">
-              {phaseName}
+            <Typography variant="h5" fontWeight="bold" gutterBottom>
+              Phase: {phaseName}
             </Typography>
-            <Box display="flex" gap={1} mt={1} flexWrap="wrap">
+            <Box display="flex" gap={1} flexWrap="wrap">
               <Chip
-                label={`${statistics.total_tasks} مهمة / tasks`}
-                size="small"
-                sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
+                icon={<CheckCircle />}
+                label={`${statistics.total_tasks} Total Tasks`}
+                size="medium"
+                sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 'bold' }}
               />
               <Chip
-                label={`${statistics.completion_percentage}% مكتمل / completed`}
-                size="small"
-                sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
+                label={`${statistics.completion_percentage}% Complete`}
+                size="medium"
+                sx={{ bgcolor: 'rgba(255,255,255,0.3)', color: 'white', fontWeight: 'bold' }}
               />
             </Box>
           </Grid>
@@ -134,12 +117,17 @@ const ProjectChecklistView = ({
               {isEngineer && completedItems.length > 0 && (
                 <Button
                   variant="contained"
-                  size="small"
+                  size="medium"
                   startIcon={<HowToReg />}
                   onClick={handleEngineerApproval}
-                  sx={{ bgcolor: 'success.main', '&:hover': { bgcolor: 'success.dark' } }}
+                  sx={{
+                    bgcolor: 'success.light',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    '&:hover': { bgcolor: 'success.main' }
+                  }}
                 >
-                  موافقة ({completedItems.length})
+                  Engineer Approve ({completedItems.length})
                 </Button>
               )}
 
@@ -149,31 +137,34 @@ const ProjectChecklistView = ({
                   {itemsReadyForSupervisor1.length > 0 && (
                     <Button
                       variant="contained"
-                      size="small"
+                      size="medium"
+                      startIcon={<SupervisorAccount />}
                       onClick={() => handleSupervisorApproval(1)}
-                      sx={{ bgcolor: 'secondary.main' }}
+                      sx={{ bgcolor: 'secondary.light', fontWeight: 'bold' }}
                     >
-                      موافقة L1 ({itemsReadyForSupervisor1.length})
+                      Approve L1 ({itemsReadyForSupervisor1.length})
                     </Button>
                   )}
                   {itemsReadyForSupervisor2.length > 0 && (
                     <Button
                       variant="contained"
-                      size="small"
+                      size="medium"
+                      startIcon={<SupervisorAccount />}
                       onClick={() => handleSupervisorApproval(2)}
-                      sx={{ bgcolor: 'secondary.main' }}
+                      sx={{ bgcolor: 'secondary.main', fontWeight: 'bold' }}
                     >
-                      موافقة L2 ({itemsReadyForSupervisor2.length})
+                      Approve L2 ({itemsReadyForSupervisor2.length})
                     </Button>
                   )}
                   {itemsReadyForSupervisor3.length > 0 && (
                     <Button
                       variant="contained"
-                      size="small"
+                      size="medium"
+                      startIcon={<SupervisorAccount />}
                       onClick={() => handleSupervisorApproval(3)}
-                      sx={{ bgcolor: 'secondary.main' }}
+                      sx={{ bgcolor: 'secondary.dark', fontWeight: 'bold' }}
                     >
-                      موافقة L3 ({itemsReadyForSupervisor3.length})
+                      Approve L3 ({itemsReadyForSupervisor3.length})
                     </Button>
                   )}
                 </>
@@ -188,129 +179,126 @@ const ProjectChecklistView = ({
           value={statistics.completion_percentage}
           sx={{
             mt: 2,
-            height: 8,
-            borderRadius: 1,
+            height: 10,
+            borderRadius: 2,
             bgcolor: 'rgba(255,255,255,0.2)',
             '& .MuiLinearProgress-bar': {
-              bgcolor: 'white',
+              bgcolor: 'success.light',
+              borderRadius: 2,
             },
           }}
         />
       </Box>
 
-      {/* Statistics */}
-      <Box sx={{ p: 2, bgcolor: 'grey.50' }}>
-        <Grid container spacing={2}>
+      {/* Statistics Summary */}
+      <Box sx={{ p: 2, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Grid container spacing={3}>
           <Grid item xs={6} sm={3}>
-            <Box display="flex" alignItems="center" gap={1}>
-              <CheckCircle fontSize="small" color="success" />
-              <Typography variant="body2" color="text.secondary">
-                مكتمل:
+            <Box textAlign="center">
+              <Typography variant="h4" fontWeight="bold" color="success.main">
+                {statistics.completed_tasks}
               </Typography>
-              <Typography variant="body2" fontWeight="bold">
-                {statistics.completed_tasks} / {statistics.total_tasks}
+              <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                Completed
               </Typography>
             </Box>
           </Grid>
           <Grid item xs={6} sm={3}>
-            <Box display="flex" alignItems="center" gap={1}>
-              <PendingActions fontSize="small" color="info" />
-              <Typography variant="body2" color="text.secondary">
-                مهندس:
-              </Typography>
-              <Typography variant="body2" fontWeight="bold">
+            <Box textAlign="center">
+              <Typography variant="h4" fontWeight="bold" color="info.main">
                 {statistics.engineer_approved_tasks}
               </Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                Engineer Approved
+              </Typography>
             </Box>
           </Grid>
           <Grid item xs={4} sm={2}>
-            <Typography variant="body2" color="text.secondary">
-              مشرف L1:
-            </Typography>
-            <Typography variant="body2" fontWeight="bold">
-              {statistics.supervisor_1_approved_tasks}
-            </Typography>
+            <Box textAlign="center">
+              <Typography variant="h5" fontWeight="bold" color="secondary.main">
+                {statistics.supervisor_1_approved_tasks}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                Supervisor L1
+              </Typography>
+            </Box>
           </Grid>
           <Grid item xs={4} sm={2}>
-            <Typography variant="body2" color="text.secondary">
-              مشرف L2:
-            </Typography>
-            <Typography variant="body2" fontWeight="bold">
-              {statistics.supervisor_2_approved_tasks}
-            </Typography>
+            <Box textAlign="center">
+              <Typography variant="h5" fontWeight="bold" color="secondary.main">
+                {statistics.supervisor_2_approved_tasks}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                Supervisor L2
+              </Typography>
+            </Box>
           </Grid>
           <Grid item xs={4} sm={2}>
-            <Typography variant="body2" color="text.secondary">
-              مشرف L3:
-            </Typography>
-            <Typography variant="body2" fontWeight="bold">
-              {statistics.supervisor_3_approved_tasks}
-            </Typography>
+            <Box textAlign="center">
+              <Typography variant="h5" fontWeight="bold" color="secondary.main">
+                {statistics.supervisor_3_approved_tasks}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                Supervisor L3
+              </Typography>
+            </Box>
           </Grid>
         </Grid>
       </Box>
 
-      <Divider />
-
-      {/* Expand/Collapse Controls */}
-      <Box sx={{ p: 1, display: 'flex', gap: 1, justifyContent: 'flex-end', bgcolor: 'grey.50' }}>
-        <Button size="small" onClick={handleExpandAll}>
-          توسيع الكل / Expand All
-        </Button>
-        <Button size="small" onClick={handleCollapseAll}>
-          طي الكل / Collapse All
-        </Button>
-      </Box>
-
-      {/* Checklist Items by Section */}
-      <Box>
-        {(sections || []).map((section, index) => {
-          const sectionName = section.section_name || 'عام / General';
-          const isExpanded = expandedSections.has(sectionName);
-
-          return (
-            <Accordion
-              key={index}
-              expanded={isExpanded}
-              onChange={() => handleSectionToggle(sectionName)}
-              disableGutters
-              elevation={0}
-              sx={{
-                '&:before': { display: 'none' },
-                borderTop: index > 0 ? '1px solid' : 'none',
-                borderColor: 'divider',
-              }}
-            >
-              <AccordionSummary
-                expandIcon={<ExpandMore />}
-                sx={{
-                  bgcolor: 'grey.100',
-                  '&:hover': { bgcolor: 'grey.200' },
-                }}
-              >
-                <Box display="flex" alignItems="center" gap={2} width="100%">
-                  <Typography fontWeight="medium">{sectionName}</Typography>
-                  <Chip
-                    label={`${(section.items || []).length} ${(section.items || []).length === 1 ? 'مهمة / task' : 'مهام / tasks'}`}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                  />
-                </Box>
-              </AccordionSummary>
-              <AccordionDetails sx={{ p: 0 }}>
-                {(section.items || []).map((item) => (
-                  <ChecklistItemRow
-                    key={item.id}
-                    item={item}
-                    onUpdate={onUpdate}
-                  />
-                ))}
-              </AccordionDetails>
-            </Accordion>
-          );
-        })}
-      </Box>
+      {/* Checklist Items Table */}
+      <TableContainer>
+        <Table sx={{ minWidth: 650 }}>
+          <TableHead>
+            <TableRow sx={{ bgcolor: 'grey.100' }}>
+              <TableCell width="5%" align="center">
+                <Typography variant="caption" fontWeight="bold">
+                  #
+                </Typography>
+              </TableCell>
+              <TableCell width="35%">
+                <Typography variant="caption" fontWeight="bold">
+                  Task Name
+                </Typography>
+              </TableCell>
+              <TableCell width="10%" align="center">
+                <Typography variant="caption" fontWeight="bold">
+                  Status
+                </Typography>
+              </TableCell>
+              <TableCell width="30%" align="center">
+                <Typography variant="caption" fontWeight="bold">
+                  Approval Workflow
+                </Typography>
+              </TableCell>
+              <TableCell width="20%" align="center">
+                <Typography variant="caption" fontWeight="bold">
+                  Actions
+                </Typography>
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {allItems.map((item, index) => (
+              <ChecklistItemRow
+                key={item.id}
+                item={item}
+                index={index + 1}
+                onUpdate={onUpdate}
+              />
+            ))}
+            {allItems.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No tasks found for this phase
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* Approval Dialogs */}
       {isEngineer && (

@@ -92,10 +92,10 @@ const EngineerApprovalDialog = ({
       <DialogTitle>
         <Box>
           <Typography variant="h6" gutterBottom>
-            موافقة المهندس / Engineer Approval
+            Engineer Approval
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            المرحلة: {phaseName}
+            Phase: {phaseName}
           </Typography>
         </Box>
       </DialogTitle>
@@ -109,30 +109,26 @@ const EngineerApprovalDialog = ({
 
         <Alert severity="info" icon={<CheckCircle />} sx={{ mb: 2 }}>
           <Typography variant="body2">
-            أنت على وشك الموافقة على المهام المكتملة التالية. سيتم إرسال إشعار إلى المشرفين للمراجعة.
-            <br />
             You are about to approve the following completed tasks. Supervisors will be notified for review.
           </Typography>
         </Alert>
 
         {completedItems.length === 0 ? (
           <Alert severity="warning" icon={<Warning />}>
-            لا توجد مهام مكتملة متاحة للموافقة
-            <br />
             No completed tasks available for approval
           </Alert>
         ) : (
           <>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="subtitle2">
-                المهام المكتملة ({completedItems.length}):
+                Completed Tasks ({completedItems.length}):
               </Typography>
               <Box>
                 <Button size="small" onClick={handleSelectAll} disabled={loading}>
-                  تحديد الكل / Select All
+                  Select All
                 </Button>
                 <Button size="small" onClick={handleDeselectAll} disabled={loading}>
-                  إلغاء التحديد / Deselect All
+                  Deselect All
                 </Button>
               </Box>
             </Box>
@@ -184,11 +180,9 @@ const EngineerApprovalDialog = ({
 
             <Box mt={2} p={2} bgcolor="primary.50" borderRadius={1}>
               <Typography variant="body2" fontWeight="medium">
-                الملخص / Summary:
+                Summary:
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                تم تحديد {selectedItems.length} من أصل {completedItems.length} مهمة
-                <br />
                 {selectedItems.length} of {completedItems.length} tasks selected
               </Typography>
             </Box>
@@ -198,7 +192,7 @@ const EngineerApprovalDialog = ({
 
       <DialogActions>
         <Button onClick={handleClose} disabled={loading}>
-          إلغاء / Cancel
+          Cancel
         </Button>
         <Button
           onClick={handleSubmit}
@@ -206,7 +200,7 @@ const EngineerApprovalDialog = ({
           disabled={loading || selectedItems.length === 0}
           color="success"
         >
-          {loading ? 'جاري الموافقة... / Approving...' : `موافقة (${selectedItems.length}) / Approve`}
+          {loading ? 'Approving...' : `Approve (${selectedItems.length})`}
         </Button>
       </DialogActions>
     </Dialog>

@@ -14,7 +14,12 @@
       "Bash(del nul 2)",
       "Bash(git cherry-pick:*)",
       "Bash(npm run typecheck:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(npm run build:*)",
+      "Bash(for file in *.tsx)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(head:*)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

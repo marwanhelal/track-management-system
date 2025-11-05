@@ -17,12 +17,14 @@ import {
   CircularProgress,
   Button,
   SelectChangeEvent,
+  Divider,
 } from '@mui/material';
 import {
   CheckCircle,
-  Pending,
   Assignment,
   Refresh,
+  Info,
+  TrendingUp,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
@@ -30,7 +32,6 @@ import {
   Project,
   ChecklistProgressOverview,
   ChecklistPhaseName,
-  ChecklistStatistics,
 } from '../types';
 import ProjectChecklistView from '../components/checklist/ProjectChecklistView';
 
@@ -74,7 +75,7 @@ const ChecklistPage = () => {
         }
       }
     } catch (error: any) {
-      setError(error.message || 'فشل في تحميل المشاريع / Failed to load projects');
+      setError(error.message || 'Failed to load projects');
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,7 @@ const ChecklistPage = () => {
         setChecklistOverview(response.data);
       }
     } catch (error: any) {
-      setError(error.message || 'فشل في تحميل قوائم المهام / Failed to load checklists');
+      setError(error.message || 'Failed to load checklists');
     } finally {
       setLoading(false);
     }
@@ -140,16 +141,16 @@ const ChecklistPage = () => {
       };
     }
 
-    return availablePhases.reduce(
+    const stats = availablePhases.reduce(
       (acc, phase) => {
-        const stats = phase.statistics;
+        const s = phase.statistics;
         return {
-          totalTasks: acc.totalTasks + stats.total_tasks,
-          completedTasks: acc.completedTasks + stats.completed_tasks,
-          engineerApproved: acc.engineerApproved + stats.engineer_approved_tasks,
-          supervisor1Approved: acc.supervisor1Approved + stats.supervisor_1_approved_tasks,
-          supervisor2Approved: acc.supervisor2Approved + stats.supervisor_2_approved_tasks,
-          supervisor3Approved: acc.supervisor3Approved + stats.supervisor_3_approved_tasks,
+          totalTasks: acc.totalTasks + s.total_tasks,
+          completedTasks: acc.completedTasks + s.completed_tasks,
+          engineerApproved: acc.engineerApproved + s.engineer_approved_tasks,
+          supervisor1Approved: acc.supervisor1Approved + s.supervisor_1_approved_tasks,
+          supervisor2Approved: acc.supervisor2Approved + s.supervisor_2_approved_tasks,
+          supervisor3Approved: acc.supervisor3Approved + s.supervisor_3_approved_tasks,
           completionPercentage: 0, // Will calculate after
         };
       },
@@ -163,42 +164,43 @@ const ChecklistPage = () => {
         completionPercentage: 0,
       }
     );
+
+    if (stats.totalTasks > 0) {
+      stats.completionPercentage = Math.round(
+        (stats.completedTasks / stats.totalTasks) * 100
+      );
+    }
+
+    return stats;
   };
 
   const overallStats = calculateOverallStats();
-  if (overallStats.totalTasks > 0) {
-    overallStats.completionPercentage = Math.round(
-      (overallStats.completedTasks / overallStats.totalTasks) * 100
-    );
-  }
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom fontWeight="bold">
-          قوائم المهام / Checklists
+        <Typography variant="h4" gutterBottom fontWeight="bold" color="primary">
+          Project Checklists
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          تتبع وإدارة مهام المشاريع مع سير عمل الموافقات
-          <br />
           Track and manage project tasks with approval workflow
         </Typography>
       </Box>
 
       {/* Filters */}
-      <Paper sx={{ p: 3, mb: 3 }}>
+      <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
         <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} md={5}>
             <FormControl fullWidth>
-              <InputLabel>المشروع / Project</InputLabel>
+              <InputLabel>Project</InputLabel>
               <Select
                 value={selectedProjectId}
                 onChange={handleProjectChange}
-                label="المشروع / Project"
+                label="Project"
               >
                 <MenuItem value="">
-                  <em>اختر مشروع / Select a project</em>
+                  <em>Select a project</em>
                 </MenuItem>
                 {projects.map((project) => (
                   <MenuItem key={project.id} value={project.id}>
@@ -211,14 +213,14 @@ const ChecklistPage = () => {
 
           <Grid item xs={12} md={4}>
             <FormControl fullWidth disabled={!selectedProjectId}>
-              <InputLabel>المرحلة / Phase</InputLabel>
+              <InputLabel>Phase</InputLabel>
               <Select
                 value={selectedPhase}
                 onChange={handlePhaseChange}
-                label="المرحلة / Phase"
+                label="Phase"
               >
                 <MenuItem value="all">
-                  <em>كل المراحل / All Phases</em>
+                  <em>All Phases</em>
                 </MenuItem>
                 {availablePhases.map((phase) => (
                   <MenuItem key={phase.phase_name} value={phase.phase_name}>
@@ -232,12 +234,13 @@ const ChecklistPage = () => {
           <Grid item xs={12} md={3}>
             <Button
               fullWidth
-              variant="outlined"
+              variant="contained"
               startIcon={<Refresh />}
               onClick={handleRefresh}
               disabled={loading}
+              sx={{ height: 56 }}
             >
-              تحديث / Refresh
+              Refresh
             </Button>
           </Grid>
         </Grid>
@@ -253,33 +256,153 @@ const ChecklistPage = () => {
       {/* Loading State */}
       {loading && !checklistOverview && (
         <Box display="flex" justifyContent="center" alignItems="center" py={8}>
-          <CircularProgress />
+          <CircularProgress size={60} />
         </Box>
       )}
 
       {/* No Project Selected */}
       {!selectedProjectId && !loading && (
-        <Alert severity="info" icon={<Assignment />}>
-          الرجاء اختيار مشروع لعرض قوائم المهام
-          <br />
-          Please select a project to view checklists
+        <Alert severity="info" icon={<Info />} sx={{ borderRadius: 2 }}>
+          <Typography variant="body1">
+            Please select a project to view checklists
+          </Typography>
         </Alert>
       )}
 
-      {/* Overall Statistics */}
-      {selectedProjectId && checklistOverview && (
+      {/* Project Details & Statistics */}
+      {selectedProjectId && checklistOverview && selectedProject && (
         <>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
+          {/* Project Information Card */}
+          <Paper elevation={3} sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: 'primary.50' }}>
+            <Box display="flex" alignItems="center" gap={1} mb={2}>
+              <Assignment color="primary" />
+              <Typography variant="h6" fontWeight="bold" color="primary">
+                Project Information
+              </Typography>
+            </Box>
+            <Divider sx={{ mb: 2 }} />
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                  Project Name
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {selectedProject.name}
+                </Typography>
+              </Grid>
+              <Grid item xs={6} sm={6} md={2}>
+                <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                  Status
+                </Typography>
+                <Typography variant="body1" fontWeight="bold" textTransform="capitalize">
+                  {selectedProject.status}
+                </Typography>
+              </Grid>
+              <Grid item xs={6} sm={4} md={2}>
+                <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                  Phases
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {availablePhases.length}
+                </Typography>
+              </Grid>
+              <Grid item xs={6} sm={4} md={2}>
+                <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                  Predicted Hours
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {selectedProject.predicted_hours}h
+                </Typography>
+              </Grid>
+              <Grid item xs={6} sm={4} md={3}>
+                <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                  Start Date
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {new Date(selectedProject.start_date).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  })}
+                </Typography>
+              </Grid>
+
+              {/* Extended Project Details */}
+              {selectedProject.land_area && (
+                <Grid item xs={6} sm={4} md={2}>
+                  <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                    Land Area
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {selectedProject.land_area}
+                  </Typography>
+                </Grid>
+              )}
+              {selectedProject.building_type && (
+                <Grid item xs={6} sm={4} md={2}>
+                  <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                    Building Type
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {selectedProject.building_type}
+                  </Typography>
+                </Grid>
+              )}
+              {selectedProject.floors_count && (
+                <Grid item xs={6} sm={4} md={2}>
+                  <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                    Number of Floors
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {selectedProject.floors_count}
+                  </Typography>
+                </Grid>
+              )}
+              {selectedProject.location && (
+                <Grid item xs={6} sm={4} md={3}>
+                  <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                    Location
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {selectedProject.location}
+                  </Typography>
+                </Grid>
+              )}
+              {selectedProject.bua && (
+                <Grid item xs={6} sm={4} md={2}>
+                  <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                    BUA (Built-Up Area)
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {selectedProject.bua}
+                  </Typography>
+                </Grid>
+              )}
+              {selectedProject.client_name && (
+                <Grid item xs={6} sm={4} md={3}>
+                  <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                    Client Name
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {selectedProject.client_name}
+                  </Typography>
+                </Grid>
+              )}
+            </Grid>
+          </Paper>
+
+          {/* Overall Statistics Cards */}
+          <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid item xs={12} sm={6} md={3}>
-              <Card>
+              <Card elevation={2} sx={{ height: '100%', borderRadius: 2 }}>
                 <CardContent>
                   <Box display="flex" alignItems="center" gap={1} mb={1}>
-                    <Assignment color="primary" />
-                    <Typography variant="body2" color="text.secondary">
-                      إجمالي المهام / Total Tasks
+                    <Assignment fontSize="large" color="primary" />
+                    <Typography variant="h6" color="text.secondary" fontWeight="medium">
+                      Total Tasks
                     </Typography>
                   </Box>
-                  <Typography variant="h4" fontWeight="bold">
+                  <Typography variant="h3" fontWeight="bold" color="primary.main">
                     {overallStats.totalTasks}
                   </Typography>
                 </CardContent>
@@ -287,40 +410,40 @@ const ChecklistPage = () => {
             </Grid>
 
             <Grid item xs={12} sm={6} md={3}>
-              <Card>
+              <Card elevation={2} sx={{ height: '100%', borderRadius: 2 }}>
                 <CardContent>
                   <Box display="flex" alignItems="center" gap={1} mb={1}>
-                    <CheckCircle color="success" />
-                    <Typography variant="body2" color="text.secondary">
-                      مكتمل / Completed
+                    <CheckCircle fontSize="large" color="success" />
+                    <Typography variant="h6" color="text.secondary" fontWeight="medium">
+                      Completed
                     </Typography>
                   </Box>
-                  <Typography variant="h4" fontWeight="bold" color="success.main">
+                  <Typography variant="h3" fontWeight="bold" color="success.main">
                     {overallStats.completedTasks}
                   </Typography>
                   <LinearProgress
                     variant="determinate"
                     value={overallStats.completionPercentage}
-                    sx={{ mt: 1 }}
+                    sx={{ mt: 2, height: 8, borderRadius: 1 }}
                     color="success"
                   />
-                  <Typography variant="caption" color="text.secondary">
-                    {overallStats.completionPercentage}%
+                  <Typography variant="body2" color="text.secondary" mt={0.5}>
+                    {overallStats.completionPercentage}% Complete
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
 
             <Grid item xs={12} sm={6} md={3}>
-              <Card>
+              <Card elevation={2} sx={{ height: '100%', borderRadius: 2 }}>
                 <CardContent>
                   <Box display="flex" alignItems="center" gap={1} mb={1}>
-                    <Pending color="info" />
-                    <Typography variant="body2" color="text.secondary">
-                      موافقة المهندس / Engineer Approved
+                    <TrendingUp fontSize="large" color="info" />
+                    <Typography variant="h6" color="text.secondary" fontWeight="medium">
+                      Engineer Approved
                     </Typography>
                   </Box>
-                  <Typography variant="h4" fontWeight="bold" color="info.main">
+                  <Typography variant="h3" fontWeight="bold" color="info.main">
                     {overallStats.engineerApproved}
                   </Typography>
                 </CardContent>
@@ -328,29 +451,29 @@ const ChecklistPage = () => {
             </Grid>
 
             <Grid item xs={12} sm={6} md={3}>
-              <Card>
+              <Card elevation={2} sx={{ height: '100%', borderRadius: 2 }}>
                 <CardContent>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    موافقات المشرفين / Supervisor Approvals
+                  <Typography variant="h6" color="text.secondary" fontWeight="medium" gutterBottom>
+                    Supervisor Approvals
                   </Typography>
-                  <Box display="flex" gap={1} flexWrap="wrap">
+                  <Box display="flex" gap={1} flexWrap="wrap" mt={2}>
                     <Chip
-                      label={`L1: ${overallStats.supervisor1Approved}`}
-                      size="small"
+                      label={`Level 1: ${overallStats.supervisor1Approved}`}
                       color="secondary"
-                      variant="outlined"
+                      variant="filled"
+                      sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}
                     />
                     <Chip
-                      label={`L2: ${overallStats.supervisor2Approved}`}
-                      size="small"
+                      label={`Level 2: ${overallStats.supervisor2Approved}`}
                       color="secondary"
-                      variant="outlined"
+                      variant="filled"
+                      sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}
                     />
                     <Chip
-                      label={`L3: ${overallStats.supervisor3Approved}`}
-                      size="small"
+                      label={`Level 3: ${overallStats.supervisor3Approved}`}
                       color="secondary"
-                      variant="outlined"
+                      variant="filled"
+                      sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}
                     />
                   </Box>
                 </CardContent>
@@ -358,63 +481,12 @@ const ChecklistPage = () => {
             </Grid>
           </Grid>
 
-          {/* Project Info */}
-          {selectedProject && (
-            <Paper sx={{ p: 2, mb: 3, bgcolor: 'primary.50' }}>
-              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                معلومات المشروع / Project Information
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Typography variant="caption" color="text.secondary">
-                    الحالة / Status:
-                  </Typography>
-                  <Typography variant="body2" fontWeight="medium">
-                    {selectedProject.status}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Typography variant="caption" color="text.secondary">
-                    المراحل / Phases:
-                  </Typography>
-                  <Typography variant="body2" fontWeight="medium">
-                    {availablePhases.length}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Typography variant="caption" color="text.secondary">
-                    الساعات / Hours:
-                  </Typography>
-                  <Typography variant="body2" fontWeight="medium">
-                    {selectedProject.predicted_hours}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Typography variant="caption" color="text.secondary">
-                    الأسابيع / Weeks:
-                  </Typography>
-                  <Typography variant="body2" fontWeight="medium">
-                    {selectedProject.planned_total_weeks}
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} sm={8} md={4}>
-                  <Typography variant="caption" color="text.secondary">
-                    تاريخ البدء / Start Date:
-                  </Typography>
-                  <Typography variant="body2" fontWeight="medium">
-                    {new Date(selectedProject.start_date).toLocaleDateString('ar-SA')}
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Paper>
-          )}
-
           {/* Checklist Items by Phase */}
           {filteredPhases.length === 0 ? (
-            <Alert severity="warning">
-              لا توجد مراحل بقوائم مهام لهذا المشروع
-              <br />
-              No phases with checklists found for this project
+            <Alert severity="warning" sx={{ borderRadius: 2 }}>
+              <Typography variant="body1">
+                No phases with checklists found for this project
+              </Typography>
             </Alert>
           ) : (
             <Box>
