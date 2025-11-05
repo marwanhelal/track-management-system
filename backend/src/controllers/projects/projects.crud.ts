@@ -183,7 +183,13 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
       start_date,
       planned_total_weeks,
       predicted_hours,
-      selectedPhases
+      selectedPhases,
+      land_area,
+      building_type,
+      floors_count,
+      location,
+      bua,
+      client_name
     }: ProjectCreateInput = req.body;
 
     // Validate that supervisor role is creating the project
@@ -219,17 +225,26 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
 
     // Create project and phases in a transaction
     const result = await transaction(async (client) => {
-      // Insert project
+      // Insert project with extended details
       const projectResult = await client.query(`
-        INSERT INTO projects (name, start_date, planned_total_weeks, predicted_hours, created_by)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO projects (
+          name, start_date, planned_total_weeks, predicted_hours, created_by,
+          land_area, building_type, floors_count, location, bua, client_name
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *
       `, [
         name,
         start_date || new Date(),
         planned_total_weeks,
         predicted_hours,
-        authReq.user.id
+        authReq.user.id,
+        land_area,
+        building_type,
+        floors_count,
+        location,
+        bua,
+        client_name
       ]);
 
       const project = projectResult.rows[0];
@@ -286,6 +301,33 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
         authReq.user.id,
         `Project created with ${selectedPhases.length} phases`
       ]);
+
+      // Generate checklist from templates
+      const templates = await client.query(`
+        SELECT * FROM checklist_templates WHERE is_active = true ORDER BY phase_name, display_order
+      `);
+
+      if (templates.rows.length > 0) {
+        const insertChecklistPromises = templates.rows.map((template: any) => {
+          return client.query(`
+            INSERT INTO project_checklist_items (
+              project_id, phase_name, section_name, task_title_ar, task_title_en, display_order
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [
+            project.id,
+            template.phase_name,
+            template.section_name,
+            template.task_title_ar,
+            template.task_title_en,
+            template.display_order
+          ]);
+        });
+
+        await Promise.all(insertChecklistPromises);
+
+        console.log(`✅ Generated ${templates.rows.length} checklist items for project ${project.id}`);
+      }
 
       return { project, phases };
     });

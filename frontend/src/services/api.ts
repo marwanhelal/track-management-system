@@ -15,7 +15,18 @@ import {
   PhaseSummary,
   ComprehensiveOverviewResponse,
   ProfileUpdateInput,
-  ChangePasswordInput
+  ChangePasswordInput,
+  ChecklistTemplate,
+  ProjectChecklistItem,
+  ChecklistStatistics,
+  ChecklistProgressOverview,
+  ChecklistTemplateInput,
+  ProjectChecklistItemInput,
+  ChecklistEngineerApprovalInput,
+  ChecklistSupervisorApprovalInput,
+  ChecklistClientNotesInput,
+  ChecklistToggleCompletionInput,
+  ChecklistPhaseName
 } from '../types';
 
 class ApiService {
@@ -707,9 +718,181 @@ class ApiService {
     building_type?: string;
     floors_count?: number;
     location?: string;
+    bua?: string;
     client_name?: string;
   }): Promise<ApiResponse<any>> {
     const response = await this.api.put(`/projects/${projectId}`, data);
+    return response.data;
+  }
+
+  // ============================================================================
+  // CHECKLIST SYSTEM METHODS
+  // ============================================================================
+
+  // ========================================
+  // CHECKLIST TEMPLATES (Supervisor Only)
+  // ========================================
+
+  /**
+   * Get all checklist templates or filter by phase
+   */
+  async getChecklistTemplates(phase_name?: ChecklistPhaseName): Promise<ApiResponse<{ templates: ChecklistTemplate[] }>> {
+    const url = phase_name ? `/checklist/templates?phase_name=${phase_name}` : '/checklist/templates';
+    const response = await this.api.get(url);
+    return response.data;
+  }
+
+  /**
+   * Get templates grouped by phase and section
+   */
+  async getChecklistTemplatesGrouped(): Promise<ApiResponse<any>> {
+    const response = await this.api.get('/checklist/templates/grouped');
+    return response.data;
+  }
+
+  /**
+   * Create a new checklist template (supervisor only)
+   */
+  async createChecklistTemplate(data: ChecklistTemplateInput): Promise<ApiResponse<{ template: ChecklistTemplate }>> {
+    const response = await this.api.post('/checklist/templates', data);
+    return response.data;
+  }
+
+  /**
+   * Update an existing checklist template (supervisor only)
+   */
+  async updateChecklistTemplate(id: number, data: Partial<ChecklistTemplateInput>): Promise<ApiResponse<{ template: ChecklistTemplate }>> {
+    const response = await this.api.put(`/checklist/templates/${id}`, data);
+    return response.data;
+  }
+
+  /**
+   * Delete a checklist template (supervisor only)
+   */
+  async deleteChecklistTemplate(id: number): Promise<ApiResponse> {
+    const response = await this.api.delete(`/checklist/templates/${id}`);
+    return response.data;
+  }
+
+  // ========================================
+  // PROJECT CHECKLIST ITEMS
+  // ========================================
+
+  /**
+   * Generate checklist for a project from templates (called during project creation)
+   */
+  async generateProjectChecklist(project_id: number): Promise<ApiResponse<{ items: ProjectChecklistItem[]; count: number }>> {
+    const response = await this.api.post(`/checklist/projects/${project_id}/generate`);
+    return response.data;
+  }
+
+  /**
+   * Get all checklist items for a project (can filter by phase)
+   */
+  async getProjectChecklistItems(project_id: number, phase_name?: ChecklistPhaseName): Promise<ApiResponse<{ items: ProjectChecklistItem[] }>> {
+    const url = phase_name
+      ? `/checklist/projects/${project_id}?phase_name=${phase_name}`
+      : `/checklist/projects/${project_id}`;
+    const response = await this.api.get(url);
+    return response.data;
+  }
+
+  /**
+   * Get project checklist grouped by phase with statistics
+   */
+  async getProjectChecklistGrouped(project_id: number): Promise<ApiResponse<ChecklistProgressOverview>> {
+    const response = await this.api.get(`/checklist/projects/${project_id}/grouped`);
+    return response.data;
+  }
+
+  /**
+   * Get statistics for a specific phase
+   */
+  async getChecklistStatistics(project_id: number, phase_name: ChecklistPhaseName): Promise<ApiResponse<{ statistics: ChecklistStatistics }>> {
+    const response = await this.api.get(`/checklist/projects/${project_id}/phases/${phase_name}/statistics`);
+    return response.data;
+  }
+
+  /**
+   * Create new checklist item for project (supervisor only - mainly for BOQ phase)
+   */
+  async createProjectChecklistItem(project_id: number, data: ProjectChecklistItemInput): Promise<ApiResponse<{ item: ProjectChecklistItem }>> {
+    const response = await this.api.post(`/checklist/projects/${project_id}/items`, data);
+    return response.data;
+  }
+
+  /**
+   * Update checklist item (supervisor only for most fields, engineers can toggle completion)
+   */
+  async updateProjectChecklistItem(id: number, data: Partial<ProjectChecklistItemInput>): Promise<ApiResponse<{ item: ProjectChecklistItem }>> {
+    const response = await this.api.put(`/checklist/items/${id}`, data);
+    return response.data;
+  }
+
+  /**
+   * Delete checklist item (supervisor only)
+   */
+  async deleteProjectChecklistItem(id: number): Promise<ApiResponse> {
+    const response = await this.api.delete(`/checklist/items/${id}`);
+    return response.data;
+  }
+
+  // ========================================
+  // TASK COMPLETION & APPROVAL WORKFLOW
+  // ========================================
+
+  /**
+   * Toggle task completion status (engineers can check/uncheck tasks)
+   */
+  async toggleItemCompletion(id: number, is_completed: boolean): Promise<ApiResponse<{ item: ProjectChecklistItem }>> {
+    const response = await this.api.post(`/checklist/items/${id}/toggle-completion`, { is_completed });
+    return response.data;
+  }
+
+  /**
+   * Engineer approval - Level 1 (engineers only)
+   * Batch approve multiple items
+   */
+  async engineerApproval(data: ChecklistEngineerApprovalInput): Promise<ApiResponse<{ items: ProjectChecklistItem[]; count: number }>> {
+    const response = await this.api.post('/checklist/approve/engineer', data);
+    return response.data;
+  }
+
+  /**
+   * Supervisor approval - Levels 1, 2, 3 (supervisors only)
+   * Batch approve multiple items at specified level
+   */
+  async supervisorApproval(data: ChecklistSupervisorApprovalInput): Promise<ApiResponse<{ items: ProjectChecklistItem[]; count: number }>> {
+    const response = await this.api.post('/checklist/approve/supervisor', data);
+    return response.data;
+  }
+
+  /**
+   * Revoke engineer approval (supervisors only)
+   */
+  async revokeEngineerApproval(id: number): Promise<ApiResponse<{ item: ProjectChecklistItem }>> {
+    const response = await this.api.post(`/checklist/items/${id}/revoke-engineer-approval`);
+    return response.data;
+  }
+
+  /**
+   * Revoke supervisor approval (supervisors only)
+   * Must specify which level to revoke
+   */
+  async revokeSupervisorApproval(id: number, level: 1 | 2 | 3): Promise<ApiResponse<{ item: ProjectChecklistItem }>> {
+    const response = await this.api.post(`/checklist/items/${id}/revoke-supervisor-approval`, { level });
+    return response.data;
+  }
+
+  // ========================================
+  // CLIENT NOTES
+  // ========================================
+
+  /**
+   * Update client notes (supervisors only)
+   */
+  async updateChecklistClientNotes(id: number, data: ChecklistClientNotesInput): Promise<ApiResponse<{ item: ProjectChecklistItem }>> {
+    const response = await this.api.put(`/checklist/items/${id}/client-notes`, data);
     return response.data;
   }
 }

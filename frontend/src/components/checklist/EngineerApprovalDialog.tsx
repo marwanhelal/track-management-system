@@ -1,0 +1,216 @@
+import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
+  Box,
+  List,
+  ListItem,
+  ListItemText,
+  Checkbox,
+  Alert,
+  Divider,
+  Chip,
+} from '@mui/material';
+import { CheckCircle, Warning } from '@mui/icons-material';
+import { ProjectChecklistItem, ChecklistPhaseName } from '../../types';
+import apiService from '../../services/api';
+
+interface EngineerApprovalDialogProps {
+  open: boolean;
+  onClose: () => void;
+  projectId: number;
+  phaseName: ChecklistPhaseName;
+  completedItems: ProjectChecklistItem[];
+  onSuccess: () => void;
+}
+
+const EngineerApprovalDialog = ({
+  open,
+  onClose,
+  projectId,
+  phaseName,
+  completedItems,
+  onSuccess,
+}: EngineerApprovalDialogProps) => {
+  const [selectedItems, setSelectedItems] = useState<number[]>(
+    completedItems.map((item) => item.id)
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleToggleItem = (itemId: number) => {
+    setSelectedItems((prev) =>
+      prev.includes(itemId)
+        ? prev.filter((id) => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    setSelectedItems(completedItems.map((item) => item.id));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedItems([]);
+  };
+
+  const handleSubmit = async () => {
+    if (selectedItems.length === 0) {
+      setError('الرجاء اختيار مهمة واحدة على الأقل / Please select at least one task');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      await apiService.engineerApproval({ items: selectedItems });
+
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      setError(error.response?.data?.error || error.message || 'فشل في الموافقة / Failed to approve');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (!loading) {
+      setSelectedItems(completedItems.map((item) => item.id));
+      setError(null);
+      onClose();
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        <Box>
+          <Typography variant="h6" gutterBottom>
+            موافقة المهندس / Engineer Approval
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            المرحلة: {phaseName}
+          </Typography>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+
+        <Alert severity="info" icon={<CheckCircle />} sx={{ mb: 2 }}>
+          <Typography variant="body2">
+            أنت على وشك الموافقة على المهام المكتملة التالية. سيتم إرسال إشعار إلى المشرفين للمراجعة.
+            <br />
+            You are about to approve the following completed tasks. Supervisors will be notified for review.
+          </Typography>
+        </Alert>
+
+        {completedItems.length === 0 ? (
+          <Alert severity="warning" icon={<Warning />}>
+            لا توجد مهام مكتملة متاحة للموافقة
+            <br />
+            No completed tasks available for approval
+          </Alert>
+        ) : (
+          <>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="subtitle2">
+                المهام المكتملة ({completedItems.length}):
+              </Typography>
+              <Box>
+                <Button size="small" onClick={handleSelectAll} disabled={loading}>
+                  تحديد الكل / Select All
+                </Button>
+                <Button size="small" onClick={handleDeselectAll} disabled={loading}>
+                  إلغاء التحديد / Deselect All
+                </Button>
+              </Box>
+            </Box>
+
+            <Divider />
+
+            <List sx={{ maxHeight: 400, overflow: 'auto' }}>
+              {completedItems.map((item, index) => (
+                <React.Fragment key={item.id}>
+                  <ListItem
+                    dense
+                    button
+                    onClick={() => handleToggleItem(item.id)}
+                    disabled={loading}
+                    sx={{
+                      '&:hover': { bgcolor: 'action.hover' },
+                    }}
+                  >
+                    <Checkbox
+                      checked={selectedItems.includes(item.id)}
+                      tabIndex={-1}
+                      disableRipple
+                      disabled={loading}
+                    />
+                    <ListItemText
+                      primary={
+                        <Box>
+                          <Typography variant="body2">
+                            {item.task_title_ar}
+                          </Typography>
+                          {item.task_title_en && (
+                            <Typography variant="caption" color="text.secondary">
+                              {item.task_title_en}
+                            </Typography>
+                          )}
+                        </Box>
+                      }
+                      secondary={
+                        item.section_name && (
+                          <Chip label={item.section_name} size="small" sx={{ mt: 0.5 }} />
+                        )
+                      }
+                    />
+                  </ListItem>
+                  {index < completedItems.length - 1 && <Divider component="li" />}
+                </React.Fragment>
+              ))}
+            </List>
+
+            <Box mt={2} p={2} bgcolor="primary.50" borderRadius={1}>
+              <Typography variant="body2" fontWeight="medium">
+                الملخص / Summary:
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                تم تحديد {selectedItems.length} من أصل {completedItems.length} مهمة
+                <br />
+                {selectedItems.length} of {completedItems.length} tasks selected
+              </Typography>
+            </Box>
+          </>
+        )}
+      </DialogContent>
+
+      <DialogActions>
+        <Button onClick={handleClose} disabled={loading}>
+          إلغاء / Cancel
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
+          disabled={loading || selectedItems.length === 0}
+          color="success"
+        >
+          {loading ? 'جاري الموافقة... / Approving...' : `موافقة (${selectedItems.length}) / Approve`}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+export default EngineerApprovalDialog;

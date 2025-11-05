@@ -39,6 +39,13 @@ export interface Project {
   created_by: string;
   created_at: Date;
   updated_at: Date;
+  // Extended project details
+  land_area?: string;
+  building_type?: string;
+  floors_count?: number;
+  location?: string;
+  bua?: string;
+  client_name?: string;
 }
 
 export interface ProjectCreateInput {
@@ -47,6 +54,13 @@ export interface ProjectCreateInput {
   planned_total_weeks: number;
   predicted_hours: number;
   selectedPhases: ProjectPhaseInput[];
+  // Extended project details
+  land_area?: string;
+  building_type?: string;
+  floors_count?: number;
+  location?: string;
+  bua?: string;
+  client_name?: string;
 }
 
 export interface ProjectUpdateInput {
@@ -783,4 +797,157 @@ export interface ProjectCreateWithDetailsInput extends ProjectCreateInput {
   floors_count?: number;
   location?: string;
   client_name?: string;
+  bua?: string;
+}
+
+// ============================================================================
+// CHECKLIST SYSTEM TYPES
+// ============================================================================
+
+// Checklist Phase Names
+export type ChecklistPhaseName = 'VIS' | 'DD' | 'License' | 'Working' | 'BOQ';
+
+// Checklist Template Types
+export interface ChecklistTemplate {
+  id: number;
+  phase_name: ChecklistPhaseName;
+  section_name?: string;
+  task_title_ar: string;
+  task_title_en?: string;
+  display_order: number;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ChecklistTemplateCreateInput {
+  phase_name: ChecklistPhaseName;
+  section_name?: string;
+  task_title_ar: string;
+  task_title_en?: string;
+  display_order: number;
+}
+
+export interface ChecklistTemplateUpdateInput {
+  section_name?: string;
+  task_title_ar?: string;
+  task_title_en?: string;
+  display_order?: number;
+  is_active?: boolean;
+}
+
+// Project Checklist Item Types
+export interface ProjectChecklistItem {
+  id: number;
+  project_id: number;
+  phase_name: ChecklistPhaseName;
+  section_name?: string;
+  task_title_ar: string;
+  task_title_en?: string;
+  display_order: number;
+
+  // Completion and approval tracking
+  is_completed: boolean;
+
+  // 4-level approval workflow
+  engineer_approved_by?: number;
+  engineer_approved_at?: Date;
+
+  supervisor_1_approved_by?: number;
+  supervisor_1_approved_at?: Date;
+
+  supervisor_2_approved_by?: number;
+  supervisor_2_approved_at?: Date;
+
+  supervisor_3_approved_by?: number;
+  supervisor_3_approved_at?: Date;
+
+  // Client notes
+  client_notes?: string;
+
+  // Metadata
+  created_at: Date;
+  updated_at: Date;
+
+  // Joined data (optional)
+  engineer_approved_name?: string;
+  supervisor_1_approved_name?: string;
+  supervisor_2_approved_name?: string;
+  supervisor_3_approved_name?: string;
+}
+
+export interface ProjectChecklistItemCreateInput {
+  project_id: number;
+  phase_name: ChecklistPhaseName;
+  section_name?: string;
+  task_title_ar: string;
+  task_title_en?: string;
+  display_order: number;
+}
+
+export interface ProjectChecklistItemUpdateInput {
+  task_title_ar?: string;
+  task_title_en?: string;
+  section_name?: string;
+  display_order?: number;
+  is_completed?: boolean;
+  client_notes?: string;
+}
+
+// Approval Input Types
+export interface ChecklistEngineerApprovalInput {
+  items: number[]; // Array of checklist item IDs to approve
+}
+
+export interface ChecklistSupervisorApprovalInput {
+  items: number[]; // Array of checklist item IDs to approve
+  level: 1 | 2 | 3; // Supervisor approval level (1, 2, or 3)
+}
+
+// Checklist Statistics Types
+export interface ChecklistStatistics {
+  project_id: number;
+  phase_name: ChecklistPhaseName;
+  total_tasks: number;
+  completed_tasks: number;
+  engineer_approved_tasks: number;
+  supervisor_1_approved_tasks: number;
+  supervisor_2_approved_tasks: number;
+  supervisor_3_approved_tasks: number;
+  completion_percentage: number;
+}
+
+// Checklist Progress Overview
+export interface ChecklistProgressOverview {
+  project_id: number;
+  project_name: string;
+  phases: {
+    phase_name: ChecklistPhaseName;
+    statistics: ChecklistStatistics;
+    items: ProjectChecklistItem[];
+  }[];
+  overall_completion: number;
+}
+
+// Checklist Filter Types
+export interface ChecklistFilters {
+  project_id?: number;
+  phase_name?: ChecklistPhaseName;
+  section_name?: string;
+  is_completed?: boolean;
+  engineer_approved?: boolean;
+  supervisor_approved_level?: 1 | 2 | 3;
+}
+
+// Socket.IO Events for Checklist
+export interface ChecklistSocketEvents {
+  'checklist:item_completed': { item: ProjectChecklistItem; project_id: number };
+  'checklist:item_approved': { item: ProjectChecklistItem; project_id: number; approval_level: number };
+  'checklist:phase_completed': { project_id: number; phase_name: ChecklistPhaseName };
+  'checklist:item_updated': { item: ProjectChecklistItem; project_id: number };
+}
+
+// Extended Project Creation with Checklist
+export interface ProjectCreateWithChecklistInput extends ProjectCreateWithDetailsInput {
+  generate_checklist?: boolean; // Whether to auto-generate checklist from templates
 }

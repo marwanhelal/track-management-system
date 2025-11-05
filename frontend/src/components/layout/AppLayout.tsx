@@ -29,6 +29,7 @@ import {
   Settings,
   Business,
   Psychology,
+  ChecklistRtl,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -87,6 +88,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       icon: <Assignment />,
       path: '/projects',
       roles: ['supervisor', 'administrator'],
+    },
+    {
+      text: 'Checklists',
+      icon: <ChecklistRtl />,
+      path: '/checklist',
+      roles: ['supervisor', 'engineer', 'administrator'],
     },
     {
       text: '🧠 Smart Warnings',
