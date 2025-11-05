@@ -72,9 +72,16 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
   // Initialize form data when project changes
   useEffect(() => {
     if (project) {
+      // Convert ISO datetime to yyyy-MM-dd format for date input
+      const formatDateForInput = (dateString: string) => {
+        if (!dateString) return '';
+        // Extract just the date portion (yyyy-MM-dd) from ISO string
+        return dateString.split('T')[0];
+      };
+
       const initialData = {
         name: project.name,
-        start_date: project.start_date,
+        start_date: formatDateForInput(project.start_date),
         planned_total_weeks: project.planned_total_weeks,
         predicted_hours: project.predicted_hours,
         status: project.status
@@ -128,10 +135,15 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
 
     // Check if there are changes
     if (project) {
+      const formatDateForInput = (dateString: string) => {
+        if (!dateString) return '';
+        return dateString.split('T')[0];
+      };
+
       const hasChangesNow = JSON.stringify({ ...formData, [field]: value }) !==
                            JSON.stringify({
                              name: project.name,
-                             start_date: project.start_date,
+                             start_date: formatDateForInput(project.start_date),
                              planned_total_weeks: project.planned_total_weeks,
                              predicted_hours: project.predicted_hours,
                              status: project.status
