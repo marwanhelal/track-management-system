@@ -11,7 +11,9 @@
       "Bash(psql:*)",
       "Bash(nul)",
       "Bash(git rm:*)",
-      "Bash(del nul 2)"
+      "Bash(del nul 2)",
+      "Bash(git cherry-pick:*)",
+      "Bash(npm run typecheck:*)"
     ],
     "deny": [],
     "ask": []
