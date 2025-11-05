@@ -61,7 +61,7 @@ INSERT INTO checklist_templates (phase_name, section_name, task_title_ar, task_t
 ('VIS', NULL, 'تحديث المساقط تبعاً لل 3D', 'Plans Update According to 3D', 32, true),
 ('VIS', NULL, 'إضافة طلبات الإلكتروميكانيكال', 'Electromechanical Requirements Addition', 33, true),
 ('VIS', NULL, 'التأكد من وجود الملف النهائي 3D على السيرفر', 'Verify Final 3D File on Server', 34, true),
-('VIS', NULL, 'التأكد من وجود ملفات VIZ في 3D', 'Verify VIZ Files in 3D', 35, true);
+('VIS', NULL, 'التأكد من وجود ملفات 3D VIZ', 'Verify 3D VIZ Files', 35, true);
 
 -- ============================================================================
 -- DD PHASE CHECKLIST (7 tasks)
