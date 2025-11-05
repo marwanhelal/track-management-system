@@ -353,7 +353,7 @@ export const getProjectChecklistGrouped = async (req: Request, res: Response): P
       return;
     }
 
-    // Get all checklist items with statistics
+    // Get all checklist items with statistics and aggregated engineer approvals
     const result = await pool.query(`
       SELECT
         pci.phase_name,
@@ -365,9 +365,7 @@ export const getProjectChecklistGrouped = async (req: Request, res: Response): P
             'task_title_en', pci.task_title_en,
             'display_order', pci.display_order,
             'is_completed', pci.is_completed,
-            'engineer_approved_by', pci.engineer_approved_by,
-            'engineer_approved_at', pci.engineer_approved_at,
-            'engineer_approved_name', e.name,
+            'engineer_approvals', COALESCE(ea.engineer_approvals, '[]'::json),
             'supervisor_1_approved_by', pci.supervisor_1_approved_by,
             'supervisor_1_approved_at', pci.supervisor_1_approved_at,
             'supervisor_1_approved_name', s1.name,
@@ -382,13 +380,27 @@ export const getProjectChecklistGrouped = async (req: Request, res: Response): P
         ) as items,
         COUNT(*)::INTEGER as total_tasks,
         COUNT(*) FILTER (WHERE pci.is_completed = true)::INTEGER as completed_tasks,
-        COUNT(*) FILTER (WHERE pci.engineer_approved_by IS NOT NULL)::INTEGER as engineer_approved_tasks,
+        COUNT(DISTINCT CASE WHEN ea.engineer_count > 0 THEN pci.id END)::INTEGER as engineer_approved_tasks,
         COUNT(*) FILTER (WHERE pci.supervisor_1_approved_by IS NOT NULL)::INTEGER as supervisor_1_approved_tasks,
         COUNT(*) FILTER (WHERE pci.supervisor_2_approved_by IS NOT NULL)::INTEGER as supervisor_2_approved_tasks,
         COUNT(*) FILTER (WHERE pci.supervisor_3_approved_by IS NOT NULL)::INTEGER as supervisor_3_approved_tasks,
         ROUND((COUNT(*) FILTER (WHERE pci.is_completed = true)::DECIMAL / NULLIF(COUNT(*), 0)::DECIMAL) * 100, 2) as completion_percentage
       FROM project_checklist_items pci
-      LEFT JOIN users e ON pci.engineer_approved_by = e.id
+      LEFT JOIN (
+        SELECT
+          ciea.checklist_item_id,
+          json_agg(
+            json_build_object(
+              'engineer_id', ciea.engineer_id,
+              'engineer_name', u.name,
+              'approved_at', ciea.approved_at
+            ) ORDER BY ciea.approved_at
+          ) as engineer_approvals,
+          COUNT(*)::INTEGER as engineer_count
+        FROM checklist_item_engineer_approvals ciea
+        LEFT JOIN users u ON ciea.engineer_id = u.id
+        GROUP BY ciea.checklist_item_id
+      ) ea ON pci.id = ea.checklist_item_id
       LEFT JOIN users s1 ON pci.supervisor_1_approved_by = s1.id
       LEFT JOIN users s2 ON pci.supervisor_2_approved_by = s2.id
       LEFT JOIN users s3 ON pci.supervisor_3_approved_by = s3.id
@@ -672,10 +684,12 @@ export const toggleItemCompletion = async (req: AuthReq, res: Response): Promise
 
 /**
  * Engineer approval (Level 1) - sign off on completed tasks
+ * Supports multiple engineers approving the same task
  * POST /api/v1/checklist/approve/engineer
  * Body: { items: [1, 2, 3] }
  */
 export const engineerApproval = async (req: AuthReq, res: Response): Promise<void> => {
+  const client = await pool.connect();
   try {
     const userId = req.user?.id;
     const { items }: ChecklistEngineerApprovalInput = req.body;
@@ -688,28 +702,52 @@ export const engineerApproval = async (req: AuthReq, res: Response): Promise<voi
       return;
     }
 
-    // Update all items in batch
-    const result = await pool.query(`
-      UPDATE project_checklist_items
-      SET
-        engineer_approved_by = $1,
-        engineer_approved_at = NOW()
-      WHERE id = ANY($2::int[])
+    await client.query('BEGIN');
+
+    // Insert approvals into junction table (ON CONFLICT to prevent duplicate approvals)
+    const insertResult = await client.query(`
+      INSERT INTO checklist_item_engineer_approvals (checklist_item_id, engineer_id, approved_at)
+      SELECT unnest($1::int[]), $2, NOW()
+      ON CONFLICT (checklist_item_id, engineer_id) DO NOTHING
       RETURNING *
-    `, [userId, items]);
+    `, [items, userId]);
+
+    // Get updated items with all engineer approvals
+    const itemsResult = await client.query(`
+      SELECT
+        pci.*,
+        json_agg(
+          json_build_object(
+            'engineer_id', ciea.engineer_id,
+            'engineer_name', u.name,
+            'approved_at', ciea.approved_at
+          ) ORDER BY ciea.approved_at
+        ) as engineer_approvals
+      FROM project_checklist_items pci
+      LEFT JOIN checklist_item_engineer_approvals ciea ON pci.id = ciea.checklist_item_id
+      LEFT JOIN users u ON ciea.engineer_id = u.id
+      WHERE pci.id = ANY($1::int[])
+      GROUP BY pci.id
+    `, [items]);
+
+    await client.query('COMMIT');
 
     res.json({
       success: true,
-      data: result.rows,
-      message: `${result.rowCount} item(s) approved by engineer`
+      data: itemsResult.rows,
+      message: `${insertResult.rowCount} item(s) approved by engineer`,
+      count: insertResult.rowCount
     });
   } catch (error: any) {
+    await client.query('ROLLBACK');
     console.error('Error in engineer approval:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to approve items',
       error: error.message
     });
+  } finally {
+    client.release();
   }
 };
 

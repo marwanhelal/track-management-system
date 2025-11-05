@@ -29,6 +29,7 @@ import {
 import { ProjectChecklistItem } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import apiService from '../../services/api';
+import EditTaskDialog from './EditTaskDialog';
 
 interface ChecklistItemRowProps {
   item: ProjectChecklistItem;
@@ -42,6 +43,7 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
   const [clientNotesDialogOpen, setClientNotesDialogOpen] = useState(false);
   const [clientNotes, setClientNotes] = useState(item.client_notes || '');
   const [error, setError] = useState<string | null>(null);
+  const [editTaskDialogOpen, setEditTaskDialogOpen] = useState(false);
 
   const isEngineer = user?.role === 'engineer';
   const isSupervisor = user?.role === 'supervisor';
@@ -80,7 +82,7 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
     if (item.supervisor_3_approved_by) return 'success.50';
     if (item.supervisor_2_approved_by) return 'secondary.50';
     if (item.supervisor_1_approved_by) return 'info.50';
-    if (item.engineer_approved_by) return 'primary.50';
+    if (item.engineer_approvals && item.engineer_approvals.length > 0) return 'primary.50';
     if (item.is_completed) return 'grey.50';
     return 'white';
   };
@@ -147,71 +149,136 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
           </Typography>
         </TableCell>
 
-        {/* Approval Workflow */}
-        <TableCell align="center">
-          <Box display="flex" gap={0.5} justifyContent="center" flexWrap="wrap">
-            {/* Engineer Approval */}
-            <Tooltip title={item.engineer_approved_by ? `Engineer: ${item.engineer_approved_name || 'Unknown'}` : 'Waiting for engineer approval'}>
-              <Chip
-                icon={item.engineer_approved_by ? <CheckCircle /> : <HourglassEmpty />}
-                label="E"
-                size="small"
-                color={item.engineer_approved_by ? 'info' : 'default'}
-                variant={item.engineer_approved_by ? 'filled' : 'outlined'}
-                sx={{ fontWeight: 'bold', minWidth: 50 }}
-              />
-            </Tooltip>
+        {/* Approval Workflow - Professional Display */}
+        <TableCell>
+          <Box display="flex" flexDirection="column" gap={1}>
+            {/* Engineer Approvals - Show all engineers who approved */}
+            <Box>
+              <Typography variant="caption" fontWeight="bold" color="text.secondary" display="block" gutterBottom>
+                Engineers:
+              </Typography>
+              {item.engineer_approvals && item.engineer_approvals.length > 0 ? (
+                <Box display="flex" gap={0.5} flexWrap="wrap">
+                  {item.engineer_approvals.map((approval, idx) => (
+                    <Chip
+                      key={idx}
+                      icon={<CheckCircle />}
+                      label={approval.engineer_name}
+                      size="small"
+                      color="info"
+                      variant="filled"
+                      sx={{ fontWeight: 'medium', fontSize: '0.75rem' }}
+                    />
+                  ))}
+                </Box>
+              ) : (
+                <Chip
+                  icon={<HourglassEmpty />}
+                  label="Pending"
+                  size="small"
+                  color="default"
+                  variant="outlined"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              )}
+            </Box>
 
-            {/* Supervisor Level 1 */}
-            <Tooltip title={item.supervisor_1_approved_by ? `Supervisor L1: ${item.supervisor_1_approved_name || 'Unknown'}` : 'Waiting for supervisor L1 approval'}>
-              <Chip
-                icon={item.supervisor_1_approved_by ? <CheckCircle /> : <HourglassEmpty />}
-                label="S1"
-                size="small"
-                color={item.supervisor_1_approved_by ? 'secondary' : 'default'}
-                variant={item.supervisor_1_approved_by ? 'filled' : 'outlined'}
-                sx={{ fontWeight: 'bold', minWidth: 50 }}
-              />
-            </Tooltip>
+            {/* Supervisor Approvals */}
+            <Box>
+              <Typography variant="caption" fontWeight="bold" color="text.secondary" display="block" gutterBottom>
+                Supervisors:
+              </Typography>
+              <Box display="flex" gap={0.5} flexWrap="wrap">
+                {/* Supervisor Level 1 */}
+                {item.supervisor_1_approved_by ? (
+                  <Chip
+                    icon={<CheckCircle />}
+                    label={`L1: ${item.supervisor_1_approved_name}`}
+                    size="small"
+                    color="secondary"
+                    variant="filled"
+                    sx={{ fontWeight: 'medium', fontSize: '0.75rem' }}
+                  />
+                ) : (
+                  <Chip
+                    icon={<HourglassEmpty />}
+                    label="L1"
+                    size="small"
+                    color="default"
+                    variant="outlined"
+                    sx={{ fontSize: '0.7rem' }}
+                  />
+                )}
 
-            {/* Supervisor Level 2 */}
-            <Tooltip title={item.supervisor_2_approved_by ? `Supervisor L2: ${item.supervisor_2_approved_name || 'Unknown'}` : 'Waiting for supervisor L2 approval'}>
-              <Chip
-                icon={item.supervisor_2_approved_by ? <CheckCircle /> : <HourglassEmpty />}
-                label="S2"
-                size="small"
-                color={item.supervisor_2_approved_by ? 'secondary' : 'default'}
-                variant={item.supervisor_2_approved_by ? 'filled' : 'outlined'}
-                sx={{ fontWeight: 'bold', minWidth: 50 }}
-              />
-            </Tooltip>
+                {/* Supervisor Level 2 */}
+                {item.supervisor_2_approved_by ? (
+                  <Chip
+                    icon={<CheckCircle />}
+                    label={`L2: ${item.supervisor_2_approved_name}`}
+                    size="small"
+                    color="secondary"
+                    variant="filled"
+                    sx={{ fontWeight: 'medium', fontSize: '0.75rem' }}
+                  />
+                ) : (
+                  <Chip
+                    icon={<HourglassEmpty />}
+                    label="L2"
+                    size="small"
+                    color="default"
+                    variant="outlined"
+                    sx={{ fontSize: '0.7rem' }}
+                  />
+                )}
 
-            {/* Supervisor Level 3 */}
-            <Tooltip title={item.supervisor_3_approved_by ? `Supervisor L3: ${item.supervisor_3_approved_name || 'Unknown'}` : 'Waiting for supervisor L3 approval'}>
-              <Chip
-                icon={item.supervisor_3_approved_by ? <CheckCircle /> : <HourglassEmpty />}
-                label="S3"
-                size="small"
-                color={item.supervisor_3_approved_by ? 'success' : 'default'}
-                variant={item.supervisor_3_approved_by ? 'filled' : 'outlined'}
-                sx={{ fontWeight: 'bold', minWidth: 50 }}
-              />
-            </Tooltip>
+                {/* Supervisor Level 3 */}
+                {item.supervisor_3_approved_by ? (
+                  <Chip
+                    icon={<CheckCircle />}
+                    label={`L3: ${item.supervisor_3_approved_name}`}
+                    size="small"
+                    color="success"
+                    variant="filled"
+                    sx={{ fontWeight: 'medium', fontSize: '0.75rem' }}
+                  />
+                ) : (
+                  <Chip
+                    icon={<HourglassEmpty />}
+                    label="L3"
+                    size="small"
+                    color="default"
+                    variant="outlined"
+                    sx={{ fontSize: '0.7rem' }}
+                  />
+                )}
+              </Box>
+            </Box>
           </Box>
         </TableCell>
 
         {/* Actions */}
         <TableCell align="center">
           {isSupervisor && (
-            <Tooltip title="Edit Client Notes">
-              <IconButton
-                size="small"
-                onClick={() => setClientNotesDialogOpen(true)}
-                color="primary"
-              >
-                <Edit fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <Box display="flex" gap={0.5} justifyContent="center">
+              <Tooltip title="Edit Task">
+                <IconButton
+                  size="small"
+                  onClick={() => setEditTaskDialogOpen(true)}
+                  color="primary"
+                >
+                  <Edit fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Client Notes">
+                <IconButton
+                  size="small"
+                  onClick={() => setClientNotesDialogOpen(true)}
+                  color="warning"
+                >
+                  <Person fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
           )}
         </TableCell>
       </TableRow>
@@ -236,7 +303,7 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
       >
         <DialogTitle>
           <Box display="flex" alignItems="center" gap={1}>
-            <Edit color="primary" />
+            <Person color="warning" />
             <Typography variant="h6">Client Notes</Typography>
           </Box>
         </DialogTitle>
@@ -265,6 +332,14 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Edit Task Dialog */}
+      <EditTaskDialog
+        open={editTaskDialogOpen}
+        onClose={() => setEditTaskDialogOpen(false)}
+        item={item}
+        onSuccess={onUpdate}
+      />
     </>
   );
 };

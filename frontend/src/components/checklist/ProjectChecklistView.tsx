@@ -21,6 +21,7 @@ import {
   HowToReg,
   SupervisorAccount,
   Person,
+  Add,
 } from '@mui/icons-material';
 import {
   ChecklistPhaseName,
@@ -31,6 +32,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ChecklistItemRow from './ChecklistItemRow';
 import EngineerApprovalDialog from './EngineerApprovalDialog';
 import SupervisorApprovalDialog from './SupervisorApprovalDialog';
+import AddChecklistItemDialog from './AddChecklistItemDialog';
 
 interface ProjectChecklistViewProps {
   projectId: number;
@@ -50,6 +52,7 @@ const ProjectChecklistView = ({
   const { user } = useAuth();
   const [engineerDialogOpen, setEngineerDialogOpen] = useState(false);
   const [supervisorDialogOpen, setSupervisorDialogOpen] = useState(false);
+  const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<1 | 2 | 3>(1);
 
   const isEngineer = user?.role === 'engineer';
@@ -67,12 +70,15 @@ const ProjectChecklistView = ({
   // Get all items from all sections
   const allItems = (sections || []).flatMap((section) => section.items || []);
 
-  // Get completed items for engineer approval
-  const completedItems = allItems.filter((item) => item.is_completed && !item.engineer_approved_by);
+  // Get completed items for engineer approval (items not yet approved by any engineer)
+  const completedItems = allItems.filter(
+    (item) => item.is_completed && (!item.engineer_approvals || item.engineer_approvals.length === 0)
+  );
 
   // Get items ready for supervisor approval at each level
+  // Items need at least one engineer approval to proceed to supervisor level
   const itemsReadyForSupervisor1 = allItems.filter(
-    (item) => item.engineer_approved_by && !item.supervisor_1_approved_by
+    (item) => item.engineer_approvals && item.engineer_approvals.length > 0 && !item.supervisor_1_approved_by
   );
   const itemsReadyForSupervisor2 = allItems.filter(
     (item) => item.supervisor_1_approved_by && !item.supervisor_2_approved_by
@@ -113,6 +119,25 @@ const ProjectChecklistView = ({
 
           <Grid item xs={12} md={6}>
             <Box display="flex" gap={1} justifyContent={{ xs: 'flex-start', md: 'flex-end' }} flexWrap="wrap">
+              {/* Supervisor Add New Item Button */}
+              {isSupervisor && (
+                <Button
+                  variant="outlined"
+                  size="medium"
+                  startIcon={<Add />}
+                  onClick={() => setAddItemDialogOpen(true)}
+                  sx={{
+                    bgcolor: 'white',
+                    borderColor: 'primary.main',
+                    color: 'primary.main',
+                    fontWeight: 'bold',
+                    '&:hover': { bgcolor: 'primary.50', borderColor: 'primary.dark' }
+                  }}
+                >
+                  Add New Item
+                </Button>
+              )}
+
               {/* Engineer Approval Button */}
               {isEngineer && completedItems.length > 0 && (
                 <Button
@@ -256,22 +281,22 @@ const ProjectChecklistView = ({
                   #
                 </Typography>
               </TableCell>
-              <TableCell width="35%">
+              <TableCell width="30%">
                 <Typography variant="caption" fontWeight="bold">
                   Task Name
                 </Typography>
               </TableCell>
-              <TableCell width="10%" align="center">
+              <TableCell width="8%" align="center">
                 <Typography variant="caption" fontWeight="bold">
                   Status
                 </Typography>
               </TableCell>
-              <TableCell width="30%" align="center">
+              <TableCell width="45%">
                 <Typography variant="caption" fontWeight="bold">
                   Approval Workflow
                 </Typography>
               </TableCell>
-              <TableCell width="20%" align="center">
+              <TableCell width="12%" align="center">
                 <Typography variant="caption" fontWeight="bold">
                   Actions
                 </Typography>
@@ -326,6 +351,18 @@ const ProjectChecklistView = ({
               ? itemsReadyForSupervisor2
               : itemsReadyForSupervisor3
           }
+          onSuccess={onUpdate}
+        />
+      )}
+
+      {/* Add New Item Dialog */}
+      {isSupervisor && (
+        <AddChecklistItemDialog
+          open={addItemDialogOpen}
+          onClose={() => setAddItemDialogOpen(false)}
+          projectId={projectId}
+          phaseName={phaseName}
+          existingItemsCount={allItems.length}
           onSuccess={onUpdate}
         />
       )}

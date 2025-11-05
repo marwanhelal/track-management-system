@@ -197,18 +197,22 @@ const SupervisorApprovalDialog = ({
                         </Box>
                       }
                       secondary={
-                        <Box display="flex" gap={0.5} mt={0.5}>
+                        <Box display="flex" gap={0.5} mt={0.5} flexWrap="wrap">
                           {item.section_name && (
                             <Chip label={item.section_name} size="small" />
                           )}
-                          {item.engineer_approved_by && (
-                            <Chip label="E" size="small" color="info" />
+                          {item.engineer_approvals && item.engineer_approvals.length > 0 && (
+                            <Chip
+                              label={`Engineers: ${item.engineer_approvals.map(e => e.engineer_name).join(', ')}`}
+                              size="small"
+                              color="info"
+                            />
                           )}
                           {item.supervisor_1_approved_by && level >= 2 && (
-                            <Chip label="S1" size="small" color="secondary" />
+                            <Chip label={`S1: ${item.supervisor_1_approved_name}`} size="small" color="secondary" />
                           )}
                           {item.supervisor_2_approved_by && level >= 3 && (
-                            <Chip label="S2" size="small" color="secondary" />
+                            <Chip label={`S2: ${item.supervisor_2_approved_name}`} size="small" color="secondary" />
                           )}
                         </Box>
                       }

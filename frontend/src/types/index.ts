@@ -507,6 +507,13 @@ export interface ChecklistTemplate {
   updated_at: string;
 }
 
+// Engineer approval info
+export interface EngineerApproval {
+  engineer_id: number;
+  engineer_name: string;
+  approved_at: string;
+}
+
 // Project Checklist Item (instance of template for a specific project)
 export interface ProjectChecklistItem {
   id: number;
@@ -521,6 +528,10 @@ export interface ProjectChecklistItem {
   is_completed: boolean;
 
   // 4-level approval workflow
+  // NEW: Support multiple engineers approving same task
+  engineer_approvals?: EngineerApproval[];
+
+  // DEPRECATED: Old single engineer approval (kept for backward compatibility)
   engineer_approved_by?: number;
   engineer_approved_at?: string;
   engineer_approved_name?: string;
