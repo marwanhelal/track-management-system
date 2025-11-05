@@ -120,7 +120,7 @@ const CreateProjectDialog = ({
   const loadChecklistTemplates = async () => {
     try {
       const response = await apiService.getChecklistTemplates();
-      if (response.success && response.data) {
+      if (response.success && response.data && response.data.templates) {
         setChecklistTemplates(response.data.templates);
 
         // Calculate statistics per phase
@@ -129,9 +129,16 @@ const CreateProjectDialog = ({
           stats[template.phase_name] = (stats[template.phase_name] || 0) + 1;
         });
         setChecklistStats(stats);
+      } else {
+        // Templates not available yet (migrations not run)
+        setChecklistTemplates([]);
+        setChecklistStats({});
       }
     } catch (error: any) {
       console.error('Failed to load checklist templates:', error);
+      // Set empty arrays to prevent undefined errors
+      setChecklistTemplates([]);
+      setChecklistStats({});
     }
   };
 
