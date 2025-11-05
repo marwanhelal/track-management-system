@@ -867,6 +867,22 @@ class ApiService {
   }
 
   /**
+   * Toggle engineer's own approval for a single item
+   * Engineer can approve/unapprove their own work
+   */
+  async toggleEngineerApproval(itemId: number, approve: boolean): Promise<ApiResponse> {
+    if (approve) {
+      // Add approval
+      const response = await this.api.post('/checklist/approve/engineer', { items: [itemId] });
+      return response.data;
+    } else {
+      // Remove approval
+      const response = await this.api.delete(`/checklist/approve/engineer/${itemId}`);
+      return response.data;
+    }
+  }
+
+  /**
    * Supervisor approval - Levels 1, 2, 3 (supervisors only)
    * Batch approve multiple items at specified level
    */

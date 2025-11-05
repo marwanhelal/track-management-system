@@ -48,23 +48,24 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
   const isEngineer = user?.role === 'engineer';
   const isSupervisor = user?.role === 'supervisor';
 
-  const handleToggleCompletion = async () => {
-    if (!isEngineer && !isSupervisor) return;
-
-    // Don't allow unchecking if task is already completed
-    // This prevents engineers from undoing each other's work
-    if (item.is_completed) {
-      setError('Cannot uncheck a completed task. Task completion cannot be reverted.');
-      return;
-    }
+  const handleToggleEngineerApproval = async () => {
+    if (!isEngineer) return;
 
     try {
       setLoading(true);
       setError(null);
-      await apiService.toggleItemCompletion(item.id, true);
+
+      // Check if current engineer has already approved
+      const currentUserId = user?.id;
+      const hasApproved = item.engineer_approvals?.some(
+        (approval) => approval.engineer_id == currentUserId
+      );
+
+      // Toggle approval
+      await apiService.toggleEngineerApproval(item.id, !hasApproved);
       onUpdate();
     } catch (error: any) {
-      setError(error.message || 'Failed to update completion status');
+      setError(error.message || 'Failed to update approval');
     } finally {
       setLoading(false);
     }
@@ -85,12 +86,19 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
   };
 
   // Get row background color based on status
+  // Green: At least one supervisor approved
+  // Yellow: At least one engineer approved (but no supervisor yet)
+  // White: No approvals
   const getRowBgColor = () => {
-    if (item.supervisor_3_approved_by) return 'success.50';
-    if (item.supervisor_2_approved_by) return 'secondary.50';
-    if (item.supervisor_1_approved_by) return 'info.50';
-    if (item.engineer_approvals && item.engineer_approvals.length > 0) return 'primary.50';
-    if (item.is_completed) return 'grey.50';
+    // Green if any supervisor approved
+    if (item.supervisor_1_approved_by || item.supervisor_2_approved_by || item.supervisor_3_approved_by) {
+      return '#d4edda'; // Light green
+    }
+    // Yellow if any engineer approved
+    if (item.engineer_approvals && item.engineer_approvals.length > 0) {
+      return '#fff3cd'; // Light yellow
+    }
+    // White if no approvals
     return 'white';
   };
 
@@ -115,12 +123,8 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
           <Box>
             <Typography
               variant="body2"
-              fontWeight={item.is_completed ? 'normal' : 'bold'}
-              sx={{
-                textDecoration: item.is_completed ? 'line-through' : 'none',
-                color: item.is_completed ? 'text.secondary' : 'text.primary',
-                mb: 0.5,
-              }}
+              fontWeight="bold"
+              sx={{ mb: 0.5 }}
             >
               {item.task_title_ar}
             </Typography>
@@ -141,25 +145,27 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
           </Box>
         </TableCell>
 
-        {/* Status */}
-        <TableCell align="center">
-          <Checkbox
-            checked={item.is_completed}
-            onChange={handleToggleCompletion}
-            disabled={loading || (!isEngineer && !isSupervisor)}
-            icon={<RadioButtonUnchecked />}
-            checkedIcon={<CheckCircle color="success" />}
-            sx={{ p: 0 }}
-          />
-          <Typography variant="caption" display="block" color={item.is_completed ? 'success.main' : 'text.secondary'} fontWeight="medium">
-            {item.is_completed ? 'Done' : 'Pending'}
-          </Typography>
-        </TableCell>
-
         {/* Approval Workflow - Professional Display */}
         <TableCell>
           <Box display="flex" flexDirection="column" gap={1}>
-            {/* Engineer Approvals - Show all engineers who approved */}
+            {/* Current Engineer's Checkbox (if engineer) */}
+            {isEngineer && (
+              <Box display="flex" alignItems="center" gap={1}>
+                <Checkbox
+                  checked={item.engineer_approvals?.some((approval) => approval.engineer_id == user?.id) || false}
+                  onChange={handleToggleEngineerApproval}
+                  disabled={loading}
+                  icon={<RadioButtonUnchecked />}
+                  checkedIcon={<CheckCircle color="success" />}
+                  sx={{ p: 0 }}
+                />
+                <Typography variant="caption" fontWeight="bold">
+                  My Approval
+                </Typography>
+              </Box>
+            )}
+
+            {/* All Engineer Approvals - Show all engineers who approved */}
             <Box>
               <Typography variant="caption" fontWeight="bold" color="text.secondary" display="block" gutterBottom>
                 Engineers:
@@ -301,7 +307,7 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
       {/* Error Display Row */}
       {error && (
         <TableRow>
-          <TableCell colSpan={5}>
+          <TableCell colSpan={4}>
             <Alert severity="error" onClose={() => setError(null)}>
               {error}
             </Alert>

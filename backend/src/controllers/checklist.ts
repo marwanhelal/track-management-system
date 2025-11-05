@@ -712,6 +712,13 @@ export const engineerApproval = async (req: AuthReq, res: Response): Promise<voi
       RETURNING *
     `, [items, userId]);
 
+    // Mark tasks as completed when first engineer approves
+    await client.query(`
+      UPDATE project_checklist_items
+      SET is_completed = true
+      WHERE id = ANY($1::int[]) AND is_completed = false
+    `, [items]);
+
     // Get updated items with all engineer approvals
     const itemsResult = await client.query(`
       SELECT
@@ -744,6 +751,70 @@ export const engineerApproval = async (req: AuthReq, res: Response): Promise<voi
     res.status(500).json({
       success: false,
       message: 'Failed to approve items',
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Remove engineer's own approval from a task
+ * DELETE /api/v1/checklist/approve/engineer/:item_id
+ * Allows engineers to uncheck their own work
+ */
+export const removeEngineerApproval = async (req: AuthReq, res: Response): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    const userId = req.user?.id;
+    const { item_id } = req.params;
+
+    await client.query('BEGIN');
+
+    // Delete only THIS engineer's approval
+    const deleteResult = await client.query(`
+      DELETE FROM checklist_item_engineer_approvals
+      WHERE checklist_item_id = $1 AND engineer_id = $2
+      RETURNING *
+    `, [item_id, userId]);
+
+    if (deleteResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({
+        success: false,
+        message: 'No approval found to remove'
+      });
+      return;
+    }
+
+    // Check if there are any remaining engineer approvals
+    const remainingApprovals = await client.query(`
+      SELECT COUNT(*) as count
+      FROM checklist_item_engineer_approvals
+      WHERE checklist_item_id = $1
+    `, [item_id]);
+
+    // If no engineer approvals left, mark task as not completed
+    if (parseInt(remainingApprovals.rows[0].count) === 0) {
+      await client.query(`
+        UPDATE project_checklist_items
+        SET is_completed = false
+        WHERE id = $1
+      `, [item_id]);
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Approval removed successfully'
+    });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error removing engineer approval:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to remove approval',
       error: error.message
     });
   } finally {

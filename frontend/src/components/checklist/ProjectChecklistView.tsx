@@ -152,23 +152,6 @@ const ProjectChecklistView = ({
                 </Button>
               )}
 
-              {/* Engineer Approval Button */}
-              {isEngineer && completedItems.length > 0 && (
-                <Button
-                  variant="contained"
-                  size="medium"
-                  startIcon={<HowToReg />}
-                  onClick={handleEngineerApproval}
-                  sx={{
-                    bgcolor: 'success.light',
-                    color: 'white',
-                    fontWeight: 'bold',
-                    '&:hover': { bgcolor: 'success.main' }
-                  }}
-                >
-                  Engineer Approve ({completedItems.length})
-                </Button>
-              )}
 
               {/* Supervisor Approval Buttons */}
               {isSupervisor && (
@@ -300,12 +283,7 @@ const ProjectChecklistView = ({
                   Task Name
                 </Typography>
               </TableCell>
-              <TableCell width="8%" align="center">
-                <Typography variant="caption" fontWeight="bold">
-                  Status
-                </Typography>
-              </TableCell>
-              <TableCell width="45%">
+              <TableCell width="53%">
                 <Typography variant="caption" fontWeight="bold">
                   Approval Workflow
                 </Typography>
@@ -328,7 +306,7 @@ const ProjectChecklistView = ({
             ))}
             {allItems.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     No tasks found for this phase
                   </Typography>

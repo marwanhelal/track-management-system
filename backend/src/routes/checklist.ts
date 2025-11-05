@@ -17,6 +17,7 @@ import {
   // Approval Workflow
   toggleItemCompletion,
   engineerApproval,
+  removeEngineerApproval,
   supervisorApproval,
   revokeEngineerApproval,
   revokeSupervisorApproval,
@@ -90,6 +91,9 @@ router.post('/items/:id/toggle-completion', authenticate, toggleItemCompletion);
 
 // Engineer approval - Level 1 (engineers only)
 router.post('/approve/engineer', authenticate, engineerOnly, engineerApproval);
+
+// Remove engineer's own approval (engineers only)
+router.delete('/approve/engineer/:item_id', authenticate, engineerOnly, removeEngineerApproval);
 
 // Supervisor approval - Levels 1, 2, 3 (supervisors only)
 router.post('/approve/supervisor', authenticate, supervisorOnly, supervisorApproval);
