@@ -73,6 +73,7 @@ export interface ProjectUpdateInput {
   building_type?: string;
   floors_count?: number;
   location?: string;
+  bua?: string;
   client_name?: string;
 }
 
