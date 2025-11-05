@@ -1116,42 +1116,55 @@ export const addPhaseToProject = async (req: AuthReq, res: Response): Promise<vo
       ORDER BY display_order
     `, [phase_name]);
 
+    // Handle phases with no templates (like BOQ)
+    // Insert a placeholder task so the phase appears in the UI
     if (templates.rows.length === 0) {
-      await client.query('ROLLBACK');
-      res.status(404).json({
-        success: false,
-        message: `No templates found for phase ${phase_name}`
-      });
-      return;
-    }
-
-    // Insert all checklist items for this phase
-    const insertPromises = templates.rows.map((template: ChecklistTemplate) => {
-      return client.query(`
+      await client.query(`
         INSERT INTO project_checklist_items (
           project_id, phase_name, section_name, task_title_ar, task_title_en, display_order
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
+        VALUES ($1, $2, NULL, $3, $4, 1)
       `, [
         project_id,
-        template.phase_name,
-        template.section_name,
-        template.task_title_ar,
-        template.task_title_en,
-        template.display_order
+        phase_name,
+        `مهام ${phase_name}`,
+        `${phase_name} Tasks - Add items using "Add New Item" button`
       ]);
-    });
+    } else {
+      // Insert all checklist items for this phase from templates
+      const insertPromises = templates.rows.map((template: ChecklistTemplate) => {
+        return client.query(`
+          INSERT INTO project_checklist_items (
+            project_id, phase_name, section_name, task_title_ar, task_title_en, display_order
+          )
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `, [
+          project_id,
+          template.phase_name,
+          template.section_name,
+          template.task_title_ar,
+          template.task_title_en,
+          template.display_order
+        ]);
+      });
 
-    await Promise.all(insertPromises);
+      await Promise.all(insertPromises);
+    }
 
     await client.query('COMMIT');
 
+    const tasksCount = templates.rows.length === 0 ? 1 : templates.rows.length;
+    const message = templates.rows.length === 0
+      ? `Phase ${phase_name} added successfully. Use "Add New Item" to add tasks.`
+      : `Phase ${phase_name} added successfully with ${templates.rows.length} tasks`;
+
     res.status(201).json({
       success: true,
-      message: `Phase ${phase_name} added successfully with ${templates.rows.length} tasks`,
+      message,
       data: {
         phase_name,
-        tasks_added: templates.rows.length
+        tasks_added: tasksCount,
+        has_templates: templates.rows.length > 0
       }
     });
   } catch (error: any) {
