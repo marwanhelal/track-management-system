@@ -48,8 +48,23 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
   const isEngineer = user?.role === 'engineer';
   const isSupervisor = user?.role === 'supervisor';
 
+  // Check if task is locked (L3 supervisor approved - task is final)
+  const isTaskLocked = !!item.supervisor_3_approved_by;
+
+  // Check if task is waiting for supervisor approval (has engineer approvals but no supervisor approval)
+  const isWaitingForSupervisor =
+    item.engineer_approvals &&
+    item.engineer_approvals.length > 0 &&
+    !item.supervisor_1_approved_by &&
+    !item.supervisor_2_approved_by &&
+    !item.supervisor_3_approved_by;
+
   const handleToggleEngineerApproval = async () => {
     if (!isEngineer) return;
+    if (isTaskLocked) {
+      setError('Cannot modify approval - task has been finalized by L3 Supervisor');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -102,32 +117,92 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
     return 'white';
   };
 
+  // Get hover color - slightly darker version of current color
+  const getHoverColor = () => {
+    // Darker green for supervisor approved tasks
+    if (item.supervisor_1_approved_by || item.supervisor_2_approved_by || item.supervisor_3_approved_by) {
+      return '#c3e6cb'; // Darker green
+    }
+    // Darker yellow for engineer approved tasks
+    if (item.engineer_approvals && item.engineer_approvals.length > 0) {
+      return '#ffe69c'; // Darker yellow
+    }
+    // Light gray for no approvals
+    return '#f5f5f5';
+  };
+
+  // Check if task is fully completed (has supervisor approval)
+  const isFullyCompleted = item.supervisor_1_approved_by || item.supervisor_2_approved_by || item.supervisor_3_approved_by;
+
   return (
     <>
       <TableRow
         sx={{
           bgcolor: getRowBgColor(),
-          '&:hover': { bgcolor: 'action.hover' },
+          '&:hover': { bgcolor: getHoverColor() },
           opacity: loading ? 0.6 : 1,
+          borderLeft: isFullyCompleted ? '4px solid #28a745' : 'none', // Bold green border for completed tasks
         }}
       >
         {/* Index Number */}
         <TableCell align="center">
-          <Typography variant="body2" fontWeight="medium">
-            {index}
-          </Typography>
+          <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
+            <Typography variant="body2" fontWeight="medium">
+              {index}
+            </Typography>
+            {isFullyCompleted && (
+              <CheckCircle
+                sx={{
+                  fontSize: '1.2rem',
+                  color: '#28a745',
+                  animation: 'none'
+                }}
+              />
+            )}
+          </Box>
         </TableCell>
 
         {/* Task Name & Client Notes */}
         <TableCell>
           <Box>
-            <Typography
-              variant="body2"
-              fontWeight="bold"
-              sx={{ mb: 0.5 }}
-            >
-              {item.task_title_ar}
-            </Typography>
+            <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+              <Typography
+                variant="body2"
+                fontWeight="bold"
+              >
+                {item.task_title_ar}
+              </Typography>
+              {/* Supervisor Indicator - Task waiting for approval */}
+              {isSupervisor && isWaitingForSupervisor && (
+                <Chip
+                  label="Awaiting Your Approval"
+                  size="small"
+                  color="warning"
+                  sx={{
+                    fontWeight: 'bold',
+                    fontSize: '0.7rem',
+                    animation: 'pulse 2s ease-in-out infinite',
+                    '@keyframes pulse': {
+                      '0%, 100%': { opacity: 1 },
+                      '50%': { opacity: 0.7 },
+                    },
+                  }}
+                />
+              )}
+              {/* Task Locked Indicator */}
+              {isTaskLocked && (
+                <Chip
+                  label="Finalized"
+                  size="small"
+                  color="success"
+                  variant="outlined"
+                  sx={{
+                    fontWeight: 'bold',
+                    fontSize: '0.7rem',
+                  }}
+                />
+              )}
+            </Box>
             {item.client_notes && (
               <Chip
                 label={`Client Notes: ${item.client_notes}`}
@@ -150,19 +225,35 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
           <Box display="flex" flexDirection="column" gap={1}>
             {/* Current Engineer's Checkbox (if engineer) */}
             {isEngineer && (
-              <Box display="flex" alignItems="center" gap={1}>
-                <Checkbox
-                  checked={item.engineer_approvals?.some((approval) => approval.engineer_id == user?.id) || false}
-                  onChange={handleToggleEngineerApproval}
-                  disabled={loading}
-                  icon={<RadioButtonUnchecked />}
-                  checkedIcon={<CheckCircle color="success" />}
-                  sx={{ p: 0 }}
-                />
-                <Typography variant="caption" fontWeight="bold">
-                  My Approval
-                </Typography>
-              </Box>
+              <Tooltip
+                title={
+                  isTaskLocked
+                    ? 'Task finalized by L3 Supervisor - cannot modify'
+                    : 'Click to toggle your approval'
+                }
+                arrow
+              >
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Checkbox
+                    checked={item.engineer_approvals?.some((approval) => approval.engineer_id == user?.id) || false}
+                    onChange={handleToggleEngineerApproval}
+                    disabled={loading || isTaskLocked}
+                    icon={<RadioButtonUnchecked />}
+                    checkedIcon={<CheckCircle color="success" />}
+                    sx={{
+                      p: 0,
+                      opacity: isTaskLocked ? 0.5 : 1,
+                    }}
+                  />
+                  <Typography
+                    variant="caption"
+                    fontWeight="bold"
+                    sx={{ opacity: isTaskLocked ? 0.5 : 1 }}
+                  >
+                    My Approval {isTaskLocked && '(Locked)'}
+                  </Typography>
+                </Box>
+              </Tooltip>
             )}
 
             {/* All Engineer Approvals - Show all engineers who approved */}
@@ -281,14 +372,17 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
         <TableCell align="center">
           {isSupervisor && (
             <Box display="flex" gap={0.5} justifyContent="center">
-              <Tooltip title="Edit Task">
-                <IconButton
-                  size="small"
-                  onClick={() => setEditTaskDialogOpen(true)}
-                  color="primary"
-                >
-                  <Edit fontSize="small" />
-                </IconButton>
+              <Tooltip title={isTaskLocked ? "Cannot edit - task finalized" : "Edit Task"}>
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => setEditTaskDialogOpen(true)}
+                    color="primary"
+                    disabled={isTaskLocked}
+                  >
+                    <Edit fontSize="small" />
+                  </IconButton>
+                </span>
               </Tooltip>
               <Tooltip title="Client Notes">
                 <IconButton
