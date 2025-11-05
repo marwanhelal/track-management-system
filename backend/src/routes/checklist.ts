@@ -26,7 +26,8 @@ import {
   updateClientNotes,
 
   // Checklist Generation
-  generateProjectChecklist
+  generateProjectChecklist,
+  addPhaseToProject
 } from '../controllers/checklist';
 
 import { authenticate, supervisorOnly, engineerOnly, authorize } from '../middleware/auth';
@@ -58,6 +59,9 @@ router.delete('/templates/:id', authenticate, supervisorOnly, deleteChecklistTem
 
 // Generate checklist for a project from templates (called during project creation)
 router.post('/projects/:project_id/generate', authenticate, supervisorOnly, generateProjectChecklist);
+
+// Add a phase with all its tasks to an existing project (supervisor only)
+router.post('/projects/:project_id/add-phase', authenticate, supervisorOnly, addPhaseToProject);
 
 // Get project checklist items (all roles)
 router.get('/projects/:project_id', authenticate, getProjectChecklistItems);

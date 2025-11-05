@@ -25,6 +25,7 @@ import {
   Refresh,
   Info,
   TrendingUp,
+  Add,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
@@ -34,6 +35,7 @@ import {
   ChecklistPhaseName,
 } from '../types';
 import ProjectChecklistView from '../components/checklist/ProjectChecklistView';
+import AddPhaseDialog from '../components/checklist/AddPhaseDialog';
 
 const ChecklistPage = () => {
   const { user } = useAuth();
@@ -43,6 +45,9 @@ const ChecklistPage = () => {
   const [checklistOverview, setChecklistOverview] = useState<ChecklistProgressOverview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addPhaseDialogOpen, setAddPhaseDialogOpen] = useState(false);
+
+  const isSupervisor = user?.role === 'supervisor';
 
   // Load projects on mount
   useEffect(() => {
@@ -191,7 +196,7 @@ const ChecklistPage = () => {
       {/* Filters */}
       <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={5}>
+          <Grid item xs={12} md={isSupervisor ? 4 : 5}>
             <FormControl fullWidth>
               <InputLabel>Project</InputLabel>
               <Select
@@ -211,7 +216,7 @@ const ChecklistPage = () => {
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={isSupervisor ? 3 : 4}>
             <FormControl fullWidth disabled={!selectedProjectId}>
               <InputLabel>Phase</InputLabel>
               <Select
@@ -231,7 +236,23 @@ const ChecklistPage = () => {
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} md={3}>
+          {isSupervisor && selectedProjectId && (
+            <Grid item xs={12} md={2.5}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<Add />}
+                onClick={() => setAddPhaseDialogOpen(true)}
+                disabled={loading}
+                color="secondary"
+                sx={{ height: 56 }}
+              >
+                Add Phase
+              </Button>
+            </Grid>
+          )}
+
+          <Grid item xs={12} md={isSupervisor ? 2.5 : 3}>
             <Button
               fullWidth
               variant="contained"
@@ -503,6 +524,20 @@ const ChecklistPage = () => {
             </Box>
           )}
         </>
+      )}
+
+      {/* Add Phase Dialog */}
+      {isSupervisor && selectedProjectId && (
+        <AddPhaseDialog
+          open={addPhaseDialogOpen}
+          onClose={() => setAddPhaseDialogOpen(false)}
+          projectId={selectedProjectId as number}
+          existingPhases={availablePhases.map((phase) => phase.phase_name)}
+          onSuccess={() => {
+            loadChecklistOverview();
+            setAddPhaseDialogOpen(false);
+          }}
+        />
       )}
     </Container>
   );

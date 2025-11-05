@@ -1069,3 +1069,100 @@ export const generateProjectChecklist = async (req: Request, res: Response): Pro
     client.release();
   }
 };
+
+/**
+ * Add a phase with all its tasks to an existing project
+ * POST /api/v1/checklist/projects/:project_id/add-phase
+ * Body: { phase_name: 'VIS' | 'DD' | 'License' | 'Working' | 'BOQ' }
+ */
+export const addPhaseToProject = async (req: AuthReq, res: Response): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    const { project_id } = req.params;
+    const { phase_name } = req.body;
+
+    // Validate phase name
+    const validPhases = ['VIS', 'DD', 'License', 'Working', 'BOQ'];
+    if (!phase_name || !validPhases.includes(phase_name)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid phase name. Must be one of: VIS, DD, License, Working, BOQ'
+      });
+      return;
+    }
+
+    await client.query('BEGIN');
+
+    // Check if phase already exists for this project
+    const existingPhase = await client.query(`
+      SELECT COUNT(*) as count
+      FROM project_checklist_items
+      WHERE project_id = $1 AND phase_name = $2
+    `, [project_id, phase_name]);
+
+    if (parseInt(existingPhase.rows[0].count) > 0) {
+      await client.query('ROLLBACK');
+      res.status(400).json({
+        success: false,
+        message: `Phase ${phase_name} already exists for this project`
+      });
+      return;
+    }
+
+    // Get all active templates for this phase
+    const templates = await client.query(`
+      SELECT * FROM checklist_templates
+      WHERE phase_name = $1 AND is_active = true
+      ORDER BY display_order
+    `, [phase_name]);
+
+    if (templates.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({
+        success: false,
+        message: `No templates found for phase ${phase_name}`
+      });
+      return;
+    }
+
+    // Insert all checklist items for this phase
+    const insertPromises = templates.rows.map((template: ChecklistTemplate) => {
+      return client.query(`
+        INSERT INTO project_checklist_items (
+          project_id, phase_name, section_name, task_title_ar, task_title_en, display_order
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [
+        project_id,
+        template.phase_name,
+        template.section_name,
+        template.task_title_ar,
+        template.task_title_en,
+        template.display_order
+      ]);
+    });
+
+    await Promise.all(insertPromises);
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      success: true,
+      message: `Phase ${phase_name} added successfully with ${templates.rows.length} tasks`,
+      data: {
+        phase_name,
+        tasks_added: templates.rows.length
+      }
+    });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error adding phase to project:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add phase to project',
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+};

@@ -822,6 +822,14 @@ class ApiService {
   }
 
   /**
+   * Add a phase with all its tasks to an existing project (supervisor only)
+   */
+  async addPhaseToProject(project_id: number, phase_name: ChecklistPhaseName): Promise<ApiResponse<{ phase_name: string; tasks_added: number }>> {
+    const response = await this.api.post(`/checklist/projects/${project_id}/add-phase`, { phase_name });
+    return response.data;
+  }
+
+  /**
    * Update checklist item (supervisor only for most fields, engineers can toggle completion)
    */
   async updateProjectChecklistItem(id: number, data: Partial<ProjectChecklistItemInput>): Promise<ApiResponse<{ item: ProjectChecklistItem }>> {

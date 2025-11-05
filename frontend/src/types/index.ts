@@ -44,6 +44,13 @@ export interface Project {
   archived_at?: string | null;
   archived_by?: number | null;
   is_archived?: boolean;
+  // Additional project details
+  land_area?: string;
+  building_type?: string;
+  floors_count?: number;
+  location?: string;
+  bua?: string;
+  client_name?: string;
 }
 
 export interface ProjectCreateInput {
