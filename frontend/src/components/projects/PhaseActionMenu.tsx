@@ -68,12 +68,19 @@ const PhaseActionMenu: React.FC<PhaseActionMenuProps> = ({
     loading: boolean;
   }>({ open: false, type: 'start', loading: false });
 
+  // Helper function to convert ISO datetime to yyyy-MM-dd format
+  const formatDateForInput = (dateString: string | null | undefined): string => {
+    if (!dateString) return '';
+    // Extract just the date portion (yyyy-MM-dd) from ISO string
+    return dateString.split('T')[0];
+  };
+
   const [editForm, setEditForm] = useState<EditFormData>({
     phase_name: phase.phase_name,
     planned_weeks: phase.planned_weeks,
     predicted_hours: phase.predicted_hours || 0,
-    planned_start_date: phase.planned_start_date || '',
-    planned_end_date: phase.planned_end_date || ''
+    planned_start_date: formatDateForInput(phase.planned_start_date),
+    planned_end_date: formatDateForInput(phase.planned_end_date)
   });
 
   const [actionNote, setActionNote] = useState('');
@@ -92,8 +99,8 @@ const PhaseActionMenu: React.FC<PhaseActionMenuProps> = ({
       phase_name: phase.phase_name,
       planned_weeks: phase.planned_weeks,
       predicted_hours: phase.predicted_hours || 0,
-      planned_start_date: phase.planned_start_date || '',
-      planned_end_date: phase.planned_end_date || ''
+      planned_start_date: formatDateForInput(phase.planned_start_date),
+      planned_end_date: formatDateForInput(phase.planned_end_date)
     });
     setEditDialog(true);
     handleMenuClose();
