@@ -904,6 +904,12 @@ export interface ChecklistSupervisorApprovalInput {
   level: 1 | 2 | 3; // Supervisor approval level (1, 2, or 3)
 }
 
+// Grouped checklist items by section
+export interface ChecklistSection {
+  section_name: string | null;
+  items: ProjectChecklistItem[];
+}
+
 // Checklist Statistics Types
 export interface ChecklistStatistics {
   project_id: number;
@@ -924,7 +930,7 @@ export interface ChecklistProgressOverview {
   phases: {
     phase_name: ChecklistPhaseName;
     statistics: ChecklistStatistics;
-    items: ProjectChecklistItem[];
+    sections: ChecklistSection[];
   }[];
   overall_completion: number;
 }

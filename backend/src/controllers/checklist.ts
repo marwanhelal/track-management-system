@@ -404,21 +404,43 @@ export const getProjectChecklistGrouped = async (req: Request, res: Response): P
         END
     `, [project_id]);
 
-    const phases = result.rows.map(row => ({
-      phase_name: row.phase_name,
-      items: row.items,
-      statistics: {
-        project_id: parseInt(project_id as string),
+    const phases = result.rows.map(row => {
+      // Group items by section_name
+      const itemsArray = row.items || [];
+      const sectionMap = new Map<string, any[]>();
+
+      itemsArray.forEach((item: any) => {
+        const sectionName = item.section_name || null;
+        const sectionKey = sectionName || '__null__';
+
+        if (!sectionMap.has(sectionKey)) {
+          sectionMap.set(sectionKey, []);
+        }
+        sectionMap.get(sectionKey)!.push(item);
+      });
+
+      // Convert map to sections array
+      const sections = Array.from(sectionMap.entries()).map(([key, items]) => ({
+        section_name: key === '__null__' ? null : key,
+        items: items
+      }));
+
+      return {
         phase_name: row.phase_name,
-        total_tasks: row.total_tasks,
-        completed_tasks: row.completed_tasks,
-        engineer_approved_tasks: row.engineer_approved_tasks,
-        supervisor_1_approved_tasks: row.supervisor_1_approved_tasks,
-        supervisor_2_approved_tasks: row.supervisor_2_approved_tasks,
-        supervisor_3_approved_tasks: row.supervisor_3_approved_tasks,
-        completion_percentage: parseFloat(row.completion_percentage || '0')
-      }
-    }));
+        sections: sections,
+        statistics: {
+          project_id: parseInt(project_id as string),
+          phase_name: row.phase_name,
+          total_tasks: row.total_tasks,
+          completed_tasks: row.completed_tasks,
+          engineer_approved_tasks: row.engineer_approved_tasks,
+          supervisor_1_approved_tasks: row.supervisor_1_approved_tasks,
+          supervisor_2_approved_tasks: row.supervisor_2_approved_tasks,
+          supervisor_3_approved_tasks: row.supervisor_3_approved_tasks,
+          completion_percentage: parseFloat(row.completion_percentage || '0')
+        }
+      };
+    });
 
     // Calculate overall completion
     const totalTasks = phases.reduce((sum, p) => sum + p.statistics.total_tasks, 0);

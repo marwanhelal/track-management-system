@@ -65,7 +65,7 @@ const ProjectChecklistView = ({
   };
 
   const handleExpandAll = () => {
-    const allSections = sections.map((s) => s.section_name || 'general');
+    const allSections = (sections || []).map((s) => s.section_name || 'general');
     setExpandedSections(new Set(allSections));
   };
 
@@ -83,7 +83,7 @@ const ProjectChecklistView = ({
   };
 
   // Get all items from all sections
-  const allItems = sections.flatMap((section) => section.items);
+  const allItems = (sections || []).flatMap((section) => section.items || []);
 
   // Get completed items for engineer approval
   const completedItems = allItems.filter((item) => item.is_completed);
@@ -264,7 +264,7 @@ const ProjectChecklistView = ({
 
       {/* Checklist Items by Section */}
       <Box>
-        {sections.map((section, index) => {
+        {(sections || []).map((section, index) => {
           const sectionName = section.section_name || 'عام / General';
           const isExpanded = expandedSections.has(sectionName);
 
@@ -291,7 +291,7 @@ const ProjectChecklistView = ({
                 <Box display="flex" alignItems="center" gap={2} width="100%">
                   <Typography fontWeight="medium">{sectionName}</Typography>
                   <Chip
-                    label={`${section.items.length} ${section.items.length === 1 ? 'مهمة / task' : 'مهام / tasks'}`}
+                    label={`${(section.items || []).length} ${(section.items || []).length === 1 ? 'مهمة / task' : 'مهام / tasks'}`}
                     size="small"
                     color="primary"
                     variant="outlined"
@@ -299,7 +299,7 @@ const ProjectChecklistView = ({
                 </Box>
               </AccordionSummary>
               <AccordionDetails sx={{ p: 0 }}>
-                {section.items.map((item) => (
+                {(section.items || []).map((item) => (
                   <ChecklistItemRow
                     key={item.id}
                     item={item}
