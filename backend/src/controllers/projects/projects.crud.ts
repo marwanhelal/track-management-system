@@ -387,7 +387,7 @@ export const updateProject = async (req: Request, res: Response): Promise<void> 
     }
 
     // Build update query safely using whitelist approach (prevents SQL injection)
-    const allowedFields = ['name', 'start_date', 'planned_total_weeks', 'predicted_hours', 'status', 'land_area', 'building_type', 'floors_count', 'location', 'client_name'] as const;
+    const allowedFields = ['name', 'start_date', 'planned_total_weeks', 'predicted_hours', 'status', 'land_area', 'building_type', 'floors_count', 'location', 'bua', 'client_name'] as const;
     const updateFields: string[] = [];
     const updateValues: any[] = [];
     let paramIndex = 1;

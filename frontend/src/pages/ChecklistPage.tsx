@@ -26,6 +26,7 @@ import {
   Info,
   TrendingUp,
   Add,
+  Edit,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
@@ -36,6 +37,7 @@ import {
 } from '../types';
 import ProjectChecklistView from '../components/checklist/ProjectChecklistView';
 import AddPhaseDialog from '../components/checklist/AddPhaseDialog';
+import EditProjectInfoDialog from '../components/checklist/EditProjectInfoDialog';
 
 const ChecklistPage = () => {
   const { user } = useAuth();
@@ -46,6 +48,7 @@ const ChecklistPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addPhaseDialogOpen, setAddPhaseDialogOpen] = useState(false);
+  const [editProjectInfoDialogOpen, setEditProjectInfoDialogOpen] = useState(false);
 
   const isSupervisor = user?.role === 'supervisor';
 
@@ -295,11 +298,24 @@ const ChecklistPage = () => {
         <>
           {/* Project Information Card */}
           <Paper elevation={3} sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: 'primary.50' }}>
-            <Box display="flex" alignItems="center" gap={1} mb={2}>
-              <Assignment color="primary" />
-              <Typography variant="h6" fontWeight="bold" color="primary">
-                Project Information
-              </Typography>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+              <Box display="flex" alignItems="center" gap={1}>
+                <Assignment color="primary" />
+                <Typography variant="h6" fontWeight="bold" color="primary">
+                  Project Information
+                </Typography>
+              </Box>
+              {isSupervisor && (
+                <Button
+                  variant="outlined"
+                  startIcon={<Edit />}
+                  onClick={() => setEditProjectInfoDialogOpen(true)}
+                  size="small"
+                  color="primary"
+                >
+                  Edit Info
+                </Button>
+              )}
             </Box>
             <Divider sx={{ mb: 2 }} />
             <Grid container spacing={3}>
@@ -536,6 +552,28 @@ const ChecklistPage = () => {
           onSuccess={() => {
             loadChecklistOverview();
             setAddPhaseDialogOpen(false);
+          }}
+        />
+      )}
+
+      {/* Edit Project Information Dialog */}
+      {isSupervisor && selectedProjectId && selectedProject && (
+        <EditProjectInfoDialog
+          open={editProjectInfoDialogOpen}
+          onClose={() => setEditProjectInfoDialogOpen(false)}
+          projectId={selectedProjectId as number}
+          projectName={selectedProject.name}
+          currentInfo={{
+            land_area: selectedProject.land_area,
+            building_type: selectedProject.building_type,
+            floors_count: selectedProject.floors_count,
+            location: selectedProject.location,
+            bua: selectedProject.bua,
+            client_name: selectedProject.client_name,
+          }}
+          onSuccess={() => {
+            loadProjects(); // Reload projects to get updated info
+            setEditProjectInfoDialogOpen(false);
           }}
         />
       )}
