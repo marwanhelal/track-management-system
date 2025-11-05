@@ -70,10 +70,24 @@ const ProjectChecklistView = ({
   // Get all items from all sections
   const allItems = (sections || []).flatMap((section) => section.items || []);
 
-  // Get completed items for engineer approval (items not yet approved by any engineer)
-  const completedItems = allItems.filter(
-    (item) => item.is_completed && (!item.engineer_approvals || item.engineer_approvals.length === 0)
-  );
+  // Get completed items for engineer approval
+  // Show items that are completed but NOT yet approved by THIS engineer
+  const completedItems = allItems.filter((item) => {
+    if (!item.is_completed) return false;
+
+    // If no engineer approvals yet, this engineer can approve
+    if (!item.engineer_approvals || item.engineer_approvals.length === 0) return true;
+
+    // Check if THIS engineer has already approved
+    // Handle both string and number ID comparisons
+    const currentUserId = user?.id;
+    const currentEngineerApproved = item.engineer_approvals.some(
+      (approval) => approval.engineer_id == currentUserId // Use == for loose equality
+    );
+
+    // Show item only if current engineer hasn't approved it yet
+    return !currentEngineerApproved;
+  });
 
   // Get items ready for supervisor approval at each level
   // Items need at least one engineer approval to proceed to supervisor level

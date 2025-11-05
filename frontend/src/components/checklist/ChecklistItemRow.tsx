@@ -51,10 +51,17 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
   const handleToggleCompletion = async () => {
     if (!isEngineer && !isSupervisor) return;
 
+    // Don't allow unchecking if task is already completed
+    // This prevents engineers from undoing each other's work
+    if (item.is_completed) {
+      setError('Cannot uncheck a completed task. Task completion cannot be reverted.');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      await apiService.toggleItemCompletion(item.id, !item.is_completed);
+      await apiService.toggleItemCompletion(item.id, true);
       onUpdate();
     } catch (error: any) {
       setError(error.message || 'Failed to update completion status');
@@ -159,17 +166,25 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
               </Typography>
               {item.engineer_approvals && item.engineer_approvals.length > 0 ? (
                 <Box display="flex" gap={0.5} flexWrap="wrap">
-                  {item.engineer_approvals.map((approval, idx) => (
-                    <Chip
-                      key={idx}
-                      icon={<CheckCircle />}
-                      label={approval.engineer_name}
-                      size="small"
-                      color="info"
-                      variant="filled"
-                      sx={{ fontWeight: 'medium', fontSize: '0.75rem' }}
-                    />
-                  ))}
+                  {item.engineer_approvals.map((approval, idx) => {
+                    // Highlight current user's approval
+                    const isCurrentUser = user && approval.engineer_id == user.id;
+                    return (
+                      <Chip
+                        key={idx}
+                        icon={<CheckCircle />}
+                        label={approval.engineer_name}
+                        size="small"
+                        color="info"
+                        variant={isCurrentUser ? 'filled' : 'outlined'}
+                        sx={{
+                          fontWeight: isCurrentUser ? 'bold' : 'medium',
+                          fontSize: '0.75rem',
+                          border: isCurrentUser ? '2px solid' : undefined,
+                        }}
+                      />
+                    );
+                  })}
                 </Box>
               ) : (
                 <Chip

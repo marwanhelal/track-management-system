@@ -109,7 +109,7 @@ const EngineerApprovalDialog = ({
 
         <Alert severity="info" icon={<CheckCircle />} sx={{ mb: 2 }}>
           <Typography variant="body2">
-            You are about to approve the following completed tasks. Supervisors will be notified for review.
+            You are about to approve the following completed tasks. <strong>Multiple engineers can approve the same task.</strong> Supervisors will be notified after engineer approvals.
           </Typography>
         </Alert>
 
@@ -167,9 +167,19 @@ const EngineerApprovalDialog = ({
                         </Box>
                       }
                       secondary={
-                        item.section_name && (
-                          <Chip label={item.section_name} size="small" sx={{ mt: 0.5 }} />
-                        )
+                        <Box display="flex" gap={0.5} mt={0.5} flexWrap="wrap">
+                          {item.section_name && (
+                            <Chip label={item.section_name} size="small" />
+                          )}
+                          {item.engineer_approvals && item.engineer_approvals.length > 0 && (
+                            <Chip
+                              label={`Already approved by: ${item.engineer_approvals.map(e => e.engineer_name).join(', ')}`}
+                              size="small"
+                              color="info"
+                              variant="outlined"
+                            />
+                          )}
+                        </Box>
                       }
                     />
                   </ListItem>
