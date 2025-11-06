@@ -145,15 +145,15 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
         }}
       >
         {/* Index Number */}
-        <TableCell align="center">
+        <TableCell align="center" sx={{ py: 2 }}>
           <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
-            <Typography variant="body2" fontWeight="medium">
+            <Typography variant="h6" fontWeight="bold" fontSize="1.2rem">
               {index}
             </Typography>
             {isFullyCompleted && (
               <CheckCircle
                 sx={{
-                  fontSize: '1.2rem',
+                  fontSize: '1.6rem',
                   color: '#28a745',
                   animation: 'none'
                 }}
@@ -163,12 +163,14 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
         </TableCell>
 
         {/* Task Name & Client Notes */}
-        <TableCell>
+        <TableCell sx={{ py: 2 }}>
           <Box>
             <Box display="flex" alignItems="center" gap={1} mb={0.5}>
               <Typography
-                variant="body2"
+                variant="body1"
                 fontWeight="bold"
+                fontSize="1.1rem"
+                sx={{ lineHeight: 1.8 }}
               >
                 {item.task_title_ar}
               </Typography>
@@ -176,11 +178,11 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
               {isSupervisor && isWaitingForSupervisor && (
                 <Chip
                   label="Awaiting Your Approval"
-                  size="small"
+                  size="medium"
                   color="warning"
                   sx={{
                     fontWeight: 'bold',
-                    fontSize: '0.7rem',
+                    fontSize: '0.85rem',
                     animation: 'pulse 2s ease-in-out infinite',
                     '@keyframes pulse': {
                       '0%, 100%': { opacity: 1 },
@@ -193,12 +195,12 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
               {isTaskLocked && (
                 <Chip
                   label="Finalized"
-                  size="small"
+                  size="medium"
                   color="success"
                   variant="outlined"
                   sx={{
                     fontWeight: 'bold',
-                    fontSize: '0.7rem',
+                    fontSize: '0.85rem',
                   }}
                 />
               )}
@@ -206,13 +208,13 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
             {item.client_notes && (
               <Chip
                 label={`Client Notes: ${item.client_notes}`}
-                size="small"
+                size="medium"
                 color="warning"
                 variant="outlined"
                 sx={{
                   maxWidth: '100%',
                   height: 'auto',
-                  '& .MuiChip-label': { whiteSpace: 'normal', fontSize: '0.7rem' },
+                  '& .MuiChip-label': { whiteSpace: 'normal', fontSize: '0.85rem', py: 1 },
                   mt: 0.5,
                 }}
               />
@@ -221,7 +223,7 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
         </TableCell>
 
         {/* Approval Workflow - Professional Display */}
-        <TableCell>
+        <TableCell sx={{ py: 2 }}>
           <Box display="flex" flexDirection="column" gap={1}>
             {/* Current Engineer's Checkbox (if engineer) */}
             {isEngineer && (
@@ -246,8 +248,9 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
                     }}
                   />
                   <Typography
-                    variant="caption"
+                    variant="body2"
                     fontWeight="bold"
+                    fontSize="0.95rem"
                     sx={{ opacity: isTaskLocked ? 0.5 : 1 }}
                   >
                     My Approval {isTaskLocked && '(Locked)'}
@@ -258,7 +261,7 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
 
             {/* All Engineer Approvals - Show all engineers who approved */}
             <Box>
-              <Typography variant="caption" fontWeight="bold" color="text.secondary" display="block" gutterBottom>
+              <Typography variant="body2" fontWeight="bold" color="text.secondary" display="block" gutterBottom fontSize="0.9rem">
                 Engineers:
               </Typography>
               {item.engineer_approvals && item.engineer_approvals.length > 0 ? (
@@ -271,12 +274,12 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
                         key={idx}
                         icon={<CheckCircle />}
                         label={approval.engineer_name}
-                        size="small"
+                        size="medium"
                         color="info"
                         variant={isCurrentUser ? 'filled' : 'outlined'}
                         sx={{
                           fontWeight: isCurrentUser ? 'bold' : 'medium',
-                          fontSize: '0.75rem',
+                          fontSize: '0.85rem',
                           border: isCurrentUser ? '2px solid' : undefined,
                         }}
                       />
@@ -287,17 +290,17 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
                 <Chip
                   icon={<HourglassEmpty />}
                   label="Pending"
-                  size="small"
+                  size="medium"
                   color="default"
                   variant="outlined"
-                  sx={{ fontSize: '0.7rem' }}
+                  sx={{ fontSize: '0.8rem' }}
                 />
               )}
             </Box>
 
             {/* Supervisor Approvals */}
             <Box>
-              <Typography variant="caption" fontWeight="bold" color="text.secondary" display="block" gutterBottom>
+              <Typography variant="body2" fontWeight="bold" color="text.secondary" display="block" gutterBottom fontSize="0.9rem">
                 Supervisors:
               </Typography>
               <Box display="flex" gap={0.5} flexWrap="wrap">
@@ -306,19 +309,19 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
                   <Chip
                     icon={<CheckCircle />}
                     label={`L1: ${item.supervisor_1_approved_name}`}
-                    size="small"
+                    size="medium"
                     color="secondary"
                     variant="filled"
-                    sx={{ fontWeight: 'medium', fontSize: '0.75rem' }}
+                    sx={{ fontWeight: 'medium', fontSize: '0.85rem' }}
                   />
                 ) : (
                   <Chip
                     icon={<HourglassEmpty />}
                     label="L1"
-                    size="small"
+                    size="medium"
                     color="default"
                     variant="outlined"
-                    sx={{ fontSize: '0.7rem' }}
+                    sx={{ fontSize: '0.8rem' }}
                   />
                 )}
 
@@ -327,19 +330,19 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
                   <Chip
                     icon={<CheckCircle />}
                     label={`L2: ${item.supervisor_2_approved_name}`}
-                    size="small"
+                    size="medium"
                     color="secondary"
                     variant="filled"
-                    sx={{ fontWeight: 'medium', fontSize: '0.75rem' }}
+                    sx={{ fontWeight: 'medium', fontSize: '0.85rem' }}
                   />
                 ) : (
                   <Chip
                     icon={<HourglassEmpty />}
                     label="L2"
-                    size="small"
+                    size="medium"
                     color="default"
                     variant="outlined"
-                    sx={{ fontSize: '0.7rem' }}
+                    sx={{ fontSize: '0.8rem' }}
                   />
                 )}
 
@@ -348,19 +351,19 @@ const ChecklistItemRow = ({ item, index, onUpdate }: ChecklistItemRowProps) => {
                   <Chip
                     icon={<CheckCircle />}
                     label={`L3: ${item.supervisor_3_approved_name}`}
-                    size="small"
+                    size="medium"
                     color="success"
                     variant="filled"
-                    sx={{ fontWeight: 'medium', fontSize: '0.75rem' }}
+                    sx={{ fontWeight: 'medium', fontSize: '0.85rem' }}
                   />
                 ) : (
                   <Chip
                     icon={<HourglassEmpty />}
                     label="L3"
-                    size="small"
+                    size="medium"
                     color="default"
                     variant="outlined"
-                    sx={{ fontSize: '0.7rem' }}
+                    sx={{ fontSize: '0.8rem' }}
                   />
                 )}
               </Box>

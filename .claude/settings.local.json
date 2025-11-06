@@ -1,25 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(npx tsc:*)",
-      "Bash(git fetch:*)",
-      "Bash(dir:*)",
-      "Bash(findstr:*)",
-      "Bash(psql:*)",
-      "Bash(nul)",
-      "Bash(git rm:*)",
-      "Bash(del nul 2)",
-      "Bash(git cherry-pick:*)",
-      "Bash(npm run typecheck:*)",
-      "Bash(wc:*)",
-      "Bash(npm run build:*)",
-      "Bash(for file in *.tsx)",
-      "Bash(do echo \"=== $file ===\")",
-      "Bash(head:*)",
-      "Bash(done)"
+      "Bash(pm2 restart:*)",
+      "Bash(npx pm2 restart frontend)",
+      "Bash(npx pm2:*)"
     ],
     "deny": [],
     "ask": []
