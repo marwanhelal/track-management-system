@@ -300,7 +300,7 @@ const ProjectChecklistView = ({
               <ChecklistItemRow
                 key={item.id}
                 item={item}
-                index={index + 1}
+                index={item.display_order}
                 onUpdate={onUpdate}
               />
             ))}
@@ -354,7 +354,7 @@ const ProjectChecklistView = ({
           onClose={() => setAddItemDialogOpen(false)}
           projectId={projectId}
           phaseName={phaseName}
-          existingItemsCount={allItems.length}
+          existingItemsCount={allItems.length === 0 ? 0 : Math.max(...allItems.map(item => item.display_order))}
           onSuccess={onUpdate}
         />
       )}
