@@ -49,6 +49,21 @@ class App {
     // Trust proxy for rate limiting behind reverse proxy (Coolify)
     this.app.set('trust proxy', 1);
 
+    // HTTPS redirect middleware (Coolify/Traefik handles SSL termination)
+    if (process.env.NODE_ENV === 'production') {
+      this.app.use((req: Request, res: Response, next: NextFunction) => {
+        // Check if request came through HTTPS (via proxy)
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+
+        if (protocol !== 'https') {
+          console.log(`⚠️ HTTP request detected, should use HTTPS: ${req.url}`);
+          // In Coolify, the proxy (Traefik) handles HTTPS
+          // This is just a warning, not a redirect (to avoid redirect loops)
+        }
+        next();
+      });
+    }
+
     // Security middleware - Enhanced security headers
     this.app.use(helmet({
       contentSecurityPolicy: {
@@ -62,14 +77,15 @@ class App {
           objectSrc: ["'none'"],
           mediaSrc: ["'self'"],
           frameSrc: ["'none'"],
+          upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null, // Force HTTPS in production
         },
       },
       crossOriginEmbedderPolicy: false, // Allow embedding resources from different origins
       crossOriginResourcePolicy: { policy: 'cross-origin' },
       hsts: {
-        maxAge: 31536000, // 1 year
-        includeSubDomains: true,
-        preload: true
+        maxAge: 31536000, // 1 year (HSTS)
+        includeSubDomains: true, // Apply to all subdomains
+        preload: true // Submit to HSTS preload list
       },
       noSniff: true,
       referrerPolicy: { policy: 'strict-origin-when-cross-origin' },

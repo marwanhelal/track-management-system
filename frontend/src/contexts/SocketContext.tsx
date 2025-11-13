@@ -88,7 +88,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const initializeSocket = useCallback((): Socket | null => {
     if (!isAuthenticated || !user) return null;
 
-    const socketUrl = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5005';
+    let socketUrl = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5005';
+
+    // HTTPS enforcement in production
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction && !socketUrl.startsWith('https://')) {
+      console.warn('⚠️ SECURITY WARNING: Socket URL should use HTTPS in production');
+      console.warn('⚠️ Current URL:', socketUrl);
+      socketUrl = socketUrl.replace('http://', 'https://');
+      console.log('✅ Auto-upgraded socket URL to HTTPS:', socketUrl);
+    }
 
     // Get access token for authentication
     const accessToken = sessionStorage.getItem('accessToken');

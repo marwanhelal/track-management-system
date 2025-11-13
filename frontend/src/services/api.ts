@@ -36,13 +36,16 @@ class ApiService {
   constructor() {
     this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5005/api/v1';
 
-    // TODO: Re-enable HTTPS enforcement after SSL certificate is configured
-    // const isProduction = process.env.NODE_ENV === 'production';
-    // if (isProduction && !this.baseURL.startsWith('https://')) {
-    //   console.error('SECURITY WARNING: API URL must use HTTPS in production');
-    //   // Auto-upgrade to HTTPS in production for security
-    //   this.baseURL = this.baseURL.replace('http://', 'https://');
-    // }
+    // HTTPS enforcement in production
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction && !this.baseURL.startsWith('https://')) {
+      console.warn('⚠️ SECURITY WARNING: API URL should use HTTPS in production');
+      console.warn('⚠️ Current URL:', this.baseURL);
+      console.warn('⚠️ Please update REACT_APP_API_URL to use https://');
+      // Auto-upgrade to HTTPS in production for security
+      this.baseURL = this.baseURL.replace('http://', 'https://');
+      console.log('✅ Auto-upgraded to HTTPS:', this.baseURL);
+    }
 
     this.api = axios.create({
       baseURL: this.baseURL,
