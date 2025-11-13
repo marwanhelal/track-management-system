@@ -53,7 +53,14 @@ async function createSuperAdmin() {
       console.log('   ℹ️  User does not exist. Creating new user...\n');
       console.log('🔐 Step 3: Hashing password...');
 
-      const password = '25180047Mm!';
+      // SECURITY: Password must be provided via environment variable
+      const password = process.env.SUPER_ADMIN_PASSWORD;
+      if (!password) {
+        console.error('❌ ERROR: SUPER_ADMIN_PASSWORD environment variable is required!');
+        console.error('   Set it in your .env file or environment variables.');
+        process.exit(1);
+      }
+
       const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
       const passwordHash = await bcrypt.hash(password, bcryptRounds);
       console.log('   ✅ Password hashed securely\n');
@@ -98,7 +105,7 @@ async function createSuperAdmin() {
     console.log('✨ Super Admin Setup Complete!\n');
     console.log('📝 Login Credentials:');
     console.log('   Email: marwanhelal15@gmail.com');
-    console.log('   Password: 25180047Mm!');
+    console.log('   Password: (set via SUPER_ADMIN_PASSWORD env variable)');
     console.log('\n🔒 Permissions:');
     console.log('   ✅ Can permanently delete supervisor accounts');
     console.log('   ✅ Can permanently delete engineer accounts');

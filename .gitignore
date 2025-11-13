@@ -80,7 +80,17 @@ ehthumbs.db
 *.tar.gz
 *.rar
 
-# Sensitive documentation
+# Sensitive documentation and credentials
 PASSWORDS.txt
 SECRETS.txt
 credentials.txt
+PRODUCTION_SECRETS.txt
+*SECRETS*.txt
+*PASSWORD*.txt
+*CREDENTIAL*.txt
+
+# Environment files - Production
+*.env.production
+backend/.env.production
+frontend/.env.production
+.env.production.local

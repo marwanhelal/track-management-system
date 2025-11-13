@@ -127,29 +127,75 @@ class App {
       pingInterval: 25000
     });
 
+    // Socket.IO Authentication Middleware
+    this.io.use(async (socket, next) => {
+      try {
+        const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
+
+        if (!token) {
+          return next(new Error('Authentication token required'));
+        }
+
+        // Verify token using the same auth utility
+        const { verifyAccessToken } = await import('@/utils/auth');
+        const payload = verifyAccessToken(token);
+
+        // Verify user exists and is active
+        const { query } = await import('@/database/connection');
+        const userResult = await query(
+          'SELECT id, email, role, is_active FROM users WHERE id = $1',
+          [payload.userId]
+        );
+
+        if (userResult.rows.length === 0 || !userResult.rows[0].is_active) {
+          return next(new Error('User not found or inactive'));
+        }
+
+        // Attach user to socket for future use
+        (socket as any).user = {
+          id: userResult.rows[0].id,
+          email: userResult.rows[0].email,
+          role: userResult.rows[0].role
+        };
+
+        next();
+      } catch (error: any) {
+        console.error('Socket authentication error:', error.message);
+        next(new Error('Authentication failed'));
+      }
+    });
+
     this.io.on('connection', (socket) => {
-      // Reduced logging to prevent console spam
+      const user = (socket as any).user;
+
       if (process.env.NODE_ENV === 'development') {
-        // console.log(`✅ Client connected: ${socket.id}`);
+        console.log(`✅ Client connected: ${socket.id} (User: ${user.email})`);
       }
 
       socket.on('disconnect', () => {
-        // console.log(`❌ Client disconnected: ${socket.id}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`❌ Client disconnected: ${socket.id}`);
+        }
       });
 
       socket.on('join_project', (projectId: number) => {
         socket.join(`project_${projectId}`);
-        console.log(`Client ${socket.id} joined project ${projectId}`);
+        console.log(`User ${user.email} joined project ${projectId}`);
       });
 
       socket.on('leave_project', (projectId: number) => {
         socket.leave(`project_${projectId}`);
-        console.log(`Client ${socket.id} left project ${projectId}`);
+        console.log(`User ${user.email} left project ${projectId}`);
       });
 
       socket.on('join_user_room', (userId: number) => {
+        // Security: Users can only join their own room
+        if (userId !== user.id) {
+          console.warn(`User ${user.email} tried to join another user's room (${userId})`);
+          return;
+        }
         socket.join(`user_${userId}`);
-        console.log(`Client ${socket.id} joined user room ${userId}`);
+        console.log(`User ${user.email} joined their user room`);
       });
     });
   }
@@ -166,18 +212,6 @@ class App {
         memory: process.memoryUsage(),
         database: dbHealth
       });
-    });
-
-    // TEST CRASH ROUTE - For testing PM2 auto-restart (REMOVE IN PRODUCTION)
-    this.app.get('/test-crash', (req: Request, res: Response) => {
-      console.log('🧪 TEST CRASH TRIGGERED - PM2 should restart this process automatically');
-      res.send('Crashing server in 1 second... PM2 will restart it automatically!');
-
-      // Crash after sending response
-      setTimeout(() => {
-        console.log('💥 CRASH! Simulating unexpected error...');
-        process.exit(1); // Exit with error code
-      }, 1000);
     });
 
     // Strict rate limiting for authentication endpoints

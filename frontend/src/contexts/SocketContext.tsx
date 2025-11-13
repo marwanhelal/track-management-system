@@ -90,8 +90,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     const socketUrl = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5005';
 
+    // Get access token for authentication
+    const accessToken = sessionStorage.getItem('accessToken');
+    if (!accessToken) {
+      console.error('❌ No access token available for socket connection');
+      return null;
+    }
+
     const newSocket = io(socketUrl, {
       auth: {
+        token: accessToken, // Send JWT token for authentication
         userId: user.id,
         role: user.role,
       },
