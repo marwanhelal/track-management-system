@@ -1285,7 +1285,7 @@ const ProjectDetailsPage: React.FC = () => {
                           <strong>Approved Date:</strong> {(phase as any).approved_date ? new Date((phase as any).approved_date).toLocaleDateString() : 'Not approved'}
                         </Typography>
 
-                        {/* Payment Status Display */}
+                        {/* Payment Status Display - Status Chip Only */}
                         {(phase as any).payment_status && (
                           <>
                             <Divider sx={{ my: 1 }} />
@@ -1312,26 +1312,6 @@ const ProjectDetailsPage: React.FC = () => {
                                 }
                               />
                             </Box>
-                            {(phase as any).total_amount && (
-                              <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                <strong>Total Amount:</strong> ${parseFloat((phase as any).total_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </Typography>
-                            )}
-                            {(phase as any).paid_amount > 0 && (
-                              <Typography variant="body2">
-                                <strong>Paid Amount:</strong> ${parseFloat((phase as any).paid_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </Typography>
-                            )}
-                            {(phase as any).total_amount && (phase as any).total_amount > (phase as any).paid_amount && (
-                              <Typography variant="body2" color="error.main" fontWeight="bold">
-                                <strong>Remaining:</strong> ${(parseFloat((phase as any).total_amount) - parseFloat((phase as any).paid_amount || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </Typography>
-                            )}
-                            {(phase as any).payment_deadline && (phase as any).payment_status !== 'fully_paid' && (
-                              <Typography variant="body2" color="text.secondary">
-                                <strong>Expected Payment:</strong> {new Date((phase as any).payment_deadline).toLocaleDateString()}
-                              </Typography>
-                            )}
                           </>
                         )}
 
