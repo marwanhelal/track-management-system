@@ -103,7 +103,7 @@ import EditPhaseDatesDialog from '../components/phases/EditPhaseDatesDialog';
 import EditWorkLogDialog from '../components/work-logs/EditWorkLogDialog';
 import DeleteWorkLogDialog from '../components/work-logs/DeleteWorkLogDialog';
 import AddManualWorkLogDialog from '../components/work-logs/AddManualWorkLogDialog';
-import PhasePaymentDialog from '../components/payments/PhasePaymentDialog';
+import SimplePaymentDialog from '../components/payments/SimplePaymentDialog';
 
 interface ProjectDetailsState {
   project: Project | null;
@@ -1284,6 +1284,57 @@ const ProjectDetailsPage: React.FC = () => {
                         <Typography variant="body2">
                           <strong>Approved Date:</strong> {(phase as any).approved_date ? new Date((phase as any).approved_date).toLocaleDateString() : 'Not approved'}
                         </Typography>
+
+                        {/* Payment Status Display */}
+                        {(phase as any).payment_status && (
+                          <>
+                            <Divider sx={{ my: 1 }} />
+                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                              <strong>Payment Status:</strong>
+                            </Typography>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Chip
+                                label={
+                                  (phase as any).payment_status === 'fully_paid' ? 'Fully Paid' :
+                                  (phase as any).payment_status === 'partially_paid' ? 'Partially Paid' :
+                                  'Not Paid'
+                                }
+                                color={
+                                  (phase as any).payment_status === 'fully_paid' ? 'success' :
+                                  (phase as any).payment_status === 'partially_paid' ? 'warning' :
+                                  'error'
+                                }
+                                size="small"
+                                icon={
+                                  (phase as any).payment_status === 'fully_paid' ? <CheckCircleIcon /> :
+                                  (phase as any).payment_status === 'partially_paid' ? <WarningIcon /> :
+                                  <CancelIcon />
+                                }
+                              />
+                            </Box>
+                            {(phase as any).total_amount && (
+                              <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                <strong>Total Amount:</strong> ${parseFloat((phase as any).total_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </Typography>
+                            )}
+                            {(phase as any).paid_amount > 0 && (
+                              <Typography variant="body2">
+                                <strong>Paid Amount:</strong> ${parseFloat((phase as any).paid_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </Typography>
+                            )}
+                            {(phase as any).total_amount && (phase as any).total_amount > (phase as any).paid_amount && (
+                              <Typography variant="body2" color="error.main" fontWeight="bold">
+                                <strong>Remaining:</strong> ${(parseFloat((phase as any).total_amount) - parseFloat((phase as any).paid_amount || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </Typography>
+                            )}
+                            {(phase as any).payment_deadline && (phase as any).payment_status !== 'fully_paid' && (
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>Expected Payment:</strong> {new Date((phase as any).payment_deadline).toLocaleDateString()}
+                              </Typography>
+                            )}
+                          </>
+                        )}
+
                         {isSupervisor && (
                           <Box sx={{ mt: 1 }}>
                             <Button
@@ -3075,7 +3126,7 @@ const ProjectDetailsPage: React.FC = () => {
 
       {/* Phase Payment Dialog - For Supervisors/Administrators */}
       {state.paymentDialog.phase && (
-        <PhasePaymentDialog
+        <SimplePaymentDialog
           open={state.paymentDialog.open}
           onClose={() => setState(prev => ({
             ...prev,
