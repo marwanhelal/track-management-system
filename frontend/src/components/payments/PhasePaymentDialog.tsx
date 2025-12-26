@@ -112,8 +112,10 @@ const PhasePaymentDialog: React.FC<PhasePaymentDialogProps> = ({
         // Pre-fill form with existing data
         const { phase } = response.data;
         setTotalAmount(phase.total_amount || '');
-        setPaymentDeadline(phase.payment_deadline || '');
-        setPaymentRequestDate(phase.payment_request_date || '');
+
+        // Format dates properly for HTML5 date inputs (yyyy-MM-dd)
+        setPaymentDeadline(phase.payment_deadline ? phase.payment_deadline.split('T')[0] : '');
+        setPaymentRequestDate(phase.payment_request_date ? phase.payment_request_date.split('T')[0] : '');
         setPaymentNotes(phase.payment_notes || '');
       }
     } catch (err: any) {
