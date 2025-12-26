@@ -102,6 +102,7 @@ import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import EditPhaseDatesDialog from '../components/phases/EditPhaseDatesDialog';
 import EditWorkLogDialog from '../components/work-logs/EditWorkLogDialog';
 import DeleteWorkLogDialog from '../components/work-logs/DeleteWorkLogDialog';
+import AddManualWorkLogDialog from '../components/work-logs/AddManualWorkLogDialog';
 
 interface ProjectDetailsState {
   project: Project | null;
@@ -174,6 +175,10 @@ interface ProjectDetailsState {
   deleteWorkLogDialog: {
     open: boolean;
     workLog: WorkLog | null;
+  };
+  addManualWorkLogDialog: {
+    open: boolean;
+    phase: ProjectPhase | null;
   };
 }
 
@@ -287,6 +292,10 @@ const ProjectDetailsPage: React.FC = () => {
     deleteWorkLogDialog: {
       open: false,
       workLog: null
+    },
+    addManualWorkLogDialog: {
+      open: false,
+      phase: null
     }
   });
 
@@ -1453,6 +1462,27 @@ const ProjectDetailsPage: React.FC = () => {
                           }}
                         >
                           Manage Progress
+                        </Button>
+                      )}
+
+                      {/* Manual Work Log Button - Supervisor/Administrator Only */}
+                      {(user?.role === 'supervisor' || user?.role === 'administrator') && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="secondary"
+                          startIcon={<AccessTimeIcon />}
+                          onClick={() => {
+                            setState(prev => ({
+                              ...prev,
+                              addManualWorkLogDialog: {
+                                open: true,
+                                phase: phase
+                              }
+                            }));
+                          }}
+                        >
+                          Add Work Log
                         </Button>
                       )}
                     </Box>
@@ -2983,6 +3013,35 @@ const ProjectDetailsPage: React.FC = () => {
         workLog={state.deleteWorkLogDialog.workLog}
         onDelete={handleConfirmDeleteWorkLog}
       />
+
+      {/* Add Manual Work Log Dialog - For Supervisors/Administrators */}
+      {state.addManualWorkLogDialog.phase && (
+        <AddManualWorkLogDialog
+          open={state.addManualWorkLogDialog.open}
+          onClose={() => setState(prev => ({
+            ...prev,
+            addManualWorkLogDialog: {
+              open: false,
+              phase: null
+            }
+          }))}
+          projectId={state.addManualWorkLogDialog.phase.project_id}
+          phaseId={state.addManualWorkLogDialog.phase.id}
+          phaseName={state.addManualWorkLogDialog.phase.phase_name}
+          phaseStatus={state.addManualWorkLogDialog.phase.status}
+          onSuccess={() => {
+            fetchProjectDetails();
+            setState(prev => ({
+              ...prev,
+              snackbar: {
+                open: true,
+                message: 'Work log added successfully!',
+                severity: 'success'
+              }
+            }));
+          }}
+        />
+      )}
 
       {/* Early Access Notifications Snackbar */}
       <Snackbar
