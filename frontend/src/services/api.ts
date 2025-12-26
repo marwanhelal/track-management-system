@@ -922,6 +922,65 @@ class ApiService {
     const response = await this.api.put(`/checklist/items/${id}/client-notes`, data);
     return response.data;
   }
+
+  // ==================== Phase Payments ====================
+
+  /**
+   * Get all payments for a specific phase
+   */
+  async getPhasePayments(phaseId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/phase-payments/${phaseId}`);
+    return response.data;
+  }
+
+  /**
+   * Update phase payment information (total amount, deadline, etc.)
+   */
+  async updatePhasePaymentInfo(phaseId: number, data: {
+    total_amount?: number | null;
+    payment_deadline?: string | null;
+    payment_request_date?: string | null;
+    payment_notes?: string | null;
+  }): Promise<ApiResponse<any>> {
+    const response = await this.api.put(`/phase-payments/${phaseId}/info`, data);
+    return response.data;
+  }
+
+  /**
+   * Add a new payment transaction
+   */
+  async addPhasePayment(phaseId: number, data: {
+    payment_amount: number;
+    payment_date: string;
+    payment_type: string;
+    payment_method?: string;
+    notes?: string;
+  }): Promise<ApiResponse<any>> {
+    const response = await this.api.post(`/phase-payments/${phaseId}/payments`, data);
+    return response.data;
+  }
+
+  /**
+   * Update a payment transaction
+   */
+  async updatePhasePayment(paymentId: number, data: {
+    payment_amount?: number;
+    payment_date?: string;
+    payment_type?: string;
+    payment_method?: string;
+    notes?: string;
+  }): Promise<ApiResponse<any>> {
+    const response = await this.api.put(`/phase-payments/payments/${paymentId}`, data);
+    return response.data;
+  }
+
+  /**
+   * Delete a payment transaction
+   */
+  async deletePhasePayment(paymentId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.delete(`/phase-payments/payments/${paymentId}`);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

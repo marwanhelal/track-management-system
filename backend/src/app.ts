@@ -25,6 +25,7 @@ import importDataRoutes from './routes/import-data';
 import engineerActivityRoutes from './routes/engineer-activity';
 import timerSessionRoutes from './routes/timer-sessions';
 import checklistRoutes from './routes/checklist';
+import phasePaymentsRoutes from './routes/phase-payments';
 
 dotenv.config();
 
@@ -253,6 +254,7 @@ class App {
     this.app.use('/api/v1/engineer-activity', engineerActivityRoutes);
     this.app.use('/api/v1/timer-sessions', timerSessionRoutes);
     this.app.use('/api/v1/checklist', checklistRoutes);
+    this.app.use('/api/v1/phase-payments', phasePaymentsRoutes);
 
     // 404 handler
     this.app.use((req: Request, res: Response) => {

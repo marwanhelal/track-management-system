@@ -103,6 +103,7 @@ import EditPhaseDatesDialog from '../components/phases/EditPhaseDatesDialog';
 import EditWorkLogDialog from '../components/work-logs/EditWorkLogDialog';
 import DeleteWorkLogDialog from '../components/work-logs/DeleteWorkLogDialog';
 import AddManualWorkLogDialog from '../components/work-logs/AddManualWorkLogDialog';
+import PhasePaymentDialog from '../components/payments/PhasePaymentDialog';
 
 interface ProjectDetailsState {
   project: Project | null;
@@ -177,6 +178,10 @@ interface ProjectDetailsState {
     workLog: WorkLog | null;
   };
   addManualWorkLogDialog: {
+    open: boolean;
+    phase: ProjectPhase | null;
+  };
+  paymentDialog: {
     open: boolean;
     phase: ProjectPhase | null;
   };
@@ -294,6 +299,10 @@ const ProjectDetailsPage: React.FC = () => {
       workLog: null
     },
     addManualWorkLogDialog: {
+      open: false,
+      phase: null
+    },
+    paymentDialog: {
       open: false,
       phase: null
     }
@@ -1483,6 +1492,27 @@ const ProjectDetailsPage: React.FC = () => {
                           }}
                         >
                           Add Work Log
+                        </Button>
+                      )}
+
+                      {/* Payment Tracking Button - Supervisor/Administrator Only */}
+                      {(user?.role === 'supervisor' || user?.role === 'administrator') && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="success"
+                          startIcon={<TrendingUpIcon />}
+                          onClick={() => {
+                            setState(prev => ({
+                              ...prev,
+                              paymentDialog: {
+                                open: true,
+                                phase: phase
+                              }
+                            }));
+                          }}
+                        >
+                          Payment Tracking
                         </Button>
                       )}
                     </Box>
@@ -3036,6 +3066,33 @@ const ProjectDetailsPage: React.FC = () => {
               snackbar: {
                 open: true,
                 message: 'Work log added successfully!',
+                severity: 'success'
+              }
+            }));
+          }}
+        />
+      )}
+
+      {/* Phase Payment Dialog - For Supervisors/Administrators */}
+      {state.paymentDialog.phase && (
+        <PhasePaymentDialog
+          open={state.paymentDialog.open}
+          onClose={() => setState(prev => ({
+            ...prev,
+            paymentDialog: {
+              open: false,
+              phase: null
+            }
+          }))}
+          phaseId={state.paymentDialog.phase.id}
+          phaseName={state.paymentDialog.phase.phase_name}
+          onSuccess={() => {
+            fetchProjectDetails();
+            setState(prev => ({
+              ...prev,
+              snackbar: {
+                open: true,
+                message: 'Payment information updated successfully!',
                 severity: 'success'
               }
             }));
