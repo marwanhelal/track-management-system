@@ -30,8 +30,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Switch,
-  FormControlLabel,
   Tooltip,
   Badge,
   Avatar,
@@ -42,11 +40,9 @@ import {
   ListItemText,
   ListItemIcon,
   CardActions,
-  Collapse,
   ToggleButton,
   ToggleButtonGroup,
-  Snackbar,
-  AlertColor
+  Snackbar
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -59,7 +55,6 @@ import {
   AccessTime as AccessTimeIcon,
   Person as PersonIcon,
   ExpandMore as ExpandMoreIcon,
-  Save as SaveIcon,
   Cancel as CancelIcon,
   Settings as SettingsIcon,
   GetApp as ExportIcon,
@@ -84,9 +79,7 @@ import {
   VpnKey as EarlyAccessIcon,
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
-  FastForward as FastForwardIcon,
-  StarBorder as StarBorderIcon,
-  Star as StarIcon
+  FastForward as FastForwardIcon
 } from '@mui/icons-material';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiService } from '../services/api';
@@ -98,7 +91,6 @@ import EditProjectDialog from '../components/projects/EditProjectDialog';
 import AddPhaseDialog from '../components/projects/AddPhaseDialog';
 import PhaseActionMenu from '../components/projects/PhaseActionMenu';
 import PhaseProgressSummary from '../components/progress/PhaseProgressSummary';
-import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import EditPhaseDatesDialog from '../components/phases/EditPhaseDatesDialog';
 import EditWorkLogDialog from '../components/work-logs/EditWorkLogDialog';
 import DeleteWorkLogDialog from '../components/work-logs/DeleteWorkLogDialog';
