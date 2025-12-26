@@ -203,7 +203,7 @@ const ProjectDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isSupervisor, isEngineer, user } = useAuth();
+  const { isSupervisor, user } = useAuth();
   const { on, off, joinProject, leaveProject } = useSocket();
 
   // Professional notification navigation parameters
@@ -408,6 +408,7 @@ const ProjectDetailsPage: React.FC = () => {
     if (urlTab || urlPhase || urlFilter) {
       console.log('✅ Professional notification navigation completed');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.project, state.loading, state.phases.length, urlTab, urlPhase, urlFilter, urlHighlight, urlSection, urlFocus, state.activeTab]);
 
   // Socket event listeners for real-time updates
@@ -638,55 +639,6 @@ const ProjectDetailsPage: React.FC = () => {
       setState(prev => ({ ...prev, loading: false }));
     }
   };
-
-  // Project Settings Handlers
-  const handleEditProject = () => {
-    setState(prev => ({
-      ...prev,
-      editingProject: true,
-      projectForm: {
-        name: state.project?.name || '',
-        status: state.project?.status || 'active',
-        planned_total_weeks: state.project?.planned_total_weeks || 0,
-        predicted_hours: state.project?.predicted_hours || 0,
-        start_date: state.project?.start_date || ''
-      }
-    }));
-  };
-
-  const handleSaveProject = async () => {
-    try {
-      setState(prev => ({ ...prev, loading: true }));
-      const response = await apiService.updateProject(state.project!.id, state.projectForm);
-
-      if (response.success) {
-        setState(prev => ({
-          ...prev,
-          editingProject: false,
-          loading: false
-        }));
-        await fetchProjectDetails();
-      } else {
-        setState(prev => ({
-          ...prev,
-          error: response.error || 'Failed to update project',
-          loading: false
-        }));
-      }
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        error: 'Failed to update project',
-        loading: false
-      }));
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setState(prev => ({ ...prev, editingProject: false }));
-  };
-
-
 
   const handleArchiveProject = async () => {
     try {
