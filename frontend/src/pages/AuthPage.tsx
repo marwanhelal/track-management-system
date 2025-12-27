@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, CssBaseline, ThemeProvider, Grid } from '@mui/material';
 import { motion } from 'framer-motion';
 import LoginForm from '../components/auth/LoginForm';
@@ -10,10 +9,18 @@ const AuthPage = () => {
   return (
     <ThemeProvider theme={professionalTheme}>
       <CssBaseline />
-      <Box sx={{ height: '100vh', overflow: 'hidden' }}>
-        <Grid container sx={{ height: '100%' }}>
+      <Box sx={{
+        height: '100vh',
+        overflow: { xs: 'auto', md: 'hidden' }
+      }}>
+        <Grid container sx={{
+          height: { xs: 'auto', md: '100%' },
+          minHeight: '100%'
+        }}>
           {/* Left side - Company Showcase */}
-          <Grid item xs={12} md={7} lg={8}>
+          <Grid item xs={12} md={7} lg={8} sx={{
+            height: { xs: '50vh', md: '100%' }
+          }}>
             <motion.div
               initial={animationVariants.fadeInLeft.initial}
               animate={animationVariants.fadeInLeft.animate}
@@ -25,7 +32,10 @@ const AuthPage = () => {
           </Grid>
 
           {/* Right side - Login/Register Form */}
-          <Grid item xs={12} md={5} lg={4}>
+          <Grid item xs={12} md={5} lg={4} sx={{
+            height: { xs: 'auto', md: '100%' },
+            minHeight: { xs: '50vh', md: '100%' }
+          }}>
             <motion.div
               initial={animationVariants.fadeInRight.initial}
               animate={animationVariants.fadeInRight.animate}
@@ -38,6 +48,7 @@ const AuthPage = () => {
               <Box
                 sx={{
                   height: '100%',
+                  minHeight: { xs: '50vh', md: '100%' },
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
