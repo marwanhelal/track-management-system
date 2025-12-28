@@ -391,7 +391,20 @@ const ProjectsPage: React.FC = () => {
       <Grid container spacing={3}>
         {state.projects.map((project) => (
           <Grid item xs={12} md={6} lg={4} key={project.id}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Card
+              onClick={() => navigate(`/projects/${project.id}`)}
+              sx={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                cursor: 'pointer',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: 4,
+                },
+              }}
+            >
               <CardContent sx={{ flexGrow: 1 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="start" mb={2}>
                   <Typography variant="h6" component="h2" noWrap>
@@ -446,7 +459,10 @@ const ProjectsPage: React.FC = () => {
                     <IconButton
                       size="small"
                       color="error"
-                      onClick={() => handleDeleteProject(project)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteProject(project);
+                      }}
                     >
                       <DeleteIcon />
                     </IconButton>
