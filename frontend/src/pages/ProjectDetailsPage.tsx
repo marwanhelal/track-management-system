@@ -1229,8 +1229,8 @@ const ProjectDetailsPage: React.FC = () => {
                           <strong>Approved Date:</strong> {(phase as any).approved_date ? new Date((phase as any).approved_date).toLocaleDateString() : 'Not approved'}
                         </Typography>
 
-                        {/* Payment Status Display - Status Chip Only */}
-                        {(phase as any).payment_status && (
+                        {/* Payment Status Display - Supervisors Only */}
+                        {isSupervisor && (phase as any).payment_status && (
                           <>
                             <Divider sx={{ my: 1 }} />
                             <Typography variant="body2" sx={{ mb: 0.5 }}>
