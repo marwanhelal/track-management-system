@@ -79,7 +79,8 @@ import {
   VpnKey as EarlyAccessIcon,
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
-  FastForward as FastForwardIcon
+  FastForward as FastForwardIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiService } from '../services/api';
@@ -1151,6 +1152,7 @@ const ProjectDetailsPage: React.FC = () => {
             <Tab label="Phases" icon={<AssignmentIcon />} />
             <Tab label="Work Logs" icon={<AccessTimeIcon />} />
             <Tab label="Team" icon={<PersonIcon />} />
+            <Tab label="Project Details" icon={<InfoIcon />} />
             <Tab label="Settings" icon={<EditIcon />} />
           </Tabs>
         </Box>
@@ -2370,8 +2372,80 @@ const ProjectDetailsPage: React.FC = () => {
           </Box>
         </TabPanel>
 
-        {/* Settings Tab */}
+        {/* Project Details Tab */}
         <TabPanel value={state.activeTab} index={3}>
+          <Box sx={{ p: 3 }}>
+            {/* Additional Project Details */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" fontWeight="bold" gutterBottom>
+                  Additional Project Details
+                </Typography>
+
+                <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
+                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Client Name
+                    </Typography>
+                    <Typography variant="body1" fontWeight="medium">
+                      {state.project?.client_name || 'Not specified'}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Location
+                    </Typography>
+                    <Typography variant="body1" fontWeight="medium">
+                      {state.project?.location || 'Not specified'}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Land Area
+                    </Typography>
+                    <Typography variant="body1" fontWeight="medium">
+                      {state.project?.land_area || 'Not specified'}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      BUA (Built-Up Area)
+                    </Typography>
+                    <Typography variant="body1" fontWeight="medium">
+                      {state.project?.bua || 'Not specified'}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Building Type
+                    </Typography>
+                    <Typography variant="body1" fontWeight="medium">
+                      {state.project?.building_type || 'Not specified'}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Number of Floors
+                    </Typography>
+                    <Typography variant="body1" fontWeight="medium">
+                      {state.project?.floors_count !== null && state.project?.floors_count !== undefined
+                        ? state.project.floors_count
+                        : 'Not specified'}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        </TabPanel>
+
+        {/* Settings Tab */}
+        <TabPanel value={state.activeTab} index={4}>
           <Box>
             {/* Enhanced Header */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -2759,73 +2833,6 @@ const ProjectDetailsPage: React.FC = () => {
                     >
                       Delete
                     </Button>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* Additional Project Details */}
-            <Card sx={{ mb: 3 }}>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Additional Project Details
-                </Typography>
-
-                <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Client Name
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {state.project?.client_name || 'Not specified'}
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Location
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {state.project?.location || 'Not specified'}
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Land Area
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {state.project?.land_area || 'Not specified'}
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      BUA (Built-Up Area)
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {state.project?.bua || 'Not specified'}
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Building Type
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {state.project?.building_type || 'Not specified'}
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Number of Floors
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {state.project?.floors_count !== null && state.project?.floors_count !== undefined
-                        ? state.project.floors_count
-                        : 'Not specified'}
-                    </Typography>
                   </Box>
                 </Box>
               </CardContent>
