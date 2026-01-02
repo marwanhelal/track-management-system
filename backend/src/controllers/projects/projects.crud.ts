@@ -597,3 +597,140 @@ export const unarchiveProject = async (req: Request, res: Response): Promise<voi
     });
   }
 };
+
+// Update project payment information
+export const updateProjectPayment = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const { id } = req.params;
+    const {
+      total_contract_amount,
+      down_payment_amount,
+      down_payment_date,
+      down_payment_notes,
+      down_payment_received
+    } = req.body;
+
+    // Only supervisors can update project payment information
+    if (authReq.user.role !== 'supervisor') {
+      res.status(403).json({
+        success: false,
+        error: 'Only supervisors can update project payment information'
+      });
+      return;
+    }
+
+    // Check if project exists
+    const projectResult = await query(
+      'SELECT id FROM projects WHERE id = $1',
+      [id]
+    );
+
+    if (projectResult.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: 'Project not found'
+      });
+      return;
+    }
+
+    // Validate amounts
+    if (total_contract_amount !== undefined && total_contract_amount < 0) {
+      res.status(400).json({
+        success: false,
+        error: 'Total contract amount cannot be negative'
+      });
+      return;
+    }
+
+    if (down_payment_amount !== undefined && down_payment_amount < 0) {
+      res.status(400).json({
+        success: false,
+        error: 'Down payment amount cannot be negative'
+      });
+      return;
+    }
+
+    if (down_payment_amount !== undefined && total_contract_amount !== undefined && down_payment_amount > total_contract_amount) {
+      res.status(400).json({
+        success: false,
+        error: 'Down payment cannot exceed total contract amount'
+      });
+      return;
+    }
+
+    // Update project payment information
+    const result = await query(
+      `UPDATE projects
+       SET total_contract_amount = COALESCE($1, total_contract_amount),
+           down_payment_amount = COALESCE($2, down_payment_amount),
+           down_payment_date = COALESCE($3, down_payment_date),
+           down_payment_notes = COALESCE($4, down_payment_notes),
+           down_payment_received = COALESCE($5, down_payment_received),
+           updated_at = NOW()
+       WHERE id = $6
+       RETURNING *`,
+      [total_contract_amount, down_payment_amount, down_payment_date, down_payment_notes, down_payment_received, id]
+    );
+
+    // Log audit event
+    await query(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',
+      ['projects', id, 'UPDATE_PAYMENT', authReq.user.id, 'Project payment information updated']
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Project payment information updated successfully',
+      data: { project: result.rows[0] }
+    });
+  } catch (error) {
+    console.error('Update project payment error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+};
+
+// Get project payment summary
+export const getProjectPaymentSummary = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    // Get project payment summary using the database function
+    const result = await query(
+      'SELECT * FROM get_project_payment_summary($1)',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: 'Project not found'
+      });
+      return;
+    }
+
+    const summary = result.rows[0];
+
+    res.status(200).json({
+      success: true,
+      data: {
+        total_contract: parseFloat(summary.total_contract) || 0,
+        down_payment: parseFloat(summary.down_payment) || 0,
+        sum_of_phases: parseFloat(summary.sum_of_phases) || 0,
+        total_phases_paid: parseFloat(summary.total_phases_paid) || 0,
+        total_paid: parseFloat(summary.total_paid) || 0,
+        total_remaining: parseFloat(summary.total_remaining) || 0,
+        is_balanced: summary.is_balanced
+      }
+    });
+  } catch (error) {
+    console.error('Get project payment summary error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+};

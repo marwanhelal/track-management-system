@@ -16,6 +16,8 @@ import {
   getTeamAnalytics,
   exportTeamReport,
   getComprehensiveOverview,
+  updateProjectPayment,
+  getProjectPaymentSummary,
 } from '@/controllers/projects';
 import { testGetProjects } from '@/controllers/test-projects';
 import { authenticate, supervisorOnly, canAccessProject, viewerAccess } from '@/middleware/auth';
@@ -69,5 +71,9 @@ router.get('/:id/team/search', canAccessProject, validateIdParam, searchTeamMemb
 // Team Analytics & Reports
 router.get('/analytics/team', getTeamAnalytics);
 router.get('/:id/team/export', canAccessProject, validateIdParam, exportTeamReport);
+
+// Project Payment Tracking (Supervisors only)
+router.put('/:id/payment', supervisorOnly, validateIdParam, updateProjectPayment);
+router.get('/:id/payment-summary', canAccessProject, validateIdParam, getProjectPaymentSummary);
 
 export default router;

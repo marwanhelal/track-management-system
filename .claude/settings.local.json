@@ -3,7 +3,16 @@
     "allow": [
       "Bash(pm2 restart:*)",
       "Bash(npx pm2 restart frontend)",
-      "Bash(npx pm2:*)"
+      "Bash(npx pm2:*)",
+      "Bash(git add:*)",
+      "Bash(git restore:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Enable HTTPS/SSL configuration and enforcement\n\n🔒 HTTPS Security Enhancements:\n- Enable automatic HTTPS upgrade in production (frontend API & Socket.IO)\n- Add HTTPS detection middleware in backend\n- Add upgrade-insecure-requests CSP directive for production\n- Enhanced HSTS configuration comments\n\nFrontend Changes:\n- Auto-upgrade HTTP to HTTPS in production (api.ts)\n- Auto-upgrade socket URL to HTTPS in production (SocketContext.tsx)\n- Add security warnings when HTTP detected in production\n- Create .env.example with HTTPS configuration notes\n\nBackend Changes:\n- Add HTTPS detection middleware (logs HTTP requests in production)\n- Add upgrade-insecure-requests to CSP (forces HTTPS upgrades)\n- Enhance HSTS header comments for clarity\n\nConfiguration Updates:\n- Update .env.example with HTTPS URL examples\n- Add SUPER_ADMIN_PASSWORD to example files\n- Update .env.production.example with proper HTTPS URLs\n- Add helpful comments for development vs production URLs\n\nNotes:\n- Coolify/Traefik handles SSL termination automatically\n- Let''s Encrypt certificates auto-generated for custom domains\n- App will work with both HTTP (dev) and HTTPS (production)\n- Auto-upgrade ensures security even if env vars use HTTP\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(node -e:*)",
+      "Bash(node run-payment-migration.js:*)",
+      "Bash(npm run build:*)",
+      "Bash(git commit:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

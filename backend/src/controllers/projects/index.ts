@@ -9,7 +9,9 @@ export {
   updateProject,
   deleteProject,
   archiveProject,
-  unarchiveProject
+  unarchiveProject,
+  updateProjectPayment,
+  getProjectPaymentSummary
 } from './projects.crud';
 
 // Export functionality

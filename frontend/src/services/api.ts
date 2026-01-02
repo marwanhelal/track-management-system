@@ -240,6 +240,30 @@ class ApiService {
     return response.data;
   }
 
+  async updateProjectPayment(projectId: number, data: {
+    total_contract_amount?: number;
+    down_payment_amount?: number;
+    down_payment_date?: string | null;
+    down_payment_notes?: string | null;
+    down_payment_received?: boolean;
+  }): Promise<ApiResponse<{ project: any }>> {
+    const response = await this.api.put(`/projects/${projectId}/payment`, data);
+    return response.data;
+  }
+
+  async getProjectPaymentSummary(projectId: number): Promise<ApiResponse<{
+    total_contract: number;
+    down_payment: number;
+    sum_of_phases: number;
+    total_phases_paid: number;
+    total_paid: number;
+    total_remaining: number;
+    is_balanced: boolean;
+  }>> {
+    const response = await this.api.get(`/projects/${projectId}/payment-summary`);
+    return response.data;
+  }
+
   async deleteProject(id: number): Promise<ApiResponse> {
     const response = await this.api.delete(`/projects/${id}`);
     return response.data;

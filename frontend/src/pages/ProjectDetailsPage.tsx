@@ -3049,7 +3049,7 @@ const ProjectDetailsPage: React.FC = () => {
       )}
 
       {/* Phase Payment Dialog - For Supervisors/Administrators */}
-      {state.paymentDialog.phase && (
+      {state.paymentDialog.phase && state.project && (
         <SimplePaymentDialog
           open={state.paymentDialog.open}
           onClose={() => setState(prev => ({
@@ -3061,6 +3061,7 @@ const ProjectDetailsPage: React.FC = () => {
           }))}
           phaseId={state.paymentDialog.phase.id}
           phaseName={state.paymentDialog.phase.phase_name}
+          projectId={state.project.id}
           onSuccess={() => {
             fetchProjectDetails();
             setState(prev => ({
