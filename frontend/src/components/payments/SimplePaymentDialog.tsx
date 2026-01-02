@@ -223,14 +223,83 @@ const SimplePaymentDialog: React.FC<SimplePaymentDialogProps> = ({
         {/* PROJECT PAYMENT SUMMARY */}
         {projectSummary && (
           <Paper elevation={2} sx={{ p: 2, mb: 3, bgcolor: 'primary.50' }}>
-            <Box display="flex" alignItems="center" gap={1} mb={2}>
-              <AccountBalanceIcon color="primary" />
-              <Typography variant="h6" color="primary">
-                Project Financial Summary
-              </Typography>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+              <Box display="flex" alignItems="center" gap={1}>
+                <AccountBalanceIcon color="primary" />
+                <Typography variant="h6" color="primary">
+                  Project Financial Summary
+                </Typography>
+              </Box>
+              <Button
+                size="small"
+                variant={showProjectEdit ? "contained" : "outlined"}
+                onClick={() => {
+                  setShowProjectEdit(!showProjectEdit);
+                  if (!showProjectEdit) {
+                    setProjectTotalContract(projectSummary.total_contract.toString());
+                    setProjectDownPayment(projectSummary.down_payment.toString());
+                  }
+                }}
+              >
+                {showProjectEdit ? 'Cancel' : 'Edit Contract'}
+              </Button>
             </Box>
 
-            <Box display="flex" flexDirection="column" gap={1}>
+            {showProjectEdit ? (
+              // EDIT MODE
+              <Box display="flex" flexDirection="column" gap={2}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Total Contract Amount"
+                  value={projectTotalContract}
+                  onChange={(e) => setProjectTotalContract(e.target.value)}
+                  inputProps={{ min: 0, step: 0.01 }}
+                  helperText="Total project contract value with client"
+                  InputProps={{
+                    startAdornment: <Typography sx={{ mr: 1 }}>$</Typography>,
+                  }}
+                />
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Down Payment Amount"
+                  value={projectDownPayment}
+                  onChange={(e) => setProjectDownPayment(e.target.value)}
+                  inputProps={{ min: 0, step: 0.01 }}
+                  helperText="Initial down payment received from client"
+                  InputProps={{
+                    startAdornment: <Typography sx={{ mr: 1 }}>$</Typography>,
+                  }}
+                />
+                <Button
+                  variant="contained"
+                  color="primary"
+                  disabled={savingProject}
+                  onClick={async () => {
+                    try {
+                      setSavingProject(true);
+                      await apiService.updateProjectPayment(projectId, {
+                        total_contract_amount: parseFloat(projectTotalContract) || 0,
+                        down_payment_amount: parseFloat(projectDownPayment) || 0,
+                      });
+                      // Reload data
+                      await loadData();
+                      setShowProjectEdit(false);
+                    } catch (err: any) {
+                      setError(err.message || 'Failed to update project payment');
+                    } finally {
+                      setSavingProject(false);
+                    }
+                  }}
+                  startIcon={savingProject ? <CircularProgress size={20} /> : <AccountBalanceIcon />}
+                >
+                  {savingProject ? 'Saving...' : 'Save Contract Info'}
+                </Button>
+              </Box>
+            ) : (
+              // VIEW MODE
+              <Box display="flex" flexDirection="column" gap={1}>
               <Box display="flex" justifyContent="space-between">
                 <Typography variant="body2" color="text.secondary">Total Contract:</Typography>
                 <Typography variant="body1" fontWeight="bold">
@@ -276,7 +345,8 @@ const SimplePaymentDialog: React.FC<SimplePaymentDialogProps> = ({
                   All Phases ({formatCurrency(projectSummary.sum_of_phases)})
                 </Alert>
               )}
-            </Box>
+              </Box>
+            )}
           </Paper>
         )}
 
