@@ -97,6 +97,7 @@ import EditWorkLogDialog from '../components/work-logs/EditWorkLogDialog';
 import DeleteWorkLogDialog from '../components/work-logs/DeleteWorkLogDialog';
 import AddManualWorkLogDialog from '../components/work-logs/AddManualWorkLogDialog';
 import SimplePaymentDialog from '../components/payments/SimplePaymentDialog';
+import EditProjectDetailsDialog from '../components/projects/EditProjectDetailsDialog';
 
 interface ProjectDetailsState {
   project: Project | null;
@@ -177,6 +178,9 @@ interface ProjectDetailsState {
   paymentDialog: {
     open: boolean;
     phase: ProjectPhase | null;
+  };
+  editProjectDetailsDialog: {
+    open: boolean;
   };
 }
 
@@ -298,6 +302,9 @@ const ProjectDetailsPage: React.FC = () => {
     paymentDialog: {
       open: false,
       phase: null
+    },
+    editProjectDetailsDialog: {
+      open: false
     }
   });
 
@@ -2378,9 +2385,21 @@ const ProjectDetailsPage: React.FC = () => {
             {/* Additional Project Details */}
             <Card>
               <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Additional Project Details
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Additional Project Details
+                  </Typography>
+                  {isSupervisor && (
+                    <Button
+                      variant="contained"
+                      startIcon={<EditIcon />}
+                      onClick={() => setState(prev => ({ ...prev, editProjectDetailsDialog: { open: true } }))}
+                      size="small"
+                    >
+                      Edit Details
+                    </Button>
+                  )}
+                </Box>
 
                 <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
                   <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
@@ -2999,6 +3018,38 @@ const ProjectDetailsPage: React.FC = () => {
               snackbar: {
                 open: true,
                 message: 'Failed to update project',
+                severity: 'error'
+              }
+            }));
+          }
+        }}
+        project={state.project}
+        loading={state.loading}
+      />
+
+      <EditProjectDetailsDialog
+        open={state.editProjectDetailsDialog.open}
+        onClose={() => setState(prev => ({ ...prev, editProjectDetailsDialog: { open: false } }))}
+        onSave={async (updatedDetails) => {
+          try {
+            const response = await apiService.updateProjectDetails(state.project!.id, updatedDetails);
+            if (response.success) {
+              await fetchProjectDetails();
+              setState(prev => ({
+                ...prev,
+                snackbar: {
+                  open: true,
+                  message: 'Project details updated successfully!',
+                  severity: 'success'
+                }
+              }));
+            }
+          } catch (error) {
+            setState(prev => ({
+              ...prev,
+              snackbar: {
+                open: true,
+                message: 'Failed to update project details',
                 severity: 'error'
               }
             }));
