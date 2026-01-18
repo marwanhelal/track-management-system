@@ -46,14 +46,14 @@ router.get('/delays', async (req: Request, res: Response) => {
     // Get project phases with progress data
     const phasesResult = await query(`
       SELECT
-        pp.id, pp.phase_name, pp.status, pp.planned_weeks, pp.planned_start_date,
-        pp.actual_start_date, pp.warning_flag, pp.phase_order, pp.predicted_hours,
+        pp.id, pp.phase_name, pp.status, pp.planned_weeks, pp.planned_start_date, pp.planned_end_date,
+        pp.actual_start_date, pp.actual_end_date, pp.warning_flag, pp.phase_order, pp.predicted_hours,
         COALESCE(SUM(wl.hours), 0) as actual_hours_logged
       FROM project_phases pp
       LEFT JOIN work_logs wl ON pp.id = wl.phase_id
       WHERE pp.project_id = $1
-      GROUP BY pp.id, pp.phase_name, pp.status, pp.planned_weeks, pp.planned_start_date,
-               pp.actual_start_date, pp.warning_flag, pp.phase_order, pp.predicted_hours
+      GROUP BY pp.id, pp.phase_name, pp.status, pp.planned_weeks, pp.planned_start_date, pp.planned_end_date,
+               pp.actual_start_date, pp.actual_end_date, pp.warning_flag, pp.phase_order, pp.predicted_hours
       ORDER BY pp.phase_order
     `, [project_id]);
 
@@ -68,23 +68,27 @@ router.get('/delays', async (req: Request, res: Response) => {
     const completionPercentage = phases.length > 0 ? (completedPhases / phases.length) * 100 : 0;
 
     for (const phase of phases) {
-      // Check for phases that are overdue
-      if (phase.status === 'in_progress' && phase.actual_start_date) {
-        const plannedDuration = phase.planned_weeks * 7; // Convert weeks to days
-        const actualStart = new Date(phase.actual_start_date);
+      // ✅ FIXED: Check for phases that are overdue using database planned_end_date
+      if (phase.status === 'in_progress' && phase.planned_end_date) {
+        const plannedEnd = new Date(phase.planned_end_date);
         const currentDate = new Date();
-        const daysInProgress = Math.floor((currentDate.getTime() - actualStart.getTime()) / (1000 * 60 * 60 * 24));
+        const daysUntilDue = Math.floor((plannedEnd.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
 
-        if (daysInProgress > plannedDuration) {
-          const daysOverdue = daysInProgress - plannedDuration;
+        // Phase is overdue if current date is past planned_end_date
+        if (daysUntilDue < 0) {
+          const daysOverdue = Math.abs(daysUntilDue);
+          const actualStart = phase.actual_start_date ? new Date(phase.actual_start_date) : null;
+          const daysInProgress = actualStart ?
+            Math.floor((currentDate.getTime() - actualStart.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
           warnings.push({
             id: `delay-${phase.id}`,
             type: 'phase_delay',
             severity: daysOverdue > 7 ? 'critical' : 'warning',
             phase_name: phase.phase_name,
-            message: `Phase "${phase.phase_name}" is ${daysOverdue} days overdue`,
+            message: `Phase "${phase.phase_name}" is ${daysOverdue} days overdue (due date: ${plannedEnd.toLocaleDateString()})`,
             days_overdue: daysOverdue,
-            planned_duration: plannedDuration,
+            planned_end_date: plannedEnd,
             actual_duration: daysInProgress,
             timestamp: new Date()
           });
@@ -92,15 +96,13 @@ router.get('/delays', async (req: Request, res: Response) => {
         }
       }
 
-      // Check for approaching due dates
-      if (phase.status === 'in_progress' && phase.planned_start_date) {
-        const plannedStart = new Date(phase.planned_start_date);
-        const plannedEnd = new Date(plannedStart);
-        plannedEnd.setDate(plannedStart.getDate() + (phase.planned_weeks * 7));
-
+      // ✅ FIXED: Check for approaching due dates using database planned_end_date
+      if (phase.status === 'in_progress' && phase.planned_end_date) {
+        const plannedEnd = new Date(phase.planned_end_date);
         const currentDate = new Date();
         const daysUntilDue = Math.floor((plannedEnd.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
 
+        // Approaching deadline (within 7 days, but not overdue)
         if (daysUntilDue <= 7 && daysUntilDue >= 0) {
           warnings.push({
             id: `due-${phase.id}`,
@@ -115,15 +117,16 @@ router.get('/delays', async (req: Request, res: Response) => {
           totalRiskScore += daysUntilDue <= 3 ? 20 : 10;
         }
 
-        // Already overdue
+        // Already overdue (this creates a separate "overdue" type warning in addition to "phase_delay")
         if (daysUntilDue < 0) {
+          const daysOverdue = Math.abs(daysUntilDue);
           warnings.push({
             id: `overdue-${phase.id}`,
             type: 'overdue',
             severity: 'critical',
             phase_name: phase.phase_name,
-            message: `Phase "${phase.phase_name}" was due ${Math.abs(daysUntilDue)} days ago`,
-            days_overdue: Math.abs(daysUntilDue),
+            message: `Phase "${phase.phase_name}" was due ${daysOverdue} days ago`,
+            days_overdue: daysOverdue,
             due_date: plannedEnd,
             timestamp: new Date()
           });
@@ -146,15 +149,15 @@ router.get('/delays', async (req: Request, res: Response) => {
 
       // 🎯 PROFESSIONAL PROGRESS-BASED RISK DETECTION
       // Check for phases approaching deadline with insufficient progress
-      if (phase.status === 'in_progress' && phase.actual_start_date && phase.predicted_hours > 0) {
-        const plannedStart = new Date(phase.actual_start_date);
-        const plannedEnd = new Date(plannedStart);
-        plannedEnd.setDate(plannedStart.getDate() + (phase.planned_weeks * 7));
+      if (phase.status === 'in_progress' && phase.actual_start_date && phase.predicted_hours > 0 && phase.planned_end_date) {
+        const actualStart = new Date(phase.actual_start_date);
+        const plannedEnd = new Date(phase.planned_end_date);
+        const plannedStart = phase.planned_start_date ? new Date(phase.planned_start_date) : actualStart;
 
         const currentDate = new Date();
         const daysUntilDue = Math.floor((plannedEnd.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-        const daysElapsed = Math.floor((currentDate.getTime() - plannedStart.getTime()) / (1000 * 60 * 60 * 24));
-        const totalPlannedDays = phase.planned_weeks * 7;
+        const daysElapsed = Math.floor((currentDate.getTime() - actualStart.getTime()) / (1000 * 60 * 60 * 24));
+        const totalPlannedDays = Math.floor((plannedEnd.getTime() - plannedStart.getTime()) / (1000 * 60 * 60 * 24));
 
         // Only check phases that are 3-7 days from deadline (professional early warning)
         if (daysUntilDue >= 3 && daysUntilDue <= 7 && daysElapsed > 0) {
