@@ -5,6 +5,105 @@ import { EnhancedWarning } from '@/types';
 
 const router = Router();
 
+// Helper function to persist warnings to database
+async function persistWarningsToDatabase(projectId: number, warnings: any[]): Promise<void> {
+  try {
+    // First, mark old warnings for this project as inactive if they're resolved
+    await query(`
+      UPDATE warning_analytics
+      SET is_active = false
+      WHERE project_id = $1
+        AND is_active = true
+        AND resolved_at IS NULL
+    `, [projectId]);
+
+    // Insert new warnings
+    for (const warning of warnings) {
+      // Map warning type to database enum
+      let warningType = 'timeline_deviation';
+      switch (warning.type) {
+        case 'phase_delay':
+        case 'overdue':
+        case 'approaching_due_date':
+          warningType = 'timeline_deviation';
+          break;
+        case 'progress_risk':
+          warningType = 'capacity_overload';
+          break;
+        case 'resource_conflict':
+          warningType = 'resource_conflict';
+          break;
+        case 'warning_flag':
+          warningType = 'quality_gate_violation';
+          break;
+        default:
+          warningType = 'timeline_deviation';
+      }
+
+      // Map severity
+      let severity = 'warning';
+      if (warning.severity === 'critical') severity = 'critical';
+      else if (warning.severity === 'urgent') severity = 'urgent';
+      else if (warning.severity === 'warning') severity = 'warning';
+
+      // Calculate risk probability and confidence
+      const riskProbability = warning.severity === 'critical' ? 90 : warning.severity === 'urgent' ? 75 : 50;
+      const confidenceScore = 85;
+
+      // Prepare warning data JSONB
+      const warningData = {
+        phase_id: warning.phase_id,
+        phase_name: warning.phase_name,
+        message: warning.message,
+        days_overdue: warning.days_overdue,
+        days_until_due: warning.days_until_due,
+        planned_end_date: warning.planned_end_date,
+        due_date: warning.due_date,
+        actual_duration: warning.actual_duration,
+        progress_gap: warning.progress_gap,
+        expected_progress: warning.expected_progress,
+        actual_progress: warning.actual_progress,
+        hours_remaining: warning.hours_remaining,
+        daily_hours_required: warning.daily_hours_required,
+        risk_level: warning.risk_level,
+        original_warning_id: warning.id
+      };
+
+      // Insert warning into database
+      await query(`
+        INSERT INTO warning_analytics (
+          project_id,
+          warning_type,
+          severity,
+          confidence_score,
+          risk_probability,
+          predicted_impact_days,
+          predicted_impact_cost,
+          warning_data,
+          is_active,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+      `, [
+        projectId,
+        warningType,
+        severity,
+        confidenceScore,
+        riskProbability,
+        warning.days_overdue || warning.days_until_due || 0,
+        (warning.days_overdue || warning.days_until_due || 0) * 500, // $500/day estimate
+        JSON.stringify(warningData),
+        true
+      ]);
+    }
+
+    console.log(`✅ Persisted ${warnings.length} warnings to database for project ${projectId}`);
+  } catch (error) {
+    console.error('❌ Error persisting warnings to database:', error);
+    // Don't throw - we don't want to break the API response if persistence fails
+  }
+}
+
 // Get all projects for dropdown selection
 router.get('/projects', async (req: Request, res: Response) => {
   try {
@@ -445,6 +544,9 @@ router.get('/delays', async (req: Request, res: Response) => {
       .sort((a, b) => b.priority - a.priority) // Sort by priority
       .slice(0, 10); // Keep top 10
 
+    // ✅ NEW: Persist warnings to database for historical tracking
+    await persistWarningsToDatabase(parseInt(project_id as string), warnings);
+
     // Advanced trend analysis
     const projectVelocity = completionPercentage > 0 ?
       Math.round((completedPhases / Math.max(1, (new Date().getTime() - new Date(phases[0]?.planned_start_date || new Date()).getTime()) / (1000 * 60 * 60 * 24 * 7)))) : 0;
@@ -502,6 +604,215 @@ router.get('/delays', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to analyze phase delays'
+    });
+  }
+});
+
+// GET /api/v1/smart-test/warnings/history?project_id=123
+// Retrieve warning history for a project
+router.get('/warnings/history', async (req: Request, res: Response) => {
+  try {
+    const { project_id } = req.query;
+
+    if (!project_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Project ID is required'
+      });
+    }
+
+    console.log('📊 Fetching warning history...', { project_id });
+
+    // Get all warnings for this project with resolution info
+    const warningsResult = await query(`
+      SELECT
+        wa.*,
+        u.name as resolved_by_name,
+        wa.created_at::date as warning_date
+      FROM warning_analytics wa
+      LEFT JOIN users u ON wa.resolved_by = u.id
+      WHERE wa.project_id = $1
+      ORDER BY wa.created_at DESC
+      LIMIT 100
+    `, [project_id]);
+
+    const warnings = warningsResult.rows;
+
+    // Group warnings by date for trending
+    const warningsByDate: Record<string, any[]> = {};
+    warnings.forEach((warning: any) => {
+      const dateKey = warning.warning_date;
+      if (!warningsByDate[dateKey]) {
+        warningsByDate[dateKey] = [];
+      }
+      warningsByDate[dateKey].push(warning);
+    });
+
+    // Calculate statistics
+    const totalWarnings = warnings.length;
+    const activeWarnings = warnings.filter((w: any) => w.is_active).length;
+    const resolvedWarnings = warnings.filter((w: any) => w.resolved_at !== null).length;
+    const criticalWarnings = warnings.filter((w: any) => w.severity === 'critical').length;
+
+    // Get warning trend (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const trendResult = await query(`
+      SELECT
+        DATE(created_at) as date,
+        COUNT(*) as count,
+        COUNT(CASE WHEN severity = 'critical' THEN 1 END) as critical_count
+      FROM warning_analytics
+      WHERE project_id = $1
+        AND created_at >= $2
+      GROUP BY DATE(created_at)
+      ORDER BY date
+    `, [project_id, sevenDaysAgo]);
+
+    return res.json({
+      success: true,
+      data: {
+        warnings,
+        statistics: {
+          total: totalWarnings,
+          active: activeWarnings,
+          resolved: resolvedWarnings,
+          critical: criticalWarnings,
+          resolution_rate: totalWarnings > 0 ? Math.round((resolvedWarnings / totalWarnings) * 100) : 0
+        },
+        trend: trendResult.rows,
+        warnings_by_date: warningsByDate
+      },
+      message: `Found ${totalWarnings} warnings for project ${project_id}`
+    });
+  } catch (error) {
+    console.error('❌ Error fetching warning history:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch warning history'
+    });
+  }
+});
+
+// PUT /api/v1/smart-test/warnings/:id/resolve
+// Mark a warning as resolved
+router.put('/warnings/:id/resolve', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { resolution_note, resolved_by } = req.body;
+
+    console.log('✅ Resolving warning...', { id, resolved_by });
+
+    // Update warning as resolved
+    const result = await query(`
+      UPDATE warning_analytics
+      SET
+        resolved_at = NOW(),
+        resolved_by = $1,
+        resolution_note = $2,
+        is_active = false,
+        updated_at = NOW()
+      WHERE id = $3
+      RETURNING *
+    `, [resolved_by, resolution_note, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Warning not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        warning: result.rows[0]
+      },
+      message: 'Warning marked as resolved'
+    });
+  } catch (error) {
+    console.error('❌ Error resolving warning:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to resolve warning'
+    });
+  }
+});
+
+// GET /api/v1/smart-test/warnings/stats?project_id=123
+// Get warning statistics and trends
+router.get('/warnings/stats', async (req: Request, res: Response) => {
+  try {
+    const { project_id } = req.query;
+
+    if (!project_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Project ID is required'
+      });
+    }
+
+    // Get warning type distribution
+    const typeDistribution = await query(`
+      SELECT
+        warning_type,
+        COUNT(*) as count,
+        AVG(risk_probability) as avg_risk
+      FROM warning_analytics
+      WHERE project_id = $1
+        AND created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY warning_type
+      ORDER BY count DESC
+    `, [project_id]);
+
+    // Get severity distribution
+    const severityDistribution = await query(`
+      SELECT
+        severity,
+        COUNT(*) as count
+      FROM warning_analytics
+      WHERE project_id = $1
+        AND created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY severity
+      ORDER BY
+        CASE severity
+          WHEN 'critical' THEN 1
+          WHEN 'urgent' THEN 2
+          WHEN 'warning' THEN 3
+          WHEN 'advisory' THEN 4
+        END
+    `, [project_id]);
+
+    // Get resolution time stats
+    const resolutionStats = await query(`
+      SELECT
+        AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600)::DECIMAL(10,2) as avg_resolution_hours,
+        MIN(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600)::DECIMAL(10,2) as min_resolution_hours,
+        MAX(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600)::DECIMAL(10,2) as max_resolution_hours
+      FROM warning_analytics
+      WHERE project_id = $1
+        AND resolved_at IS NOT NULL
+    `, [project_id]);
+
+    return res.json({
+      success: true,
+      data: {
+        type_distribution: typeDistribution.rows,
+        severity_distribution: severityDistribution.rows,
+        resolution_stats: resolutionStats.rows[0] || {
+          avg_resolution_hours: null,
+          min_resolution_hours: null,
+          max_resolution_hours: null
+        }
+      },
+      message: 'Warning statistics retrieved successfully'
+    });
+  } catch (error) {
+    console.error('❌ Error fetching warning stats:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch warning statistics'
     });
   }
 });
