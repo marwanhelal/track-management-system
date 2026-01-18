@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { query } from '@/database/connection';
+import { SmartRecoveryService } from '@/services/smartRecoveryService';
+import { EnhancedWarning } from '@/types';
 
 const router = Router();
 
@@ -85,6 +87,7 @@ router.get('/delays', async (req: Request, res: Response) => {
             id: `delay-${phase.id}`,
             type: 'phase_delay',
             severity: daysOverdue > 7 ? 'critical' : 'warning',
+            phase_id: phase.id, // Add phase_id for recovery service
             phase_name: phase.phase_name,
             message: `Phase "${phase.phase_name}" is ${daysOverdue} days overdue (due date: ${plannedEnd.toLocaleDateString()})`,
             days_overdue: daysOverdue,
@@ -124,6 +127,7 @@ router.get('/delays', async (req: Request, res: Response) => {
             id: `overdue-${phase.id}`,
             type: 'overdue',
             severity: 'critical',
+            phase_id: phase.id, // Add phase_id for recovery service
             phase_name: phase.phase_name,
             message: `Phase "${phase.phase_name}" was due ${daysOverdue} days ago`,
             days_overdue: daysOverdue,
@@ -370,6 +374,77 @@ router.get('/delays', async (req: Request, res: Response) => {
       });
     }
 
+    // ✅ ENHANCED: Generate intelligent recovery suggestions using SmartRecoveryService
+    // Convert critical warnings to EnhancedWarning format for recovery service
+    const enhancedRecoverySuggestions: any[] = [];
+
+    for (const warning of criticalWarnings.slice(0, 3)) { // Process top 3 critical warnings
+      try {
+        // Map warning type to recovery service type
+        let warningType = 'timeline_deviation'; // default
+        if (warning.type === 'phase_delay' || warning.type === 'overdue') {
+          warningType = 'timeline_deviation';
+        } else if (warning.type === 'progress_risk') {
+          warningType = 'capacity_overload';
+        }
+
+        // Create EnhancedWarning for recovery service
+        const enhancedWarning: EnhancedWarning = {
+          id: warning.id,
+          type: warningType,
+          severity: warning.severity === 'critical' ? 'critical' : 'urgent',
+          title: warning.phase_name || 'Project Issue',
+          message: warning.message,
+          context: `Phase: ${warning.phase_name}, Days overdue: ${warning.days_overdue || 0}`,
+          confidence_score: 85,
+          risk_probability: 70,
+          predicted_impact: {
+            days: warning.days_overdue || warning.days_until_due || 7,
+            cost: (warning.days_overdue || 7) * 500, // Estimate $500/day
+            resources_affected: 2
+          },
+          cascade_effects: [],
+          recovery_suggestions: [],
+          project_id: parseInt(project_id as string),
+          phase_ids: warning.phase_id ? [warning.phase_id] : [],
+          affected_engineers: [],
+          action_required: true,
+          escalation_level: warning.severity === 'critical' ? 3 : 2,
+          timestamp: new Date(),
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
+        };
+
+        // Generate contextual recovery suggestions
+        const recoverySuggestions = await SmartRecoveryService.generateContextualRecovery(
+          enhancedWarning,
+          { phases, completionPercentage, healthScore }
+        );
+
+        // Convert recovery suggestions to recommendation format
+        recoverySuggestions.slice(0, 2).forEach((suggestion, idx) => {
+          enhancedRecoverySuggestions.push({
+            id: `recovery-${warning.id}-${idx}`,
+            category: 'recovery',
+            priority: 90 - (idx * 5),
+            title: suggestion.title,
+            description: suggestion.description,
+            action_items: suggestion.implementation_steps || [],
+            effort_required: suggestion.effort_required,
+            success_probability: suggestion.success_probability,
+            estimated_recovery_days: suggestion.estimated_recovery_days,
+            risks: suggestion.risks || []
+          });
+        });
+      } catch (error) {
+        console.error('Error generating recovery suggestion:', error);
+      }
+    }
+
+    // Merge enhanced suggestions with existing recommendations
+    const allRecommendations = [...recommendations, ...enhancedRecoverySuggestions]
+      .sort((a, b) => b.priority - a.priority) // Sort by priority
+      .slice(0, 10); // Keep top 10
+
     // Advanced trend analysis
     const projectVelocity = completionPercentage > 0 ?
       Math.round((completedPhases / Math.max(1, (new Date().getTime() - new Date(phases[0]?.planned_start_date || new Date()).getTime()) / (1000 * 60 * 60 * 24 * 7)))) : 0;
@@ -403,7 +478,7 @@ router.get('/delays', async (req: Request, res: Response) => {
           not_started_phases: notStartedPhases,
           completion_percentage: Math.round(completionPercentage)
         },
-        recommendations,
+        recommendations: allRecommendations,
         risk_assessment: {
           level: totalRiskScore >= 70 ? 'critical' : totalRiskScore >= 40 ? 'high' : totalRiskScore >= 20 ? 'medium' : 'low',
           description: totalRiskScore >= 70 ? 'Immediate attention required' :
