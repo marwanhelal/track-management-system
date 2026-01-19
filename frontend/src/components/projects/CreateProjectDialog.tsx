@@ -19,27 +19,16 @@ import {
   StepLabel,
   Grid,
   Divider,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { Add, Remove, ArrowUpward, ArrowDownward, ExpandMore } from '@mui/icons-material';
+import { Add, Remove, ArrowUpward, ArrowDownward } from '@mui/icons-material';
 import dayjs from 'dayjs';
 import {
   Project,
   PredefinedPhase,
   ProjectPhaseInput,
-  ChecklistTemplate,
-  ChecklistPhaseName
 } from '../../types';
 import apiService from '../../services/api';
 
@@ -53,7 +42,6 @@ interface CreateProjectDialogProps {
 const steps = [
   'اسم المشروع', // Project Basic Info
   'بيانات المشروع', // Project Phases
-  'خطوات المشروع', // Checklist Review
 ];
 
 const CreateProjectDialog = ({
@@ -78,19 +66,14 @@ const CreateProjectDialog = ({
   const [predefinedPhases, setPredefinedPhases] = useState<PredefinedPhase[]>([]);
   const [selectedPhases, setSelectedPhases] = useState<ProjectPhaseInput[]>([]);
 
-  // Step 3: Checklist templates
-  const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>([]);
-  const [checklistStats, setChecklistStats] = useState<{ [key: string]: number }>({});
-
   // Common state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load predefined phases and checklist templates
+  // Load predefined phases
   useEffect(() => {
     if (open) {
       loadPredefinedPhases();
-      loadChecklistTemplates();
     }
   }, [open]);
 
@@ -114,31 +97,6 @@ const CreateProjectDialog = ({
       }
     } catch (error: any) {
       setError(error.message || 'Failed to load phases');
-    }
-  };
-
-  const loadChecklistTemplates = async () => {
-    try {
-      const response = await apiService.getChecklistTemplates();
-      if (response.success && response.data && response.data.templates) {
-        setChecklistTemplates(response.data.templates);
-
-        // Calculate statistics per phase
-        const stats: { [key: string]: number } = {};
-        response.data.templates.forEach((template: ChecklistTemplate) => {
-          stats[template.phase_name] = (stats[template.phase_name] || 0) + 1;
-        });
-        setChecklistStats(stats);
-      } else {
-        // Templates not available yet (migrations not run)
-        setChecklistTemplates([]);
-        setChecklistStats({});
-      }
-    } catch (error: any) {
-      console.error('Failed to load checklist templates:', error);
-      // Set empty arrays to prevent undefined errors
-      setChecklistTemplates([]);
-      setChecklistStats({});
     }
   };
 
@@ -295,22 +253,6 @@ const CreateProjectDialog = ({
   };
 
   const { totalWeeks, totalHours } = calculateTotals();
-
-  // Get checklist templates for selected phases
-  const getChecklistForPhase = (phaseName: string) => {
-    return checklistTemplates.filter(t => t.phase_name === phaseName);
-  };
-
-  // Group checklist templates by section
-  const groupBySection = (templates: ChecklistTemplate[]) => {
-    const grouped: { [key: string]: ChecklistTemplate[] } = {};
-    templates.forEach(template => {
-      const section = template.section_name || 'عام / General';
-      if (!grouped[section]) grouped[section] = [];
-      grouped[section].push(template);
-    });
-    return grouped;
-  };
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -610,123 +552,6 @@ const CreateProjectDialog = ({
               >
                 إضافة مرحلة مخصصة / Add Custom Phase
               </Button>
-            </Box>
-          )}
-
-          {/* STEP 3: CHECKLIST REVIEW */}
-          {activeStep === 2 && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
-              <Typography variant="h6" color="primary">
-                مراجعة قوائم المهام / Checklist Review
-              </Typography>
-
-              <Alert severity="info">
-                سيتم إنشاء قوائم المهام تلقائياً للمراحل المحددة. يمكن تعديلها لاحقاً من صفحة المشروع.
-                <br />
-                Checklists will be automatically generated for selected phases. You can customize them later from the project page.
-              </Alert>
-
-              {selectedPhases.length === 0 ? (
-                <Alert severity="warning">
-                  لم يتم اختيار أي مراحل / No phases selected
-                </Alert>
-              ) : (
-                <Box>
-                  {selectedPhases.map((phase, index) => {
-                    const phaseTemplates = getChecklistForPhase(phase.phase_name);
-                    const taskCount = phaseTemplates.length;
-                    const groupedTemplates = groupBySection(phaseTemplates);
-
-                    return (
-                      <Accordion key={index} defaultExpanded={index === 0}>
-                        <AccordionSummary expandIcon={<ExpandMore />}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                            <Chip label={index + 1} size="small" color="primary" />
-                            <Typography fontWeight="bold">{phase.phase_name}</Typography>
-                            <Chip
-                              label={`${taskCount} ${taskCount === 1 ? 'مهمة / task' : 'مهام / tasks'}`}
-                              size="small"
-                              color="secondary"
-                              variant="outlined"
-                            />
-                          </Box>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          {taskCount === 0 ? (
-                            <Alert severity="info">
-                              لا توجد مهام محددة مسبقاً لهذه المرحلة. يمكن إضافتها يدوياً لاحقاً.
-                              <br />
-                              No predefined tasks for this phase. You can add them manually later.
-                            </Alert>
-                          ) : (
-                            <TableContainer component={Paper} variant="outlined">
-                              <Table size="small">
-                                <TableHead>
-                                  <TableRow>
-                                    <TableCell width="50px">#</TableCell>
-                                    <TableCell>المهمة / Task</TableCell>
-                                    <TableCell>القسم / Section</TableCell>
-                                  </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                  {Object.entries(groupedTemplates).map(([section, templates]) => (
-                                    <React.Fragment key={section}>
-                                      {templates.map((template, idx) => (
-                                        <TableRow key={template.id}>
-                                          <TableCell>{template.display_order}</TableCell>
-                                          <TableCell>
-                                            <Typography variant="body2">
-                                              {template.task_title_ar}
-                                              {template.task_title_en && (
-                                                <Typography variant="caption" display="block" color="text.secondary">
-                                                  {template.task_title_en}
-                                                </Typography>
-                                              )}
-                                            </Typography>
-                                          </TableCell>
-                                          <TableCell>
-                                            <Chip label={section} size="small" variant="outlined" />
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </React.Fragment>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </TableContainer>
-                          )}
-                        </AccordionDetails>
-                      </Accordion>
-                    );
-                  })}
-                </Box>
-              )}
-
-              <Paper sx={{ p: 2, bgcolor: 'primary.50' }}>
-                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                  ملخص المشروع / Project Summary
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="body2" color="text.secondary">المراحل / Phases:</Typography>
-                    <Typography variant="h6">{selectedPhases.length}</Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="body2" color="text.secondary">الأسابيع / Weeks:</Typography>
-                    <Typography variant="h6">{totalWeeks}</Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="body2" color="text.secondary">الساعات / Hours:</Typography>
-                    <Typography variant="h6">{totalHours}</Typography>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Typography variant="body2" color="text.secondary">المهام / Tasks:</Typography>
-                    <Typography variant="h6">
-                      {selectedPhases.reduce((sum, phase) => sum + (checklistStats[phase.phase_name] || 0), 0)}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </Paper>
             </Box>
           )}
         </DialogContent>

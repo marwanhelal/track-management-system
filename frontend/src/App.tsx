@@ -14,7 +14,6 @@ const AuthPage = React.lazy(() => import('./pages/AuthPage'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const ProjectsPage = React.lazy(() => import('./pages/ProjectsPage'));
 const ProjectDetailsPage = React.lazy(() => import('./pages/ProjectDetailsPage'));
-const ChecklistPage = React.lazy(() => import('./pages/ChecklistPage'));
 const TeamManagementPage = React.lazy(() => import('./pages/TeamManagementPage'));
 const TimeTrackingPage = React.lazy(() => import('./pages/TimeTrackingPage'));
 const MyWorkLogsPage = React.lazy(() => import('./pages/MyWorkLogsPage'));
@@ -86,20 +85,6 @@ function App() {
                       <AppLayout>
                         <Suspense fallback={<PageLoader />}>
                           <ProjectDetailsPage />
-                        </Suspense>
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-
-                {/* Checklist - Available to all authenticated users */}
-                <Route
-                  path="/checklist"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <Suspense fallback={<PageLoader />}>
-                          <ChecklistPage />
                         </Suspense>
                       </AppLayout>
                     </ProtectedRoute>

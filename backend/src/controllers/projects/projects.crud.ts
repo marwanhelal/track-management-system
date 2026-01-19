@@ -302,33 +302,6 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
         `Project created with ${selectedPhases.length} phases`
       ]);
 
-      // Generate checklist from templates
-      const templates = await client.query(`
-        SELECT * FROM checklist_templates WHERE is_active = true ORDER BY phase_name, display_order
-      `);
-
-      if (templates.rows.length > 0) {
-        const insertChecklistPromises = templates.rows.map((template: any) => {
-          return client.query(`
-            INSERT INTO project_checklist_items (
-              project_id, phase_name, section_name, task_title_ar, task_title_en, display_order
-            )
-            VALUES ($1, $2, $3, $4, $5, $6)
-          `, [
-            project.id,
-            template.phase_name,
-            template.section_name,
-            template.task_title_ar,
-            template.task_title_en,
-            template.display_order
-          ]);
-        });
-
-        await Promise.all(insertChecklistPromises);
-
-        console.log(`✅ Generated ${templates.rows.length} checklist items for project ${project.id}`);
-      }
-
       return { project, phases };
     });
 
