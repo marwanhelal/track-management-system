@@ -218,23 +218,6 @@ router.get('/delays', async (req: Request, res: Response) => {
           });
           totalRiskScore += daysUntilDue <= 3 ? 20 : 10;
         }
-
-        // Already overdue (this creates a separate "overdue" type warning in addition to "phase_delay")
-        if (daysUntilDue < 0) {
-          const daysOverdue = Math.abs(daysUntilDue);
-          warnings.push({
-            id: `overdue-${phase.id}`,
-            type: 'overdue',
-            severity: 'critical',
-            phase_id: phase.id, // Add phase_id for recovery service
-            phase_name: phase.phase_name,
-            message: `Phase "${phase.phase_name}" was due ${daysOverdue} days ago`,
-            days_overdue: daysOverdue,
-            due_date: plannedEnd,
-            timestamp: new Date()
-          });
-          totalRiskScore += 40;
-        }
       }
 
       // Check warning flags
