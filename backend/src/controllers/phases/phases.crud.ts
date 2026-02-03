@@ -103,6 +103,19 @@ export const createPhase = async (req: Request, res: Response): Promise<void> =>
       ['project_phases', result.rows[0].id, 'CREATE', authReq.user.id, `Custom phase "${phase_name}" created`]
     );
 
+    // Recalculate project's total predicted_hours after adding new phase
+    const totalResult = await query(
+      'SELECT COALESCE(SUM(predicted_hours), 0) as total_predicted_hours FROM project_phases WHERE project_id = $1',
+      [projectId]
+    );
+
+    const totalPredictedHours = parseInt(totalResult.rows[0].total_predicted_hours) || 0;
+
+    await query(
+      'UPDATE projects SET predicted_hours = $1, updated_at = NOW() WHERE id = $2',
+      [totalPredictedHours, projectId]
+    );
+
     res.status(201).json({
       success: true,
       message: 'Phase created successfully',
@@ -178,6 +191,25 @@ export const updatePhase = async (req: Request, res: Response): Promise<void> =>
       ['project_phases', phaseId, 'UPDATE', authReq.user.id, `Phase updated: ${Object.keys(updates).join(', ')}`]
     );
 
+    // If predicted_hours was updated, recalculate project's total predicted_hours
+    if (updates.predicted_hours !== undefined) {
+      const projectId = result.rows[0].project_id;
+
+      // Calculate sum of all phases' predicted_hours for this project
+      const totalResult = await query(
+        'SELECT COALESCE(SUM(predicted_hours), 0) as total_predicted_hours FROM project_phases WHERE project_id = $1',
+        [projectId]
+      );
+
+      const totalPredictedHours = parseInt(totalResult.rows[0].total_predicted_hours) || 0;
+
+      // Update project's predicted_hours
+      await query(
+        'UPDATE projects SET predicted_hours = $1, updated_at = NOW() WHERE id = $2',
+        [totalPredictedHours, projectId]
+      );
+    }
+
     res.status(200).json({
       success: true,
       message: 'Phase updated successfully',
@@ -227,12 +259,27 @@ export const deletePhase = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    const projectId = phase.project_id;
+
     // Delete phase
     await query('DELETE FROM project_phases WHERE id = $1', [phaseId]);
 
     await query(
       'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',
       ['project_phases', phaseId, 'DELETE', authReq.user.id, `Phase "${phase.phase_name}" deleted`]
+    );
+
+    // Recalculate project's total predicted_hours after deleting phase
+    const totalResult = await query(
+      'SELECT COALESCE(SUM(predicted_hours), 0) as total_predicted_hours FROM project_phases WHERE project_id = $1',
+      [projectId]
+    );
+
+    const totalPredictedHours = parseInt(totalResult.rows[0].total_predicted_hours) || 0;
+
+    await query(
+      'UPDATE projects SET predicted_hours = $1, updated_at = NOW() WHERE id = $2',
+      [totalPredictedHours, projectId]
     );
 
     res.status(200).json({
@@ -316,6 +363,23 @@ export const updatePhaseHistorical = async (req: Request, res: Response): Promis
       WHERE id = $${paramIndex}
       RETURNING *
     `, updateValues);
+
+    // If predicted_hours was updated, recalculate project's total predicted_hours
+    if (updates.predicted_hours !== undefined) {
+      const projectId = result.rows[0].project_id;
+
+      const totalResult = await query(
+        'SELECT COALESCE(SUM(predicted_hours), 0) as total_predicted_hours FROM project_phases WHERE project_id = $1',
+        [projectId]
+      );
+
+      const totalPredictedHours = parseInt(totalResult.rows[0].total_predicted_hours) || 0;
+
+      await query(
+        'UPDATE projects SET predicted_hours = $1, updated_at = NOW() WHERE id = $2',
+        [totalPredictedHours, projectId]
+      );
+    }
 
     res.status(200).json({
       success: true,
