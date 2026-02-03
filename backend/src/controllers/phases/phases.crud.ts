@@ -103,17 +103,21 @@ export const createPhase = async (req: Request, res: Response): Promise<void> =>
       ['project_phases', result.rows[0].id, 'CREATE', authReq.user.id, `Custom phase "${phase_name}" created`]
     );
 
-    // Recalculate project's total predicted_hours after adding new phase
+    // Recalculate project's totals after adding new phase
     const totalResult = await query(
-      'SELECT COALESCE(SUM(predicted_hours), 0) as total_predicted_hours FROM project_phases WHERE project_id = $1',
+      `SELECT
+        COALESCE(SUM(predicted_hours), 0) as total_predicted_hours,
+        COALESCE(SUM(planned_weeks), 0) as total_planned_weeks
+       FROM project_phases WHERE project_id = $1`,
       [projectId]
     );
 
     const totalPredictedHours = parseInt(totalResult.rows[0].total_predicted_hours) || 0;
+    const totalPlannedWeeks = parseInt(totalResult.rows[0].total_planned_weeks) || 0;
 
     await query(
-      'UPDATE projects SET predicted_hours = $1, updated_at = NOW() WHERE id = $2',
-      [totalPredictedHours, projectId]
+      'UPDATE projects SET predicted_hours = $1, planned_total_weeks = $2, updated_at = NOW() WHERE id = $3',
+      [totalPredictedHours, totalPlannedWeeks, projectId]
     );
 
     res.status(201).json({
@@ -191,22 +195,26 @@ export const updatePhase = async (req: Request, res: Response): Promise<void> =>
       ['project_phases', phaseId, 'UPDATE', authReq.user.id, `Phase updated: ${Object.keys(updates).join(', ')}`]
     );
 
-    // If predicted_hours was updated, recalculate project's total predicted_hours
-    if (updates.predicted_hours !== undefined) {
+    // If predicted_hours or planned_weeks was updated, recalculate project totals
+    if (updates.predicted_hours !== undefined || updates.planned_weeks !== undefined) {
       const projectId = result.rows[0].project_id;
 
-      // Calculate sum of all phases' predicted_hours for this project
+      // Calculate sum of all phases' predicted_hours and planned_weeks
       const totalResult = await query(
-        'SELECT COALESCE(SUM(predicted_hours), 0) as total_predicted_hours FROM project_phases WHERE project_id = $1',
+        `SELECT
+          COALESCE(SUM(predicted_hours), 0) as total_predicted_hours,
+          COALESCE(SUM(planned_weeks), 0) as total_planned_weeks
+         FROM project_phases WHERE project_id = $1`,
         [projectId]
       );
 
       const totalPredictedHours = parseInt(totalResult.rows[0].total_predicted_hours) || 0;
+      const totalPlannedWeeks = parseInt(totalResult.rows[0].total_planned_weeks) || 0;
 
-      // Update project's predicted_hours
+      // Update project's totals
       await query(
-        'UPDATE projects SET predicted_hours = $1, updated_at = NOW() WHERE id = $2',
-        [totalPredictedHours, projectId]
+        'UPDATE projects SET predicted_hours = $1, planned_total_weeks = $2, updated_at = NOW() WHERE id = $3',
+        [totalPredictedHours, totalPlannedWeeks, projectId]
       );
     }
 
@@ -269,17 +277,21 @@ export const deletePhase = async (req: Request, res: Response): Promise<void> =>
       ['project_phases', phaseId, 'DELETE', authReq.user.id, `Phase "${phase.phase_name}" deleted`]
     );
 
-    // Recalculate project's total predicted_hours after deleting phase
+    // Recalculate project's totals after deleting phase
     const totalResult = await query(
-      'SELECT COALESCE(SUM(predicted_hours), 0) as total_predicted_hours FROM project_phases WHERE project_id = $1',
+      `SELECT
+        COALESCE(SUM(predicted_hours), 0) as total_predicted_hours,
+        COALESCE(SUM(planned_weeks), 0) as total_planned_weeks
+       FROM project_phases WHERE project_id = $1`,
       [projectId]
     );
 
     const totalPredictedHours = parseInt(totalResult.rows[0].total_predicted_hours) || 0;
+    const totalPlannedWeeks = parseInt(totalResult.rows[0].total_planned_weeks) || 0;
 
     await query(
-      'UPDATE projects SET predicted_hours = $1, updated_at = NOW() WHERE id = $2',
-      [totalPredictedHours, projectId]
+      'UPDATE projects SET predicted_hours = $1, planned_total_weeks = $2, updated_at = NOW() WHERE id = $3',
+      [totalPredictedHours, totalPlannedWeeks, projectId]
     );
 
     res.status(200).json({
@@ -364,20 +376,24 @@ export const updatePhaseHistorical = async (req: Request, res: Response): Promis
       RETURNING *
     `, updateValues);
 
-    // If predicted_hours was updated, recalculate project's total predicted_hours
-    if (updates.predicted_hours !== undefined) {
+    // If predicted_hours or planned_weeks was updated, recalculate project totals
+    if (updates.predicted_hours !== undefined || updates.planned_weeks !== undefined) {
       const projectId = result.rows[0].project_id;
 
       const totalResult = await query(
-        'SELECT COALESCE(SUM(predicted_hours), 0) as total_predicted_hours FROM project_phases WHERE project_id = $1',
+        `SELECT
+          COALESCE(SUM(predicted_hours), 0) as total_predicted_hours,
+          COALESCE(SUM(planned_weeks), 0) as total_planned_weeks
+         FROM project_phases WHERE project_id = $1`,
         [projectId]
       );
 
       const totalPredictedHours = parseInt(totalResult.rows[0].total_predicted_hours) || 0;
+      const totalPlannedWeeks = parseInt(totalResult.rows[0].total_planned_weeks) || 0;
 
       await query(
-        'UPDATE projects SET predicted_hours = $1, updated_at = NOW() WHERE id = $2',
-        [totalPredictedHours, projectId]
+        'UPDATE projects SET predicted_hours = $1, planned_total_weeks = $2, updated_at = NOW() WHERE id = $3',
+        [totalPredictedHours, totalPlannedWeeks, projectId]
       );
     }
 
