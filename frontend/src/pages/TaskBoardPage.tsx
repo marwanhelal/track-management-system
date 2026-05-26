@@ -92,8 +92,9 @@ const CreateTaskDialog: React.FC<{
   const loadEngineers = async (projectId: string) => {
     setLoading(true);
     try {
-      const res = await apiService.getMyTeam(parseInt(projectId));
-      setEngineers(res.data?.members || res.data || []);
+      const res = await apiService.getMyTeam();
+      const all: any[] = res.data?.memberships || [];
+      setEngineers(all.filter(m => String(m.project_id) === projectId));
     } finally {
       setLoading(false);
     }
@@ -425,7 +426,7 @@ const TaskBoardPage: React.FC = () => {
     setError(null);
     try {
       const res = await apiService.getTaskAssignments();
-      setTasks(res.data?.tasks || res.data || []);
+      setTasks(Array.isArray(res.data?.tasks) ? res.data.tasks : []);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load tasks');
     } finally {
