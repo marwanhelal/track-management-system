@@ -100,11 +100,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   ];
 
   const teamLeaderNav = [
-    { text: 'Dashboard',   icon: <Dashboard />,    path: '/dashboard' },
-    { text: 'My Team',     icon: <Groups />,       path: '/my-team' },
-    { text: 'Task Board',  icon: <ViewKanban />,   path: '/task-board' },
-    { text: 'Projects',    icon: <Assignment />,   path: '/projects' },
-    { text: 'My Work Logs',icon: <AccessTime />,   path: '/my-work-logs' },
+    { text: 'Dashboard',      icon: <Dashboard />,    path: '/dashboard' },
+    { text: 'My Team',        icon: <Groups />,       path: '/my-team' },
+    { text: 'Task Board',     icon: <ViewKanban />,   path: '/task-board' },
+    { text: 'Projects',       icon: <Assignment />,   path: '/projects' },
+    { text: 'Time Tracking',  icon: <AccessTime />,   path: '/time-tracking' },
+    { text: 'My Work Logs',   icon: <AccessTime />,   path: '/my-work-logs' },
   ];
 
   const engineerNav = [

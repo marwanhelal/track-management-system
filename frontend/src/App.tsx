@@ -129,7 +129,7 @@ function App() {
                 <Route
                   path="/time-tracking"
                   element={
-                    <ProtectedRoute requireRole="engineer">
+                    <ProtectedRoute requireRole={["engineer", "team_leader"]}>
                       <AppLayout>
                         <Suspense fallback={<PageLoader />}>
                           <TimeTrackingPage />
@@ -142,7 +142,7 @@ function App() {
                 <Route
                   path="/my-work-logs"
                   element={
-                    <ProtectedRoute requireRole="engineer">
+                    <ProtectedRoute requireRole={["engineer", "team_leader"]}>
                       <AppLayout>
                         <Suspense fallback={<PageLoader />}>
                           <MyWorkLogsPage />
