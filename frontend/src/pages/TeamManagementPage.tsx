@@ -53,7 +53,7 @@ interface User {
   id: number;
   name: string;
   email: string;
-  role: 'supervisor' | 'engineer' | 'administrator';
+  role: 'supervisor' | 'engineer' | 'administrator' | 'team_leader';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -86,6 +86,16 @@ interface TeamManagementState {
     errors: Record<string, string>;
   };
   createAdministratorDialog: {
+    open: boolean;
+    loading: boolean;
+    formData: {
+      name: string;
+      email: string;
+      password: string;
+    };
+    errors: Record<string, string>;
+  };
+  createTeamLeaderDialog: {
     open: boolean;
     loading: boolean;
     formData: {
@@ -158,6 +168,16 @@ const TeamManagementPage: React.FC = () => {
       errors: {}
     },
     createAdministratorDialog: {
+      open: false,
+      loading: false,
+      formData: {
+        name: '',
+        email: '',
+        password: ''
+      },
+      errors: {}
+    },
+    createTeamLeaderDialog: {
       open: false,
       loading: false,
       formData: {
@@ -472,6 +492,56 @@ const TeamManagementPage: React.FC = () => {
           loading: false,
           errors: { general: 'Failed to create administrator account' }
         }
+      }));
+    }
+  };
+
+  const handleCreateTeamLeader = () => {
+    setState(prev => ({
+      ...prev,
+      createTeamLeaderDialog: {
+        ...prev.createTeamLeaderDialog,
+        open: true,
+        formData: { name: '', email: '', password: '' },
+        errors: {}
+      }
+    }));
+  };
+
+  const handleCreateTeamLeaderSubmit = async () => {
+    const { formData } = state.createTeamLeaderDialog;
+    const errors: Record<string, string> = {};
+
+    if (!formData.name.trim()) errors.name = 'Name is required';
+    if (!formData.email.trim()) errors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Please enter a valid email address';
+    if (!formData.password.trim()) errors.password = 'Password is required';
+    else if (formData.password.length < 8) errors.password = 'Password must be at least 8 characters long';
+
+    if (Object.keys(errors).length > 0) {
+      setState(prev => ({ ...prev, createTeamLeaderDialog: { ...prev.createTeamLeaderDialog, errors } }));
+      return;
+    }
+
+    try {
+      setState(prev => ({ ...prev, createTeamLeaderDialog: { ...prev.createTeamLeaderDialog, loading: true, errors: {} } }));
+      const response = await apiService.createTeamLeader(formData);
+      if (response.success) {
+        setState(prev => ({
+          ...prev,
+          createTeamLeaderDialog: { open: false, loading: false, formData: { name: '', email: '', password: '' }, errors: {} }
+        }));
+        await fetchUsers();
+      } else {
+        setState(prev => ({
+          ...prev,
+          createTeamLeaderDialog: { ...prev.createTeamLeaderDialog, loading: false, errors: { general: response.error || 'Failed to create team leader account' } }
+        }));
+      }
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        createTeamLeaderDialog: { ...prev.createTeamLeaderDialog, loading: false, errors: { general: 'Failed to create team leader account' } }
       }));
     }
   };
@@ -1096,6 +1166,14 @@ const TeamManagementPage: React.FC = () => {
           <Button
             variant="contained"
             startIcon={<PersonAddIcon />}
+            onClick={handleCreateTeamLeader}
+            sx={{ bgcolor: '#00897b', '&:hover': { bgcolor: '#00695c' } }}
+          >
+            Add Team Leader
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<PersonAddIcon />}
             onClick={handleCreateEngineer}
           >
             Add Engineer
@@ -1409,6 +1487,50 @@ const TeamManagementPage: React.FC = () => {
             disabled={state.createDialog.loading}
           >
             Create Engineer
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Team Leader Dialog */}
+      <Dialog open={state.createTeamLeaderDialog.open} onClose={() => setState(prev => ({ ...prev, createTeamLeaderDialog: { ...prev.createTeamLeaderDialog, open: false } }))}>
+        <DialogTitle>Create Team Leader Account</DialogTitle>
+        <DialogContent>
+          {state.createTeamLeaderDialog.errors.general && (
+            <Alert severity="error" sx={{ mb: 2 }}>{state.createTeamLeaderDialog.errors.general}</Alert>
+          )}
+          <TextField
+            autoFocus margin="dense" label="Full Name" fullWidth variant="outlined"
+            value={state.createTeamLeaderDialog.formData.name}
+            onChange={e => setState(prev => ({ ...prev, createTeamLeaderDialog: { ...prev.createTeamLeaderDialog, formData: { ...prev.createTeamLeaderDialog.formData, name: e.target.value } } }))}
+            error={!!state.createTeamLeaderDialog.errors.name}
+            helperText={state.createTeamLeaderDialog.errors.name}
+          />
+          <TextField
+            margin="dense" label="Email Address" type="email" fullWidth variant="outlined"
+            value={state.createTeamLeaderDialog.formData.email}
+            onChange={e => setState(prev => ({ ...prev, createTeamLeaderDialog: { ...prev.createTeamLeaderDialog, formData: { ...prev.createTeamLeaderDialog.formData, email: e.target.value } } }))}
+            error={!!state.createTeamLeaderDialog.errors.email}
+            helperText={state.createTeamLeaderDialog.errors.email}
+          />
+          <TextField
+            margin="dense" label="Password" type="password" fullWidth variant="outlined"
+            value={state.createTeamLeaderDialog.formData.password}
+            onChange={e => setState(prev => ({ ...prev, createTeamLeaderDialog: { ...prev.createTeamLeaderDialog, formData: { ...prev.createTeamLeaderDialog.formData, password: e.target.value } } }))}
+            error={!!state.createTeamLeaderDialog.errors.password}
+            helperText={state.createTeamLeaderDialog.errors.password || 'Minimum 8 characters'}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setState(prev => ({ ...prev, createTeamLeaderDialog: { ...prev.createTeamLeaderDialog, open: false } }))}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreateTeamLeaderSubmit}
+            variant="contained"
+            disabled={state.createTeamLeaderDialog.loading}
+            sx={{ bgcolor: '#00897b', '&:hover': { bgcolor: '#00695c' } }}
+          >
+            Create Team Leader
           </Button>
         </DialogActions>
       </Dialog>

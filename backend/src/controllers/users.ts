@@ -366,6 +366,62 @@ export const createEngineer = async (req: Request, res: Response): Promise<void>
   }
 };
 
+// Create new team leader (supervisor only)
+export const createTeamLeader = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    if (authReq.user.role !== 'supervisor') {
+      res.status(403).json({ success: false, error: 'Only supervisors can create team leader accounts' });
+      return;
+    }
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({ success: false, error: 'Validation failed', details: errors.array() });
+      return;
+    }
+
+    const { name, email, password }: RegisterInput = req.body;
+
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.isValid) {
+      res.status(400).json({ success: false, error: 'Password does not meet requirements', details: passwordValidation.errors });
+      return;
+    }
+
+    const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      res.status(409).json({ success: false, error: 'User with this email already exists' });
+      return;
+    }
+
+    const passwordHash = await hashPassword(password);
+
+    const userResult = await query(
+      `INSERT INTO users (name, email, password_hash, role)
+       VALUES ($1, $2, $3, 'team_leader')
+       RETURNING id, name, email, role, is_active, created_at`,
+      [name, email, passwordHash]
+    );
+
+    const user = userResult.rows[0];
+
+    await query(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',
+      ['users', user.id, 'CREATE_TEAM_LEADER', authReq.user.id, `Team leader account created for: ${email}`]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Team leader account created successfully',
+      data: { user: { id: user.id, name: user.name, email: user.email, role: user.role, is_active: user.is_active, created_at: user.created_at, updated_at: user.created_at } }
+    });
+  } catch (error) {
+    console.error('Create team leader error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error during team leader creation' });
+  }
+};
+
 // Update user
 export const updateUser = async (req: Request, res: Response): Promise<void> => {
   const authReq = req as any;

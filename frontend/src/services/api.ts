@@ -449,6 +449,11 @@ class ApiService {
     return response.data;
   }
 
+  async createTeamLeader(userData: { name: string; email: string; password: string }): Promise<ApiResponse<{ user: any }>> {
+    const response = await this.api.post('/users/team-leaders', userData);
+    return response.data;
+  }
+
   // Check if current user is super admin
   isSuperAdmin(): boolean {
     const userStr = sessionStorage.getItem('user');

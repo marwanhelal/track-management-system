@@ -5,6 +5,7 @@ import {
   createEngineer,
   createSupervisor,
   createAdministrator,
+  createTeamLeader,
   updateUser,
   deactivateUser,
   deleteUser,
@@ -42,6 +43,9 @@ router.post('/supervisors', superAdminOnly, validateEngineerCreation, handleVali
 
 // Create administrator (super admin only)
 router.post('/administrators', superAdminOnly, validateEngineerCreation, handleValidationErrors, createAdministrator);
+
+// Create team leader (supervisor only)
+router.post('/team-leaders', supervisorOnly, validateEngineerCreation, handleValidationErrors, createTeamLeader);
 
 // Update user
 router.put('/:id', validateIdParam, validateUserUpdate, updateUser);
