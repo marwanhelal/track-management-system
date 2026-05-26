@@ -17,17 +17,15 @@ import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
 
 interface TeamMember {
-  id: number;
-  membership_id: number;
+  id: number;        // membership id (tm.id)
   engineer_id: number;
   engineer_name: string;
   engineer_email: string;
   project_id: number;
   project_name: string;
+  is_active?: boolean;
   active_tasks?: number;
-  total_tasks?: number;
-  logged_hours?: number;
-  completed_tasks?: number;
+  total_hours_logged?: number;
 }
 
 interface AddEngineerDialogProps {
@@ -164,10 +162,7 @@ const EngineerCard: React.FC<{
   isRemoving: boolean;
 }> = ({ member, onViewTasks, onRemove, isRemoving }) => {
   const activeTasks = member.active_tasks || 0;
-  const totalTasks = member.total_tasks || 0;
-  const completedTasks = member.completed_tasks || 0;
-  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const loggedHours = member.logged_hours || 0;
+  const loggedHours = member.total_hours_logged || 0;
 
   return (
     <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -213,9 +208,7 @@ const EngineerCard: React.FC<{
         <Grid container spacing={1.5} sx={{ mb: 2 }}>
           {[
             { label: 'Active Tasks', value: activeTasks, color: 'primary.main' },
-            { label: 'Completed', value: completedTasks, color: 'success.main' },
             { label: 'Hours Logged', value: `${loggedHours}h`, color: 'text.primary' },
-            { label: 'Success Rate', value: `${completionRate}%`, color: completionRate >= 80 ? 'success.main' : completionRate >= 50 ? 'warning.main' : 'error.main' },
           ].map(({ label, value, color }) => (
             <Grid item xs={6} key={label}>
               <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'action.hover', borderRadius: 2 }}>
@@ -225,22 +218,6 @@ const EngineerCard: React.FC<{
             </Grid>
           ))}
         </Grid>
-
-        {/* Completion bar */}
-        {totalTasks > 0 && (
-          <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="caption" color="text.secondary">Task completion</Typography>
-              <Typography variant="caption" fontWeight={600}>{completionRate}%</Typography>
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={completionRate}
-              color={completionRate >= 80 ? 'success' : completionRate >= 50 ? 'warning' : 'error'}
-              sx={{ height: 5, borderRadius: 3, bgcolor: 'rgba(0,0,0,0.08)' }}
-            />
-          </Box>
-        )}
       </CardContent>
 
       {/* Actions */}
@@ -288,7 +265,7 @@ const MyTeamPage: React.FC = () => {
     setError(null);
     try {
       const res = await apiService.getMyTeam();
-      setMembers(res.data?.members || res.data || []);
+      setMembers(res.data?.memberships || []);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load team');
     } finally {
@@ -322,8 +299,7 @@ const MyTeamPage: React.FC = () => {
   });
 
   const totalActiveTasks = members.reduce((sum, m) => sum + (m.active_tasks || 0), 0);
-  const totalLoggedHours = members.reduce((sum, m) => sum + (m.logged_hours || 0), 0);
-  const totalCompleted = members.reduce((sum, m) => sum + (m.completed_tasks || 0), 0);
+  const totalLoggedHours = members.reduce((sum, m) => sum + (m.total_hours_logged || 0), 0);
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
@@ -349,9 +325,8 @@ const MyTeamPage: React.FC = () => {
           { label: 'Team Size', value: members.length, color: 'primary.main', icon: <Person /> },
           { label: 'Active Tasks', value: totalActiveTasks, color: 'info.main', icon: <Assignment /> },
           { label: 'Hours Logged', value: `${totalLoggedHours}h`, color: 'text.primary', icon: <AccessTime /> },
-          { label: 'Completed', value: totalCompleted, color: 'success.main', icon: <CheckCircle /> },
         ].map(({ label, value, color, icon }) => (
-          <Grid item xs={6} sm={3} key={label}>
+          <Grid item xs={12} sm={4} key={label}>
             <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
@@ -407,12 +382,12 @@ const MyTeamPage: React.FC = () => {
       ) : (
         <Grid container spacing={2}>
           {filteredMembers.map(member => (
-            <Grid item xs={12} sm={6} md={4} key={member.membership_id}>
+            <Grid item xs={12} sm={6} md={4} key={member.id}>
               <EngineerCard
                 member={member}
                 onViewTasks={() => navigate(`/task-board?engineer=${member.engineer_id}`)}
-                onRemove={() => handleRemove(member.membership_id, member.engineer_name)}
-                isRemoving={removingId === member.membership_id}
+                onRemove={() => handleRemove(member.id, member.engineer_name)}
+                isRemoving={removingId === member.id}
               />
             </Grid>
           ))}
