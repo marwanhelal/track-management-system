@@ -36,6 +36,7 @@ export const getMyTeam = async (req: Request, res: Response): Promise<void> => {
               ON wl.engineer_id = tm.engineer_id
              AND wl.project_id  = tm.project_id
        WHERE tm.team_leader_id = $1
+         AND tm.is_active = true
        GROUP BY tm.id, u.name, u.email, p.name
        ORDER BY u.name, p.name`,
       [authReq.user.id]
