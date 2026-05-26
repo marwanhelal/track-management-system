@@ -44,7 +44,10 @@ import {
   Search as SearchIcon,
   FilterList as FilterListIcon,
   Clear as ClearIcon,
-  Visibility as VisibilityIcon
+  Visibility as VisibilityIcon,
+  SwapHoriz as SwapHorizIcon,
+  Engineering as EngineeringIcon,
+  SupervisorAccount as SupervisorAccountIcon
 } from '@mui/icons-material';
 import { apiService } from '../services/api';
 import EngineerDetailsDialog from '../components/team-management/EngineerDetailsDialog';
@@ -133,6 +136,13 @@ interface TeamManagementState {
     open: boolean;
     user: User | null;
   };
+  changeRoleDialog: {
+    open: boolean;
+    loading: boolean;
+    user: User | null;
+    selectedRole: string;
+    error: string | null;
+  };
   filters: {
     role: string;
     status: string;
@@ -214,6 +224,13 @@ const TeamManagementPage: React.FC = () => {
     detailsDialog: {
       open: false,
       user: null
+    },
+    changeRoleDialog: {
+      open: false,
+      loading: false,
+      user: null,
+      selectedRole: '',
+      error: null
     },
     filters: {
       role: 'all',
@@ -768,6 +785,42 @@ const TeamManagementPage: React.FC = () => {
     }));
   };
 
+  const handleChangeRole = (user: User) => {
+    setState(prev => ({
+      ...prev,
+      changeRoleDialog: {
+        open: true,
+        loading: false,
+        user,
+        selectedRole: user.role,
+        error: null
+      },
+      actionMenuAnchor: null,
+      selectedUser: null
+    }));
+  };
+
+  const handleChangeRoleSubmit = async () => {
+    const { user, selectedRole } = state.changeRoleDialog;
+    if (!user) return;
+    if (selectedRole === user.role) {
+      setState(prev => ({ ...prev, changeRoleDialog: { ...prev.changeRoleDialog, error: 'Please select a different role.' } }));
+      return;
+    }
+    try {
+      setState(prev => ({ ...prev, changeRoleDialog: { ...prev.changeRoleDialog, loading: true, error: null } }));
+      const response = await apiService.changeUserRole(user.id, selectedRole);
+      if (response.success) {
+        setState(prev => ({ ...prev, changeRoleDialog: { open: false, loading: false, user: null, selectedRole: '', error: null } }));
+        await fetchUsers();
+      } else {
+        setState(prev => ({ ...prev, changeRoleDialog: { ...prev.changeRoleDialog, loading: false, error: response.error || 'Failed to change role' } }));
+      }
+    } catch {
+      setState(prev => ({ ...prev, changeRoleDialog: { ...prev.changeRoleDialog, loading: false, error: 'Failed to change role' } }));
+    }
+  };
+
   const handleExportReport = () => {
     setState(prev => ({
       ...prev,
@@ -1272,6 +1325,7 @@ const TeamManagementPage: React.FC = () => {
             >
               <MenuItem value="all">All Roles</MenuItem>
               <MenuItem value="engineer">Engineer</MenuItem>
+              <MenuItem value="team_leader">Team Leader</MenuItem>
               <MenuItem value="supervisor">Supervisor</MenuItem>
               <MenuItem value="administrator">Administrator</MenuItem>
             </Select>
@@ -1378,6 +1432,12 @@ const TeamManagementPage: React.FC = () => {
           <EditIcon sx={{ mr: 1 }} />
           Edit
         </MenuItem>
+        {state.selectedUser && (state.selectedUser.role === 'engineer' || state.selectedUser.role === 'team_leader') && (
+          <MenuItem onClick={() => state.selectedUser && handleChangeRole(state.selectedUser)}>
+            <SwapHorizIcon sx={{ mr: 1 }} />
+            Change Role
+          </MenuItem>
+        )}
         {state.selectedUser && !state.selectedUser.is_active && (
           <MenuItem onClick={() => state.selectedUser && handleReactivateUser(state.selectedUser)}>
             <CheckCircleIcon sx={{ mr: 1 }} />
@@ -1909,6 +1969,95 @@ const TeamManagementPage: React.FC = () => {
             disabled={state.exportDialog.loading}
           >
             Export
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Change Role Dialog */}
+      <Dialog
+        open={state.changeRoleDialog.open}
+        onClose={() => setState(prev => ({ ...prev, changeRoleDialog: { ...prev.changeRoleDialog, open: false } }))}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <SwapHorizIcon />
+            Change Role — {state.changeRoleDialog.user?.name}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {state.changeRoleDialog.error && (
+            <Alert severity="error" sx={{ mb: 2 }}>{state.changeRoleDialog.error}</Alert>
+          )}
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Current role: <strong style={{ textTransform: 'capitalize' }}>{state.changeRoleDialog.user?.role?.replace('_', ' ')}</strong>. Select the new role below.
+          </Typography>
+          <Box display="flex" flexDirection="column" gap={2}>
+            {/* Engineer card */}
+            <Box
+              onClick={() => setState(prev => ({ ...prev, changeRoleDialog: { ...prev.changeRoleDialog, selectedRole: 'engineer' } }))}
+              sx={{
+                p: 2,
+                border: state.changeRoleDialog.selectedRole === 'engineer' ? '2px solid' : '1px solid',
+                borderColor: state.changeRoleDialog.selectedRole === 'engineer' ? 'primary.main' : 'divider',
+                borderRadius: 2,
+                cursor: 'pointer',
+                bgcolor: state.changeRoleDialog.selectedRole === 'engineer' ? 'action.selected' : 'background.paper',
+                '&:hover': { bgcolor: 'action.hover' },
+                position: 'relative'
+              }}
+            >
+              <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                <EngineeringIcon color={state.changeRoleDialog.selectedRole === 'engineer' ? 'primary' : 'action'} />
+                <Typography variant="subtitle1" fontWeight="medium">Engineer</Typography>
+                {state.changeRoleDialog.user?.role === 'engineer' && (
+                  <Chip label="Current" size="small" sx={{ ml: 'auto' }} />
+                )}
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Logs work hours, completes assigned tasks, reports blockers, and uploads resources. Can view their own project progress and performance stats.
+              </Typography>
+            </Box>
+
+            {/* Team Leader card */}
+            <Box
+              onClick={() => setState(prev => ({ ...prev, changeRoleDialog: { ...prev.changeRoleDialog, selectedRole: 'team_leader' } }))}
+              sx={{
+                p: 2,
+                border: state.changeRoleDialog.selectedRole === 'team_leader' ? '2px solid' : '1px solid',
+                borderColor: state.changeRoleDialog.selectedRole === 'team_leader' ? 'teal' : 'divider',
+                borderRadius: 2,
+                cursor: 'pointer',
+                bgcolor: state.changeRoleDialog.selectedRole === 'team_leader' ? 'rgba(0,137,123,0.08)' : 'background.paper',
+                '&:hover': { bgcolor: 'action.hover' },
+                position: 'relative'
+              }}
+            >
+              <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                <SupervisorAccountIcon sx={{ color: state.changeRoleDialog.selectedRole === 'team_leader' ? 'teal' : 'action.active' }} />
+                <Typography variant="subtitle1" fontWeight="medium">Team Leader</Typography>
+                {state.changeRoleDialog.user?.role === 'team_leader' && (
+                  <Chip label="Current" size="small" sx={{ ml: 'auto' }} />
+                )}
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Manages a team of engineers across projects. Can assign tasks with milestones, review submitted work, resolve blockers, and track team performance on the task board.
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setState(prev => ({ ...prev, changeRoleDialog: { ...prev.changeRoleDialog, open: false } }))}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleChangeRoleSubmit}
+            variant="contained"
+            disabled={state.changeRoleDialog.loading || state.changeRoleDialog.selectedRole === state.changeRoleDialog.user?.role}
+            startIcon={<SwapHorizIcon />}
+          >
+            {state.changeRoleDialog.loading ? 'Changing...' : 'Confirm Change'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -10,7 +10,8 @@ import {
   deactivateUser,
   deleteUser,
   reactivateUser,
-  getUserProjectBreakdown
+  getUserProjectBreakdown,
+  changeUserRole
 } from '@/controllers/users';
 import { authenticate, supervisorOnly, superAdminOnly, viewerAccess } from '@/middleware/auth';
 import {
@@ -58,5 +59,8 @@ router.delete('/:id', supervisorOnly, validateIdParam, deleteUser);
 
 // Reactivate user (supervisor only)
 router.post('/:id/reactivate', supervisorOnly, validateIdParam, reactivateUser);
+
+// Change user role (supervisor only)
+router.patch('/:id/role', supervisorOnly, validateIdParam, changeUserRole);
 
 export default router;

@@ -526,6 +526,65 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
+// Change user role (supervisor only)
+export const changeUserRole = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const { id } = req.params;
+    const { role: newRole } = req.body;
+
+    if (authReq.user.role !== 'supervisor') {
+      res.status(403).json({ success: false, error: 'Only supervisors can change user roles' });
+      return;
+    }
+
+    // Prevent changing own role
+    if (authReq.user.id === parseInt(id as string)) {
+      res.status(400).json({ success: false, error: 'You cannot change your own role' });
+      return;
+    }
+
+    const allowedRoles = ['engineer', 'team_leader'];
+    if (!allowedRoles.includes(newRole)) {
+      res.status(400).json({ success: false, error: `Role must be one of: ${allowedRoles.join(', ')}` });
+      return;
+    }
+
+    const existing = await query('SELECT id, name, email, role FROM users WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    const user = existing.rows[0];
+    if (user.role === newRole) {
+      res.status(400).json({ success: false, error: `User is already a ${newRole.replace('_', ' ')}` });
+      return;
+    }
+
+    const result = await query(
+      `UPDATE users SET role = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, name, email, role, is_active, created_at, updated_at`,
+      [newRole, id]
+    );
+
+    await query(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',
+      ['users', id, 'ROLE_CHANGE', authReq.user.id, `Role changed from ${user.role} to ${newRole} for: ${user.email}`]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Role changed to ${newRole.replace('_', ' ')} successfully`,
+      data: { user: result.rows[0] }
+    });
+  } catch (error) {
+    console.error('Change role error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // Deactivate user (soft delete)
 export const deactivateUser = async (req: Request, res: Response): Promise<void> => {
   const authReq = req as any;

@@ -454,6 +454,11 @@ class ApiService {
     return response.data;
   }
 
+  async changeUserRole(userId: number, role: string): Promise<ApiResponse<{ user: any }>> {
+    const response = await this.api.patch(`/users/${userId}/role`, { role });
+    return response.data;
+  }
+
   // Check if current user is super admin
   isSuperAdmin(): boolean {
     const userStr = sessionStorage.getItem('user');
