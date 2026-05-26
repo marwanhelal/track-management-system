@@ -174,11 +174,29 @@ const TimeTrackingPage: React.FC = () => {
     try {
       setLoading(true);
 
-      // Fetch projects
-      const projectsResponse = await apiService.getProjects();
-      if (projectsResponse.success && projectsResponse.data) {
-        setProjects(projectsResponse.data.projects);
+      // Build accessible project list based on role
+      let accessibleProjects: Project[] = [];
+
+      if (user?.role === 'team_leader') {
+        // Team leaders: get projects from their team memberships
+        const teamRes = await apiService.getMyTeam();
+        const memberships: any[] = teamRes.data?.memberships || [];
+        const projectMap = new Map<number, Project>();
+        memberships.forEach((m: any) => {
+          if (!projectMap.has(m.project_id)) {
+            projectMap.set(m.project_id, { id: m.project_id, name: m.project_name, status: 'active' });
+          }
+        });
+        accessibleProjects = Array.from(projectMap.values());
+      } else {
+        // Supervisors/engineers: use the normal projects endpoint
+        const projectsResponse = await apiService.getProjects();
+        if (projectsResponse.success && projectsResponse.data) {
+          accessibleProjects = projectsResponse.data.projects;
+        }
       }
+
+      setProjects(accessibleProjects);
 
       // Fetch work logs with filters
       const filters = {
@@ -192,30 +210,27 @@ const TimeTrackingPage: React.FC = () => {
         setWorkLogs(workLogsResponse.data.workLogs);
       }
 
-      // Get all phases for active projects (in parallel for better performance)
+      // Fetch phases only for accessible projects
       const allPhases: ProjectPhase[] = [];
-      if (projectsResponse.success && projectsResponse.data) {
-        const phasePromises = projectsResponse.data.projects.map(async (project) => {
-          try {
-            const phasesResponse = await apiService.getProjectPhases(project.id);
-            if (phasesResponse.success && phasesResponse.data) {
-              return phasesResponse.data.phases.map(phase => ({
-                ...phase,
-                project_name: project.name
-              }));
-            }
-          } catch (err) {
-            // Continue if phases fetch fails for a project
-            return [];
+      const phasePromises = accessibleProjects.map(async (project) => {
+        try {
+          const phasesResponse = await apiService.getProjectPhases(project.id);
+          if (phasesResponse.success && phasesResponse.data) {
+            return phasesResponse.data.phases.map((phase: any) => ({
+              ...phase,
+              project_name: project.name
+            }));
           }
+        } catch {
           return [];
-        });
+        }
+        return [];
+      });
 
-        const phasesArrays = await Promise.all(phasePromises);
-        phasesArrays.forEach(phases => allPhases.push(...phases));
-      }
+      const phasesArrays = await Promise.all(phasePromises);
+      phasesArrays.forEach(phases => allPhases.push(...phases));
 
-      // Filter to only show phases that engineers can work on (unlocked phases)
+      // Show phases that can be worked on
       const workablePhases = allPhases.filter(phase =>
         ['ready', 'in_progress', 'submitted'].includes(phase.status)
       );
