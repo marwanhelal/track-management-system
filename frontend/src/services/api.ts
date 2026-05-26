@@ -830,8 +830,8 @@ class ApiService {
 
   async getAvailableEngineers(projectId: number, teamLeaderId?: number): Promise<ApiResponse<any>> {
     const url = teamLeaderId
-      ? `/team-memberships/available-engineers?projectId=${projectId}&teamLeaderId=${teamLeaderId}`
-      : `/team-memberships/available-engineers?projectId=${projectId}`;
+      ? `/team-memberships/available-engineers?project_id=${projectId}&team_leader_id=${teamLeaderId}`
+      : `/team-memberships/available-engineers?project_id=${projectId}`;
     const response = await this.api.get(url);
     return response.data;
   }

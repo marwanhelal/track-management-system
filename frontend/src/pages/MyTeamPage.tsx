@@ -66,7 +66,7 @@ const AddEngineerDialog: React.FC<AddEngineerDialogProps> = ({ open, onClose, on
     setLoading(true);
     try {
       const res = await apiService.getAvailableEngineers(parseInt(projectId));
-      setEngineers(res.data?.engineers || res.data || []);
+      setEngineers(res.data?.engineers || []);
     } finally {
       setLoading(false);
     }
