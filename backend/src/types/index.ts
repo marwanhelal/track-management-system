@@ -1,10 +1,13 @@
+// ─── Shared role type ────────────────────────────────────────
+export type UserRole = 'supervisor' | 'engineer' | 'administrator' | 'team_leader';
+
 // User Types
 export interface User {
   id: string;
   name: string;
   email: string;
   password_hash: string;
-  role: 'supervisor' | 'engineer' | 'administrator';
+  role: UserRole;
   job_description?: string;
   is_active: boolean;
   is_super_admin?: boolean;
@@ -16,7 +19,7 @@ export interface UserCreateInput {
   name: string;
   email: string;
   password: string;
-  role: 'supervisor' | 'engineer' | 'administrator';
+  role: UserRole;
   job_description?: string;
 }
 
@@ -229,7 +232,7 @@ export interface AuthTokens {
 export interface TokenPayload {
   userId: string;
   email: string;
-  role: 'supervisor' | 'engineer' | 'administrator';
+  role: UserRole;
   iat: number;
   exp: number;
 }
@@ -243,7 +246,7 @@ export interface RegisterInput {
   name: string;
   email: string;
   password: string;
-  role: 'supervisor' | 'engineer' | 'administrator';
+  role: UserRole;
   job_description?: string;
 }
 
@@ -551,8 +554,251 @@ export interface AuthenticatedRequest extends Express.Request {
   user?: {
     id: number;
     email: string;
-    role: 'supervisor' | 'engineer' | 'administrator';
+    role: UserRole;
   };
+}
+
+// ─────────────────────────────────────────────────────────────
+// TEAM LEADER SYSTEM TYPES
+// ─────────────────────────────────────────────────────────────
+
+export interface TeamMembership {
+  id: number;
+  team_leader_id: number;
+  engineer_id: number;
+  project_id: number;
+  assigned_by?: number;
+  is_active: boolean;
+  note?: string;
+  created_at: Date;
+  updated_at: Date;
+  // Joined fields
+  engineer_name?: string;
+  engineer_email?: string;
+  team_leader_name?: string;
+  project_name?: string;
+}
+
+export interface TeamMembershipCreateInput {
+  engineer_id: number;
+  project_id: number;
+  note?: string;
+}
+
+// ─── Task Assignment ─────────────────────────────────────────
+
+export type TaskStatus =
+  | 'assigned'
+  | 'in_progress'
+  | 'blocked'
+  | 'submitted'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled';
+
+export interface TaskAssignment {
+  id: number;
+  team_leader_id: number;
+  engineer_id: number;
+  project_id: number;
+  phase_id: number;
+  title: string;
+  description?: string;
+  allocated_hours: number;
+  deadline?: Date;
+  status: TaskStatus;
+  final_deliverable?: string;
+  submitted_at?: Date;
+  review_note?: string;
+  reviewed_at?: Date;
+  reviewed_by?: number;
+  created_at: Date;
+  updated_at: Date;
+  // View fields (from task_assignments_with_stats)
+  logged_hours?: number;
+  total_milestones?: number;
+  completed_milestones?: number;
+  overdue_milestones?: number;
+  has_active_blocker?: boolean;
+  engineer_name?: string;
+  engineer_email?: string;
+  team_leader_name?: string;
+  project_name?: string;
+  phase_name?: string;
+}
+
+export interface TaskAssignmentCreateInput {
+  engineer_id: number;
+  project_id: number;
+  phase_id: number;
+  title: string;
+  description?: string;
+  allocated_hours: number;
+  deadline?: string;
+  milestones?: TaskMilestoneCreateInput[];
+}
+
+export interface TaskAssignmentUpdateInput {
+  title?: string;
+  description?: string;
+  allocated_hours?: number;
+  deadline?: string;
+}
+
+export interface TaskSubmitInput {
+  final_deliverable: string;
+}
+
+export interface TaskReviewInput {
+  action: 'approve' | 'reject';
+  review_note?: string;
+}
+
+// ─── Task Milestone ──────────────────────────────────────────
+
+export type MilestoneStatus = 'pending' | 'completed' | 'overdue';
+
+export interface TaskMilestone {
+  id: number;
+  assignment_id: number;
+  title: string;
+  description?: string;
+  due_date: Date;
+  status: MilestoneStatus; // 'overdue' is computed, not stored
+  engineer_note?: string;
+  completed_at?: Date;
+  completed_by?: number;
+  review_note?: string;
+  reviewed_at?: Date;
+  reviewed_by?: number;
+  display_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface TaskMilestoneCreateInput {
+  title: string;
+  description?: string;
+  due_date: string;
+  display_order?: number;
+}
+
+export interface TaskMilestoneCompleteInput {
+  engineer_note: string;
+}
+
+// ─── Task Note ───────────────────────────────────────────────
+
+export interface TaskNote {
+  id: number;
+  assignment_id: number;
+  author_id: number;
+  content: string;
+  created_at: Date;
+  updated_at: Date;
+  author_name?: string;
+  author_role?: UserRole;
+}
+
+export interface TaskNoteCreateInput {
+  content: string;
+}
+
+// ─── Task Resource ───────────────────────────────────────────
+
+export type ResourceType = 'text_document' | 'external_link' | 'technical_data';
+
+export interface TaskResource {
+  id: number;
+  assignment_id: number;
+  milestone_id?: number;
+  author_id: number;
+  resource_type: ResourceType;
+  title: string;
+  content: string;
+  description?: string;
+  created_at: Date;
+  updated_at: Date;
+  author_name?: string;
+  milestone_title?: string;
+}
+
+export interface TaskResourceCreateInput {
+  resource_type: ResourceType;
+  title: string;
+  content: string;
+  description?: string;
+  milestone_id?: number;
+}
+
+// ─── Task Blocker ────────────────────────────────────────────
+
+export interface TaskBlocker {
+  id: number;
+  assignment_id: number;
+  reported_by: number;
+  reason: string;
+  status: 'active' | 'resolved';
+  resolved_by?: number;
+  resolved_note?: string;
+  resolved_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+  reporter_name?: string;
+  resolver_name?: string;
+}
+
+export interface TaskBlockerCreateInput {
+  reason: string;
+}
+
+export interface TaskBlockerResolveInput {
+  resolved_note?: string;
+}
+
+// ─── Notification ────────────────────────────────────────────
+
+export type NotificationType =
+  | 'task_assigned'
+  | 'task_approved'
+  | 'task_rejected'
+  | 'task_cancelled'
+  | 'milestone_due_soon'
+  | 'milestone_overdue'
+  | 'milestone_completed'
+  | 'tl_note_added'
+  | 'engineer_note_added'
+  | 'blocker_reported'
+  | 'blocker_resolved'
+  | 'hours_budget_exceeded'
+  | 'task_submitted';
+
+export interface Notification {
+  id: number;
+  user_id: number;
+  type: NotificationType;
+  title: string;
+  message: string;
+  reference_type?: string;
+  reference_id?: number;
+  is_read: boolean;
+  created_at: Date;
+}
+
+// ─── Engineer Performance (aggregated, no new table) ─────────
+
+export interface EngineerPerformanceStats {
+  engineer_id: number;
+  engineer_name: string;
+  period_label: string;
+  total_hours: number;
+  tasks_completed: number;
+  tasks_in_progress: number;
+  milestones_completed: number;
+  milestones_overdue: number;
+  on_time_rate: number;        // 0-100
+  hours_by_project: Array<{ project_id: number; project_name: string; hours: number }>;
+  hours_by_week: Array<{ week_start: string; hours: number }>;
 }
 
 // Database Health Check

@@ -21,6 +21,14 @@ const SmartWarningDashboard = React.lazy(() => import('./pages/SmartWarningDashb
 const EngineerActivityPage = React.lazy(() => import('./pages/EngineerActivityPage'));
 const SettingsPage = React.lazy(() => import('./pages/SettingsPage'));
 
+// Team Leader System pages
+const MyTasksPage = React.lazy(() => import('./pages/MyTasksPage'));
+const TaskDetailPage = React.lazy(() => import('./pages/TaskDetailPage'));
+const MyCalendarPage = React.lazy(() => import('./pages/MyCalendarPage'));
+const MyPerformancePage = React.lazy(() => import('./pages/MyPerformancePage'));
+const MyTeamPage = React.lazy(() => import('./pages/MyTeamPage'));
+const TaskBoardPage = React.lazy(() => import('./pages/TaskBoardPage'));
+
 // Loading component for Suspense fallback
 const PageLoader: React.FC = () => (
   <Box
@@ -68,7 +76,7 @@ function App() {
                 <Route
                   path="/projects"
                   element={
-                    <ProtectedRoute requireRole={["supervisor", "administrator"]}>
+                    <ProtectedRoute requireRole={["supervisor", "administrator", "team_leader", "engineer"]}>
                       <AppLayout>
                         <Suspense fallback={<PageLoader />}>
                           <ProjectsPage />
@@ -166,6 +174,87 @@ function App() {
                       <AppLayout>
                         <Suspense fallback={<PageLoader />}>
                           <SettingsPage />
+                        </Suspense>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Team Leader Routes */}
+                <Route
+                  path="/my-team"
+                  element={
+                    <ProtectedRoute requireRole={["team_leader", "supervisor"]}>
+                      <AppLayout>
+                        <Suspense fallback={<PageLoader />}>
+                          <MyTeamPage />
+                        </Suspense>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/task-board"
+                  element={
+                    <ProtectedRoute requireRole={["team_leader", "supervisor"]}>
+                      <AppLayout>
+                        <Suspense fallback={<PageLoader />}>
+                          <TaskBoardPage />
+                        </Suspense>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Engineer Routes */}
+                <Route
+                  path="/my-tasks"
+                  element={
+                    <ProtectedRoute requireRole={["engineer", "team_leader"]}>
+                      <AppLayout>
+                        <Suspense fallback={<PageLoader />}>
+                          <MyTasksPage />
+                        </Suspense>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/my-calendar"
+                  element={
+                    <ProtectedRoute requireRole={["engineer", "team_leader"]}>
+                      <AppLayout>
+                        <Suspense fallback={<PageLoader />}>
+                          <MyCalendarPage />
+                        </Suspense>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/my-performance"
+                  element={
+                    <ProtectedRoute requireRole="engineer">
+                      <AppLayout>
+                        <Suspense fallback={<PageLoader />}>
+                          <MyPerformancePage />
+                        </Suspense>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Shared Task Detail - all authenticated users */}
+                <Route
+                  path="/tasks/:id"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <Suspense fallback={<PageLoader />}>
+                          <TaskDetailPage />
                         </Suspense>
                       </AppLayout>
                     </ProtectedRoute>

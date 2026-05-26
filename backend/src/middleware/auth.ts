@@ -73,7 +73,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 };
 
 // Authorization middleware for specific roles
-export const authorize = (...roles: ('supervisor' | 'engineer' | 'administrator')[]) => {
+export const authorize = (...roles: ('supervisor' | 'engineer' | 'administrator' | 'team_leader')[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     const authReq = req as AuthenticatedRequest;
     if (!authReq.user) {
@@ -84,7 +84,7 @@ export const authorize = (...roles: ('supervisor' | 'engineer' | 'administrator'
       return;
     }
 
-    if (!roles.includes(authReq.user.role)) {
+    if (!roles.includes(authReq.user.role as any)) {
       res.status(403).json({
         success: false,
         error: 'Insufficient permissions'
@@ -105,11 +105,20 @@ export const engineerOnly = authorize('engineer');
 // Administrator only middleware (read-only + export)
 export const administratorOnly = authorize('administrator');
 
-// All authenticated users (supervisor, engineer, administrator)
-export const authenticatedUser = authorize('supervisor', 'engineer', 'administrator');
+// Team leader only middleware
+export const teamLeaderOnly = authorize('team_leader');
+
+// Team leader or supervisor
+export const teamLeaderOrSupervisor = authorize('supervisor', 'team_leader');
+
+// All authenticated users
+export const authenticatedUser = authorize('supervisor', 'engineer', 'administrator', 'team_leader');
 
 // Supervisor and Administrator (for viewing and exporting)
 export const viewerAccess = authorize('supervisor', 'administrator');
+
+// Can log time: supervisor, team_leader, engineer
+export const canLogTime = authorize('supervisor', 'team_leader', 'engineer');
 
 // Super Admin middleware - Only specific account can create/delete supervisor/administrator accounts
 // For production: Consider moving this email to environment variable or database flag
@@ -180,57 +189,53 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
-// Middleware to check if user can access specific project (supervisors can access all, engineers can access assigned projects)
+// Middleware to check project access.
+// - supervisor / administrator : all projects
+// - team_leader                : projects where they have an active team_membership
+// - engineer                   : projects where they have an active team_membership
 export const canAccessProject = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const authReq = req as AuthenticatedRequest;
   try {
     if (!authReq.user) {
-      res.status(401).json({
-        success: false,
-        error: 'Authentication required'
-      });
+      res.status(401).json({ success: false, error: 'Authentication required' });
       return;
     }
 
     const projectId = req.params.id || req.params.projectId || req.body.project_id;
 
     if (!projectId) {
-      res.status(400).json({
+      res.status(400).json({ success: false, error: 'Project ID required' });
+      return;
+    }
+
+    // Full access roles
+    if (authReq.user.role === 'supervisor' || authReq.user.role === 'administrator') {
+      next();
+      return;
+    }
+
+    // team_leader and engineer: must have an active team_membership for this project
+    const membershipResult = await query(
+      `SELECT id FROM team_memberships
+       WHERE project_id = $1
+         AND (engineer_id = $2 OR team_leader_id = $2)
+         AND is_active = true
+       LIMIT 1`,
+      [projectId, authReq.user.id]
+    );
+
+    if (membershipResult.rows.length === 0) {
+      res.status(403).json({
         success: false,
-        error: 'Project ID required'
+        error: 'You do not have access to this project'
       });
       return;
     }
 
-    // Supervisors can access all projects
-    if (authReq.user.role === 'supervisor') {
-      next();
-      return;
-    }
-
-    // Administrators can view all projects (read-only)
-    if (authReq.user.role === 'administrator') {
-      next();
-      return;
-    }
-
-    // Engineers can access all projects (as per requirements)
-    // Note: Based on your requirements, engineers can view and work on any project
-    if (authReq.user.role === 'engineer') {
-      next();
-      return;
-    }
-
-    res.status(403).json({
-      success: false,
-      error: 'Access denied'
-    });
+    next();
   } catch (error) {
     console.error('Project access check error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 

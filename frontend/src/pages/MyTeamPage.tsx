@@ -1,0 +1,443 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Box, Typography, Grid, Card, CardContent, Avatar, Chip, LinearProgress,
+  IconButton, Button, TextField, InputAdornment, Skeleton, Alert, Paper,
+  Dialog, DialogTitle, DialogContent, DialogActions, FormControl,
+  InputLabel, Select, MenuItem, Divider, Tooltip, Badge, Snackbar,
+  List, ListItem, ListItemAvatar, ListItemText, CircularProgress,
+  AvatarGroup
+} from '@mui/material';
+import {
+  Add, Search, Refresh, Person, Assignment, CheckCircle,
+  Block, AccessTime, TrendingUp, ArrowForward, Close, Warning,
+  FiberManualRecord, GroupAdd, PersonAdd, MoreVert
+} from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import apiService from '../services/api';
+
+interface TeamMember {
+  id: number;
+  membership_id: number;
+  engineer_id: number;
+  engineer_name: string;
+  engineer_email: string;
+  project_id: number;
+  project_name: string;
+  active_tasks?: number;
+  total_tasks?: number;
+  logged_hours?: number;
+  completed_tasks?: number;
+}
+
+interface AddEngineerDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onAdded: () => void;
+}
+
+const AddEngineerDialog: React.FC<AddEngineerDialogProps> = ({ open, onClose, onAdded }) => {
+  const [projects, setProjects] = useState<any[]>([]);
+  const [engineers, setEngineers] = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedEngineer, setSelectedEngineer] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setSelectedProject('');
+      setSelectedEngineer('');
+      setError(null);
+      loadProjects();
+    }
+  }, [open]);
+
+  const loadProjects = async () => {
+    setLoading(true);
+    try {
+      const res = await apiService.getProjects();
+      setProjects((res.data as any)?.projects || []);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAvailableEngineers = async (projectId: string) => {
+    setLoading(true);
+    try {
+      const res = await apiService.getAvailableEngineers(parseInt(projectId));
+      setEngineers(res.data?.engineers || res.data || []);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProjectChange = (value: string) => {
+    setSelectedProject(value);
+    setSelectedEngineer('');
+    if (value) loadAvailableEngineers(value);
+  };
+
+  const handleAdd = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await apiService.createMembership({
+        engineer_id: parseInt(selectedEngineer),
+        project_id: parseInt(selectedProject),
+      });
+      onAdded();
+      onClose();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to add engineer');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+      <DialogTitle sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        Add Engineer to Team
+        <IconButton size="small" onClick={onClose}><Close /></IconButton>
+      </DialogTitle>
+      <DialogContent>
+        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <FormControl fullWidth required disabled={loading}>
+            <InputLabel>Project</InputLabel>
+            <Select value={selectedProject} onChange={e => handleProjectChange(e.target.value)} label="Project">
+              {projects.map((p: any) => (
+                <MenuItem key={p.id} value={String(p.id)}>{p.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {selectedProject && (
+            <FormControl fullWidth required disabled={loading || engineers.length === 0}>
+              <InputLabel>Engineer</InputLabel>
+              <Select value={selectedEngineer} onChange={e => setSelectedEngineer(e.target.value)} label="Engineer">
+                {loading ? (
+                  <MenuItem disabled>Loading...</MenuItem>
+                ) : engineers.length === 0 ? (
+                  <MenuItem disabled>All engineers already in your team for this project</MenuItem>
+                ) : (
+                  engineers.map((e: any) => (
+                    <MenuItem key={e.id} value={String(e.id)}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Avatar sx={{ width: 28, height: 28, fontSize: 13 }}>{e.name[0]}</Avatar>
+                        <Box>
+                          <Typography variant="body2">{e.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">{e.email}</Typography>
+                        </Box>
+                      </Box>
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+            </FormControl>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          onClick={handleAdd}
+          disabled={!selectedProject || !selectedEngineer || submitting}
+          startIcon={submitting ? <CircularProgress size={16} /> : <PersonAdd />}
+        >
+          Add to Team
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+// ── Engineer Card ──────────────────────────────────────────────────────────────
+const EngineerCard: React.FC<{
+  member: TeamMember;
+  onViewTasks: () => void;
+  onRemove: () => void;
+  isRemoving: boolean;
+}> = ({ member, onViewTasks, onRemove, isRemoving }) => {
+  const activeTasks = member.active_tasks || 0;
+  const totalTasks = member.total_tasks || 0;
+  const completedTasks = member.completed_tasks || 0;
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const loggedHours = member.logged_hours || 0;
+
+  return (
+    <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <CardContent sx={{ flex: 1, p: 2.5 }}>
+        {/* Header */}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Avatar
+              sx={{
+                width: 48, height: 48, fontSize: 18, fontWeight: 700,
+                bgcolor: 'primary.main',
+                boxShadow: 2
+              }}
+            >
+              {member.engineer_name[0].toUpperCase()}
+            </Avatar>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>{member.engineer_name}</Typography>
+              <Typography variant="caption" color="text.secondary">{member.engineer_email}</Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Chip
+              size="small"
+              label={activeTasks > 0 ? `${activeTasks} active` : 'Available'}
+              color={activeTasks > 2 ? 'warning' : activeTasks > 0 ? 'primary' : 'default'}
+              sx={{ fontWeight: 600 }}
+            />
+          </Box>
+        </Box>
+
+        {/* Project badge */}
+        <Chip
+          label={member.project_name}
+          size="small"
+          variant="outlined"
+          sx={{ mb: 2, fontSize: '0.7rem' }}
+        />
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Stats Grid */}
+        <Grid container spacing={1.5} sx={{ mb: 2 }}>
+          {[
+            { label: 'Active Tasks', value: activeTasks, color: 'primary.main' },
+            { label: 'Completed', value: completedTasks, color: 'success.main' },
+            { label: 'Hours Logged', value: `${loggedHours}h`, color: 'text.primary' },
+            { label: 'Success Rate', value: `${completionRate}%`, color: completionRate >= 80 ? 'success.main' : completionRate >= 50 ? 'warning.main' : 'error.main' },
+          ].map(({ label, value, color }) => (
+            <Grid item xs={6} key={label}>
+              <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'action.hover', borderRadius: 2 }}>
+                <Typography variant="h6" fontWeight={800} sx={{ color }}>{value}</Typography>
+                <Typography variant="caption" color="text.secondary">{label}</Typography>
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* Completion bar */}
+        {totalTasks > 0 && (
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="caption" color="text.secondary">Task completion</Typography>
+              <Typography variant="caption" fontWeight={600}>{completionRate}%</Typography>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={completionRate}
+              color={completionRate >= 80 ? 'success' : completionRate >= 50 ? 'warning' : 'error'}
+              sx={{ height: 5, borderRadius: 3, bgcolor: 'rgba(0,0,0,0.08)' }}
+            />
+          </Box>
+        )}
+      </CardContent>
+
+      {/* Actions */}
+      <Box sx={{ p: 2, pt: 0, display: 'flex', gap: 1 }}>
+        <Button
+          fullWidth
+          variant="outlined"
+          size="small"
+          startIcon={<Assignment />}
+          onClick={onViewTasks}
+          sx={{ borderRadius: 2 }}
+        >
+          View Tasks
+        </Button>
+        <Button
+          variant="outlined"
+          size="small"
+          color="error"
+          onClick={onRemove}
+          disabled={isRemoving}
+          sx={{ borderRadius: 2, minWidth: 'auto', px: 1.5 }}
+        >
+          {isRemoving ? <CircularProgress size={14} /> : <Close sx={{ fontSize: 16 }} />}
+        </Button>
+      </Box>
+    </Card>
+  );
+};
+
+// ── Main Page ──────────────────────────────────────────────────────────────────
+const MyTeamPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, isTeamLeader, isSupervisor } = useAuth();
+
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [addDialog, setAddDialog] = useState(false);
+  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [snack, setSnack] = useState<{ open: boolean; msg: string; severity: 'success' | 'error' }>({ open: false, msg: '', severity: 'success' });
+
+  const loadTeam = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiService.getMyTeam();
+      setMembers(res.data?.members || res.data || []);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to load team');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadTeam(); }, [loadTeam]);
+
+  const handleRemove = async (membershipId: number, engineerName: string) => {
+    if (!window.confirm(`Remove ${engineerName} from this project team?`)) return;
+    setRemovingId(membershipId);
+    try {
+      await apiService.deactivateMembership(membershipId);
+      setSnack({ open: true, msg: `${engineerName} removed from team.`, severity: 'success' });
+      loadTeam();
+    } catch (err: any) {
+      setSnack({ open: true, msg: err.response?.data?.error || 'Failed to remove', severity: 'error' });
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const filteredMembers = members.filter(m => {
+    if (!searchQuery) return true;
+    return (
+      m.engineer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.engineer_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.project_name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
+
+  const totalActiveTasks = members.reduce((sum, m) => sum + (m.active_tasks || 0), 0);
+  const totalLoggedHours = members.reduce((sum, m) => sum + (m.logged_hours || 0), 0);
+  const totalCompleted = members.reduce((sum, m) => sum + (m.completed_tasks || 0), 0);
+
+  return (
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+        <Box>
+          <Typography variant="h4" fontWeight={800} sx={{ mb: 0.5 }}>My Team</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {members.length} engineer{members.length !== 1 ? 's' : ''} in your team
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <IconButton onClick={loadTeam} size="small" sx={{ bgcolor: 'action.hover' }}><Refresh /></IconButton>
+          <Button variant="contained" startIcon={<PersonAdd />} onClick={() => setAddDialog(true)} sx={{ borderRadius: 2 }}>
+            Add Engineer
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Summary Row */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        {[
+          { label: 'Team Size', value: members.length, color: 'primary.main', icon: <Person /> },
+          { label: 'Active Tasks', value: totalActiveTasks, color: 'info.main', icon: <Assignment /> },
+          { label: 'Hours Logged', value: `${totalLoggedHours}h`, color: 'text.primary', icon: <AccessTime /> },
+          { label: 'Completed', value: totalCompleted, color: 'success.main', icon: <CheckCircle /> },
+        ].map(({ label, value, color, icon }) => (
+          <Grid item xs={6} sm={3} key={label}>
+            <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Box sx={{ color }}>{icon}</Box>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>{label}</Typography>
+                </Box>
+                <Typography variant="h5" fontWeight={800} sx={{ color }}>
+                  {loading ? <Skeleton width={50} /> : value}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+
+      {/* Search */}
+      <TextField
+        fullWidth
+        placeholder="Search by name, email, or project..."
+        value={searchQuery}
+        onChange={e => setSearchQuery(e.target.value)}
+        size="small"
+        sx={{ mb: 3 }}
+        InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
+      />
+
+      {/* Team Grid */}
+      {loading ? (
+        <Grid container spacing={2}>
+          {[1, 2, 3].map(i => (
+            <Grid item xs={12} sm={6} md={4} key={i}>
+              <Skeleton variant="rounded" height={320} sx={{ borderRadius: 3 }} />
+            </Grid>
+          ))}
+        </Grid>
+      ) : filteredMembers.length === 0 ? (
+        <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 3, border: '2px dashed', borderColor: 'divider' }}>
+          <Person sx={{ fontSize: 56, color: 'text.disabled', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            {searchQuery ? 'No engineers match your search' : 'No engineers in your team yet'}
+          </Typography>
+          <Typography variant="body2" color="text.disabled" sx={{ mb: 3 }}>
+            Add engineers to your team to start assigning tasks.
+          </Typography>
+          {!searchQuery && (
+            <Button variant="contained" startIcon={<PersonAdd />} onClick={() => setAddDialog(true)}>
+              Add First Engineer
+            </Button>
+          )}
+        </Paper>
+      ) : (
+        <Grid container spacing={2}>
+          {filteredMembers.map(member => (
+            <Grid item xs={12} sm={6} md={4} key={member.membership_id}>
+              <EngineerCard
+                member={member}
+                onViewTasks={() => navigate(`/task-board?engineer=${member.engineer_id}`)}
+                onRemove={() => handleRemove(member.membership_id, member.engineer_name)}
+                isRemoving={removingId === member.membership_id}
+              />
+            </Grid>
+          ))}
+        </Grid>
+      )}
+
+      <AddEngineerDialog
+        open={addDialog}
+        onClose={() => setAddDialog(false)}
+        onAdded={() => {
+          loadTeam();
+          setSnack({ open: true, msg: 'Engineer added to your team!', severity: 'success' });
+        }}
+      />
+
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={3000}
+        onClose={() => setSnack(p => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snack.severity} sx={{ borderRadius: 2 }}>{snack.msg}</Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default MyTeamPage;

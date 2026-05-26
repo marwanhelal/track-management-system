@@ -15,6 +15,7 @@ interface AuthContextType {
   isSupervisor: boolean;
   isEngineer: boolean;
   isAdministrator: boolean;
+  isTeamLeader: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -139,6 +140,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isSupervisor: user?.role === 'supervisor',
     isEngineer: user?.role === 'engineer',
     isAdministrator: user?.role === 'administrator',
+    isTeamLeader: user?.role === 'team_leader',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

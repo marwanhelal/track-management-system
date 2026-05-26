@@ -799,6 +799,189 @@ class ApiService {
     const response = await this.api.delete(`/phase-payments/payments/${paymentId}`);
     return response.data;
   }
+
+  // ==================== Team Memberships ====================
+
+  async getMyTeam(projectId?: number): Promise<ApiResponse<any>> {
+    const url = projectId ? `/team-memberships/my-team?projectId=${projectId}` : '/team-memberships/my-team';
+    const response = await this.api.get(url);
+    return response.data;
+  }
+
+  async createMembership(data: { engineer_id: number; project_id: number; team_leader_id?: number }): Promise<ApiResponse<any>> {
+    const response = await this.api.post('/team-memberships', data);
+    return response.data;
+  }
+
+  async deactivateMembership(membershipId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/team-memberships/${membershipId}/deactivate`);
+    return response.data;
+  }
+
+  async getAvailableEngineers(projectId: number, teamLeaderId?: number): Promise<ApiResponse<any>> {
+    const url = teamLeaderId
+      ? `/team-memberships/available-engineers?projectId=${projectId}&teamLeaderId=${teamLeaderId}`
+      : `/team-memberships/available-engineers?projectId=${projectId}`;
+    const response = await this.api.get(url);
+    return response.data;
+  }
+
+  async getEngineerMemberships(engineerId?: number): Promise<ApiResponse<any>> {
+    const url = engineerId ? `/team-memberships/engineer/${engineerId}` : '/team-memberships/my-memberships';
+    const response = await this.api.get(url);
+    return response.data;
+  }
+
+  // ==================== Task Assignments ====================
+
+  async getTaskAssignments(params?: { projectId?: number; engineerId?: number; status?: string }): Promise<ApiResponse<any>> {
+    const query = new URLSearchParams();
+    if (params?.projectId) query.append('projectId', String(params.projectId));
+    if (params?.engineerId) query.append('engineerId', String(params.engineerId));
+    if (params?.status) query.append('status', params.status);
+    const url = `/task-assignments${query.toString() ? '?' + query.toString() : ''}`;
+    const response = await this.api.get(url);
+    return response.data;
+  }
+
+  async getTaskAssignment(id: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/task-assignments/${id}`);
+    return response.data;
+  }
+
+  async createTaskAssignment(data: any): Promise<ApiResponse<any>> {
+    const response = await this.api.post('/task-assignments', data);
+    return response.data;
+  }
+
+  async updateTaskAssignment(id: number, data: any): Promise<ApiResponse<any>> {
+    const response = await this.api.put(`/task-assignments/${id}`, data);
+    return response.data;
+  }
+
+  async startTask(id: number): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/task-assignments/${id}/start`);
+    return response.data;
+  }
+
+  async submitTask(id: number, data: { final_deliverable: string }): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/task-assignments/${id}/submit`, data);
+    return response.data;
+  }
+
+  async reviewTask(id: number, data: { action: 'approve' | 'reject'; review_note?: string }): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/task-assignments/${id}/review`, data);
+    return response.data;
+  }
+
+  async cancelTask(id: number, reason?: string): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/task-assignments/${id}/cancel`, { reason });
+    return response.data;
+  }
+
+  // ==================== Task Milestones ====================
+
+  async getTaskMilestones(taskId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/task-assignments/${taskId}/milestones`);
+    return response.data;
+  }
+
+  async createTaskMilestone(taskId: number, data: any): Promise<ApiResponse<any>> {
+    const response = await this.api.post(`/task-assignments/${taskId}/milestones`, data);
+    return response.data;
+  }
+
+  async completeMilestone(taskId: number, milestoneId: number, data: { engineer_note?: string }): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/milestones/${milestoneId}/complete`, data);
+    return response.data;
+  }
+
+  async addMilestoneReviewNote(taskId: number, milestoneId: number, data: { review_note: string }): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/milestones/${milestoneId}/review-note`, data);
+    return response.data;
+  }
+
+  async deleteMilestone(taskId: number, milestoneId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.delete(`/milestones/${milestoneId}`);
+    return response.data;
+  }
+
+  // ==================== Task Notes ====================
+
+  async getTaskNotes(taskId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/task-assignments/${taskId}/notes`);
+    return response.data;
+  }
+
+  async addTaskNote(taskId: number, data: { content: string }): Promise<ApiResponse<any>> {
+    const response = await this.api.post(`/task-assignments/${taskId}/notes`, data);
+    return response.data;
+  }
+
+  async deleteTaskNote(taskId: number, noteId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.delete(`/task-assignments/${taskId}/notes/${noteId}`);
+    return response.data;
+  }
+
+  // ==================== Task Resources ====================
+
+  async getTaskResources(taskId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/task-assignments/${taskId}/resources`);
+    return response.data;
+  }
+
+  async addTaskResource(taskId: number, data: any): Promise<ApiResponse<any>> {
+    const response = await this.api.post(`/task-assignments/${taskId}/resources`, data);
+    return response.data;
+  }
+
+  async deleteTaskResource(taskId: number, resourceId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.delete(`/task-assignments/${taskId}/resources/${resourceId}`);
+    return response.data;
+  }
+
+  // ==================== Task Blockers ====================
+
+  async getTaskBlockers(taskId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/task-assignments/${taskId}/blockers`);
+    return response.data;
+  }
+
+  async reportBlocker(taskId: number, data: { reason: string }): Promise<ApiResponse<any>> {
+    const response = await this.api.post(`/task-assignments/${taskId}/blockers`, data);
+    return response.data;
+  }
+
+  async resolveBlocker(taskId: number, blockerId: number, data: { resolved_note: string }): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/task-assignments/${taskId}/blockers/${blockerId}/resolve`, data);
+    return response.data;
+  }
+
+  // ==================== Notifications ====================
+
+  async getMyNotifications(limit?: number, offset?: number): Promise<ApiResponse<any>> {
+    const query = new URLSearchParams();
+    if (limit) query.append('limit', String(limit));
+    if (offset) query.append('offset', String(offset));
+    const url = `/notifications${query.toString() ? '?' + query.toString() : ''}`;
+    const response = await this.api.get(url);
+    return response.data;
+  }
+
+  async getUnreadNotificationCount(): Promise<ApiResponse<any>> {
+    const response = await this.api.get('/notifications/unread-count');
+    return response.data;
+  }
+
+  async markNotificationRead(id: number): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/notifications/${id}/read`);
+    return response.data;
+  }
+
+  async markAllNotificationsRead(): Promise<ApiResponse<any>> {
+    const response = await this.api.patch('/notifications/read-all');
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();
