@@ -542,3 +542,47 @@ export const cancelTask = async (req: Request, res: Response): Promise<void> => 
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
+
+// GET /task-assignments/my-assigned-phases
+// Engineer: returns distinct projects + phases where they have active task assignments
+export const getMyAssignedPhases = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const result = await query(
+      `SELECT DISTINCT
+         ta.project_id,
+         ta.phase_id,
+         p.name  AS project_name,
+         p.status AS project_status,
+         pp.phase_name,
+         pp.status AS phase_status,
+         pp.phase_order
+       FROM task_assignments ta
+       JOIN projects       p  ON p.id  = ta.project_id
+       JOIN project_phases pp ON pp.id = ta.phase_id
+       WHERE ta.engineer_id = $1
+         AND ta.status NOT IN ('cancelled')
+         AND p.archived_at IS NULL
+       ORDER BY p.name, pp.phase_order`,
+      [authReq.user.id]
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        phases: result.rows,
+        projects: [
+          ...new Map(
+            result.rows.map((r: any) => [
+              r.project_id,
+              { id: r.project_id, name: r.project_name, status: r.project_status }
+            ])
+          ).values()
+        ]
+      }
+    } as ApiResponse);
+  } catch (error) {
+    console.error('getMyAssignedPhases error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};

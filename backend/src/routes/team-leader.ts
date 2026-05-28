@@ -42,6 +42,10 @@ router.patch('/team-memberships/:id/deactivate',
 );
 
 // ─── Task Assignments ─────────────────────────────────────────
+router.get('/task-assignments/my-assigned-phases',
+  authenticatedUser,
+  tasks.getMyAssignedPhases
+);
 router.get('/task-assignments',
   authenticatedUser,
   tasks.getTaskAssignments

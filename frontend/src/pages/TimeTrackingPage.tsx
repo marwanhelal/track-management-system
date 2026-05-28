@@ -178,11 +178,37 @@ const TimeTrackingPage: React.FC = () => {
       let accessibleProjects: Project[] = [];
 
       if (user?.role === 'team_leader') {
-        // Team leaders: get all projects they lead (regardless of engineer is_active)
+        // Team leaders: all their projects
         const myProjectsRes = await apiService.getMyProjects();
         accessibleProjects = myProjectsRes.data?.projects || [];
+      } else if (user?.role === 'engineer') {
+        // Engineers: only projects their TL assigned tasks on
+        const assignedRes = await apiService.getMyAssignedPhases();
+        accessibleProjects = assignedRes.data?.projects || [];
+        // Use assigned phases directly — no extra getProjectPhases calls needed
+        const assignedPhases = (assignedRes.data?.phases || []).map((ph: any) => ({
+          id: ph.phase_id,
+          phase_name: ph.phase_name,
+          project_id: ph.project_id,
+          project_name: ph.project_name,
+          status: ph.phase_status,
+          phase_order: ph.phase_order
+        }));
+        setProjects(accessibleProjects);
+
+        const filters = {
+          startDate: dateFilter.startDate.format('YYYY-MM-DD'),
+          endDate: dateFilter.endDate.format('YYYY-MM-DD'),
+          ...(projectFilter && { projectId: parseInt(projectFilter) })
+        };
+        const workLogsResponse = await apiService.getEngineerWorkLogs(user!.id, filters);
+        if (workLogsResponse.success && workLogsResponse.data) {
+          setWorkLogs(workLogsResponse.data.workLogs);
+        }
+        setPhases(assignedPhases);
+        return;
       } else {
-        // Supervisors/engineers: use the normal projects endpoint
+        // Supervisors: use all projects
         const projectsResponse = await apiService.getProjects();
         if (projectsResponse.success && projectsResponse.data) {
           accessibleProjects = projectsResponse.data.projects;
@@ -203,7 +229,7 @@ const TimeTrackingPage: React.FC = () => {
         setWorkLogs(workLogsResponse.data.workLogs);
       }
 
-      // Fetch phases only for accessible projects
+      // Fetch phases only for accessible projects (team leaders and supervisors)
       const allPhases: ProjectPhase[] = [];
       const phasePromises = accessibleProjects.map(async (project) => {
         try {

@@ -823,6 +823,14 @@ class ApiService {
     return response.data;
   }
 
+  async getMyAssignedPhases(): Promise<ApiResponse<{
+    phases: { project_id: number; phase_id: number; project_name: string; phase_name: string; phase_status: string; phase_order: number }[];
+    projects: { id: number; name: string; status: string }[];
+  }>> {
+    const response = await this.api.get('/task-assignments/my-assigned-phases');
+    return response.data;
+  }
+
   async createMembership(data: { engineer_id: number; project_id: number; team_leader_id?: number }): Promise<ApiResponse<any>> {
     const response = await this.api.post('/team-memberships', data);
     return response.data;

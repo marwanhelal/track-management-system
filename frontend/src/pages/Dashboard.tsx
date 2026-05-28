@@ -570,15 +570,6 @@ const Dashboard = () => {
                 Quick Time Entry
               </Typography>
               <QuickTimeEntry
-                filteredProjects={
-                  workLogSummary.projectSummary.length > 0
-                    ? workLogSummary.projectSummary.map(s => ({
-                        id: s.project_id,
-                        name: s.project_name,
-                        status: 'active'
-                      }))
-                    : undefined
-                }
                 onSuccess={() => {
                   apiService.getWorkLogsSummary().then(response => {
                     if (response.success && response.data) {

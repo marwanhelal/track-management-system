@@ -10,15 +10,32 @@ import {
 
 // Get all projects with filters and pagination
 export const getProjects = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
   try {
-    // Direct SQL query to get projects (excluding archived)
-    const result = await query(`
-      SELECT p.*, u.name as created_by_name
-      FROM projects p
-      LEFT JOIN users u ON p.created_by = u.id
-      WHERE p.archived_at IS NULL
-      ORDER BY p.created_at DESC
-    `);
+    let result;
+
+    if (authReq.user?.role === 'engineer') {
+      // Engineers only see projects where their TL has assigned them tasks
+      result = await query(`
+        SELECT DISTINCT p.*, u.name as created_by_name
+        FROM projects p
+        LEFT JOIN users u ON p.created_by = u.id
+        JOIN task_assignments ta ON ta.project_id = p.id
+        WHERE p.archived_at IS NULL
+          AND ta.engineer_id = $1
+          AND ta.status NOT IN ('cancelled')
+        ORDER BY p.created_at DESC
+      `, [authReq.user.id]);
+    } else {
+      // All other roles see all active projects
+      result = await query(`
+        SELECT p.*, u.name as created_by_name
+        FROM projects p
+        LEFT JOIN users u ON p.created_by = u.id
+        WHERE p.archived_at IS NULL
+        ORDER BY p.created_at DESC
+      `);
+    }
 
     const response: ApiResponse<{ projects: any[] }> = {
       success: true,

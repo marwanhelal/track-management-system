@@ -19,6 +19,7 @@ import { AccessTime, Save } from '@mui/icons-material';
 import dayjs from 'dayjs';
 import { ProjectPhase, WorkLogCreateInput } from '../../types';
 import apiService from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ProjectOption {
   id: number;
@@ -32,7 +33,11 @@ interface QuickTimeEntryProps {
 }
 
 const QuickTimeEntry = ({ onSuccess, filteredProjects }: QuickTimeEntryProps) => {
+  const { user } = useAuth();
+  const isEngineer = user?.role === 'engineer';
+
   const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [allAssignedPhases, setAllAssignedPhases] = useState<any[]>([]);
   const [phases, setPhases] = useState<ProjectPhase[]>([]);
   const [selectedProject, setSelectedProject] = useState<number | ''>('');
   const [selectedPhase, setSelectedPhase] = useState<number | ''>('');
@@ -43,24 +48,55 @@ const QuickTimeEntry = ({ onSuccess, filteredProjects }: QuickTimeEntryProps) =>
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Load projects on component mount (or when filteredProjects changes)
+  // Load on mount
   useEffect(() => {
-    if (filteredProjects && filteredProjects.length > 0) {
+    if (isEngineer) {
+      loadAssignedPhases();
+    } else if (filteredProjects && filteredProjects.length > 0) {
       setProjects(filteredProjects);
     } else {
       loadProjects();
     }
-  }, [filteredProjects]);
+  }, [isEngineer, filteredProjects]);
 
-  // Load phases when project is selected
+  // Filter phases when project changes
   useEffect(() => {
-    if (selectedProject) {
-      loadProjectPhases(selectedProject as number);
-    } else {
+    if (!selectedProject) {
       setPhases([]);
       setSelectedPhase('');
+      return;
     }
-  }, [selectedProject]);
+    if (isEngineer) {
+      const filtered = allAssignedPhases.filter(
+        p => p.project_id === selectedProject
+      ) as any as ProjectPhase[];
+      setPhases(filtered);
+      if (filtered.length > 0) setSelectedPhase(filtered[0].id);
+      else setSelectedPhase('');
+    } else {
+      loadProjectPhases(selectedProject as number);
+    }
+  }, [selectedProject, isEngineer, allAssignedPhases]);
+
+  const loadAssignedPhases = async () => {
+    try {
+      const response = await apiService.getMyAssignedPhases();
+      if (response.success && response.data) {
+        setProjects(response.data.projects);
+        // Map to ProjectPhase shape
+        const mapped = response.data.phases.map((ph: any) => ({
+          id: ph.phase_id,
+          phase_name: ph.phase_name,
+          project_id: ph.project_id,
+          status: ph.phase_status,
+          phase_order: ph.phase_order,
+        }));
+        setAllAssignedPhases(mapped);
+      }
+    } catch (error: any) {
+      setError(error.message || 'Failed to load assigned phases');
+    }
+  };
 
   const loadProjects = async () => {
     try {
@@ -78,16 +114,11 @@ const QuickTimeEntry = ({ onSuccess, filteredProjects }: QuickTimeEntryProps) =>
     try {
       const response = await apiService.getProjectPhases(projectId);
       if (response.success && response.data) {
-        // Filter to only phases that engineers can work on
         const workablePhases = response.data.phases.filter(phase =>
           ['ready', 'in_progress', 'submitted'].includes(phase.status)
         );
         setPhases(workablePhases);
-
-        // Auto-select first available phase
-        if (workablePhases.length > 0) {
-          setSelectedPhase(workablePhases[0].id);
-        }
+        if (workablePhases.length > 0) setSelectedPhase(workablePhases[0].id);
       }
     } catch (error: any) {
       setError(error.message || 'Failed to load project phases');

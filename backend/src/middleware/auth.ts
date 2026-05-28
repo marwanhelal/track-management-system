@@ -208,9 +208,31 @@ export const canAccessProject = async (req: Request, res: Response, next: NextFu
       return;
     }
 
-    // All authenticated users can view project details.
-    // getProjects already shows all projects with no role filter, so
-    // read access is open to everyone. Write operations are guarded by supervisorOnly.
+    // Supervisor, administrator, team_leader: full access
+    if (
+      authReq.user.role === 'supervisor' ||
+      authReq.user.role === 'administrator' ||
+      authReq.user.role === 'team_leader'
+    ) {
+      next();
+      return;
+    }
+
+    // Engineer: must have a non-cancelled task assignment in this project
+    const accessResult = await query(
+      `SELECT id FROM task_assignments
+       WHERE project_id = $1
+         AND engineer_id = $2
+         AND status NOT IN ('cancelled')
+       LIMIT 1`,
+      [projectId, authReq.user.id]
+    );
+
+    if (accessResult.rows.length === 0) {
+      res.status(403).json({ success: false, error: 'You do not have access to this project' });
+      return;
+    }
+
     next();
   } catch (error) {
     console.error('Project access check error:', error);

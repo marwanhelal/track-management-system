@@ -107,10 +107,7 @@ const CreateTaskDialog: React.FC<{
   const loadPhases = async (projectId: string) => {
     try {
       const res = await apiService.getProjectPhases(parseInt(projectId));
-      const workable = (res.data?.phases || []).filter((ph: any) =>
-        ['ready', 'in_progress', 'submitted'].includes(ph.status)
-      );
-      setPhases(workable);
+      setPhases(res.data?.phases || []);
     } catch {
       setPhases([]);
     }
