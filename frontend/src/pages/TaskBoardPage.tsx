@@ -56,12 +56,14 @@ const CreateTaskDialog: React.FC<{
   const [step, setStep] = useState(0);
   const [projects, setProjects] = useState<any[]>([]);
   const [engineers, setEngineers] = useState<any[]>([]);
+  const [phases, setPhases] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     project_id: '',
+    phase_id: '',
     engineer_id: '',
     title: '',
     description: '',
@@ -74,7 +76,9 @@ const CreateTaskDialog: React.FC<{
     if (open) {
       setStep(0);
       setError(null);
-      setForm({ project_id: '', engineer_id: '', title: '', description: '', allocated_hours: '', due_date: '', milestones: [] });
+      setForm({ project_id: '', phase_id: '', engineer_id: '', title: '', description: '', allocated_hours: '', due_date: '', milestones: [] });
+      setPhases([]);
+      setEngineers([]);
       loadProjects();
     }
   }, [open]);
@@ -100,9 +104,26 @@ const CreateTaskDialog: React.FC<{
     }
   };
 
+  const loadPhases = async (projectId: string) => {
+    try {
+      const res = await apiService.getProjectPhases(parseInt(projectId));
+      const workable = (res.data?.phases || []).filter((ph: any) =>
+        ['ready', 'in_progress', 'submitted'].includes(ph.status)
+      );
+      setPhases(workable);
+    } catch {
+      setPhases([]);
+    }
+  };
+
   const handleProjectChange = (projectId: string) => {
-    setForm(p => ({ ...p, project_id: projectId, engineer_id: '' }));
-    if (projectId) loadEngineers(projectId);
+    setForm(p => ({ ...p, project_id: projectId, phase_id: '', engineer_id: '' }));
+    setPhases([]);
+    setEngineers([]);
+    if (projectId) {
+      loadEngineers(projectId);
+      loadPhases(projectId);
+    }
   };
 
   const addMilestone = () => setForm(p => ({ ...p, milestones: [...p.milestones, { title: '', due_date: '', description: '' }] }));
@@ -121,6 +142,7 @@ const CreateTaskDialog: React.FC<{
     try {
       await apiService.createTaskAssignment({
         project_id: parseInt(form.project_id),
+        phase_id: parseInt(form.phase_id),
         engineer_id: parseInt(form.engineer_id),
         title: form.title,
         description: form.description || undefined,
@@ -138,7 +160,7 @@ const CreateTaskDialog: React.FC<{
   };
 
   const steps = ['Project & Engineer', 'Task Details', 'Milestones (optional)'];
-  const canNextStep0 = form.project_id && form.engineer_id;
+  const canNextStep0 = form.project_id && form.phase_id && form.engineer_id;
   const canNextStep1 = form.title.trim() && form.allocated_hours && parseInt(form.allocated_hours) > 0;
 
   return (
@@ -180,6 +202,28 @@ const CreateTaskDialog: React.FC<{
                 ))}
               </Select>
             </FormControl>
+
+            {form.project_id && (
+              <FormControl fullWidth required>
+                <InputLabel>Phase</InputLabel>
+                <Select
+                  value={form.phase_id}
+                  onChange={e => setForm(p => ({ ...p, phase_id: e.target.value }))}
+                  label="Phase"
+                  disabled={loading || phases.length === 0}
+                >
+                  {phases.length === 0 ? (
+                    <MenuItem disabled>No active phases for this project</MenuItem>
+                  ) : (
+                    phases.map((ph: any) => (
+                      <MenuItem key={ph.id} value={String(ph.id)}>
+                        {ph.phase_name} ({ph.status.replace('_', ' ')})
+                      </MenuItem>
+                    ))
+                  )}
+                </Select>
+              </FormControl>
+            )}
 
             {form.project_id && (
               <FormControl fullWidth required>
