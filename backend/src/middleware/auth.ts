@@ -208,21 +208,22 @@ export const canAccessProject = async (req: Request, res: Response, next: NextFu
       return;
     }
 
-    // Full access roles
-    if (authReq.user.role === 'supervisor' || authReq.user.role === 'administrator') {
+    // Full access roles (supervisor, administrator, team_leader see all projects)
+    if (
+      authReq.user.role === 'supervisor' ||
+      authReq.user.role === 'administrator' ||
+      authReq.user.role === 'team_leader'
+    ) {
       next();
       return;
     }
 
-    // team_leader: always has access to projects where they are the team_leader_id
     // engineer: must have an active team_membership
     const membershipResult = await query(
       `SELECT id FROM team_memberships
        WHERE project_id = $1
-         AND (
-           team_leader_id = $2
-           OR (engineer_id = $2 AND is_active = true)
-         )
+         AND engineer_id = $2
+         AND is_active = true
        LIMIT 1`,
       [projectId, authReq.user.id]
     );
