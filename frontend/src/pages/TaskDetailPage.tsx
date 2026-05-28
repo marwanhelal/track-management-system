@@ -687,7 +687,7 @@ const TaskDetailPage: React.FC = () => {
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <Chip label={statusCfg.label} color={statusCfg.color} size="small" sx={{ fontWeight: 700 }} />
-                <Chip label={`Project #${task.project_id}`} variant="outlined" size="small" />
+                <Chip label={task.project_name || `Project #${task.project_id}`} variant="outlined" size="small" />
               </Box>
               <Typography variant="h5" fontWeight={800} sx={{ mb: 1 }}>{task.title}</Typography>
               {task.description && (
