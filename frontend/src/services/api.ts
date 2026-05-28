@@ -818,6 +818,11 @@ class ApiService {
     return response.data;
   }
 
+  async getMyProjects(): Promise<ApiResponse<{ projects: { id: number; name: string; status: string }[] }>> {
+    const response = await this.api.get('/team-memberships/my-projects');
+    return response.data;
+  }
+
   async createMembership(data: { engineer_id: number; project_id: number; team_leader_id?: number }): Promise<ApiResponse<any>> {
     const response = await this.api.post('/team-memberships', data);
     return response.data;

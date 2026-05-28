@@ -226,6 +226,31 @@ export const deactivateMembership = async (req: Request, res: Response): Promise
   }
 };
 
+// GET /team-memberships/my-projects
+// Team leader: get all distinct projects where they are team_leader_id (any is_active status)
+export const getMyProjects = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const result = await query(
+      `SELECT DISTINCT p.id, p.name, p.status
+       FROM team_memberships tm
+       JOIN projects p ON p.id = tm.project_id
+       WHERE tm.team_leader_id = $1
+         AND p.archived_at IS NULL
+       ORDER BY p.name`,
+      [authReq.user.id]
+    );
+
+    res.status(200).json({
+      success: true,
+      data: { projects: result.rows }
+    } as ApiResponse);
+  } catch (error) {
+    console.error('getMyProjects error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // GET /team-memberships/available-engineers
 // TL or supervisor: list all active engineers not yet on this TL+project combo
 export const getAvailableEngineers = async (req: Request, res: Response): Promise<void> => {

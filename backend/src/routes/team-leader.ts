@@ -20,6 +20,10 @@ router.get('/team-memberships/my-team',
   teamLeaderOrSupervisor,
   memberships.getMyTeam
 );
+router.get('/team-memberships/my-projects',
+  teamLeaderOrSupervisor,
+  memberships.getMyProjects
+);
 router.get('/team-memberships/available-engineers',
   teamLeaderOrSupervisor,
   memberships.getAvailableEngineers

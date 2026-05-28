@@ -214,12 +214,15 @@ export const canAccessProject = async (req: Request, res: Response, next: NextFu
       return;
     }
 
-    // team_leader and engineer: must have an active team_membership for this project
+    // team_leader: always has access to projects where they are the team_leader_id
+    // engineer: must have an active team_membership
     const membershipResult = await query(
       `SELECT id FROM team_memberships
        WHERE project_id = $1
-         AND (engineer_id = $2 OR team_leader_id = $2)
-         AND is_active = true
+         AND (
+           team_leader_id = $2
+           OR (engineer_id = $2 AND is_active = true)
+         )
        LIMIT 1`,
       [projectId, authReq.user.id]
     );

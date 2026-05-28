@@ -17,15 +17,22 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { AccessTime, Save } from '@mui/icons-material';
 import dayjs from 'dayjs';
-import { Project, ProjectPhase, WorkLogCreateInput } from '../../types';
+import { ProjectPhase, WorkLogCreateInput } from '../../types';
 import apiService from '../../services/api';
+
+interface ProjectOption {
+  id: number;
+  name: string;
+  status: string;
+}
 
 interface QuickTimeEntryProps {
   onSuccess?: () => void;
+  filteredProjects?: ProjectOption[];
 }
 
-const QuickTimeEntry = ({ onSuccess }: QuickTimeEntryProps) => {
-  const [projects, setProjects] = useState<Project[]>([]);
+const QuickTimeEntry = ({ onSuccess, filteredProjects }: QuickTimeEntryProps) => {
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [phases, setPhases] = useState<ProjectPhase[]>([]);
   const [selectedProject, setSelectedProject] = useState<number | ''>('');
   const [selectedPhase, setSelectedPhase] = useState<number | ''>('');
@@ -36,10 +43,14 @@ const QuickTimeEntry = ({ onSuccess }: QuickTimeEntryProps) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Load projects on component mount
+  // Load projects on component mount (or when filteredProjects changes)
   useEffect(() => {
-    loadProjects();
-  }, []);
+    if (filteredProjects && filteredProjects.length > 0) {
+      setProjects(filteredProjects);
+    } else {
+      loadProjects();
+    }
+  }, [filteredProjects]);
 
   // Load phases when project is selected
   useEffect(() => {
@@ -55,7 +66,6 @@ const QuickTimeEntry = ({ onSuccess }: QuickTimeEntryProps) => {
     try {
       const response = await apiService.getProjects();
       if (response.success && response.data) {
-        // Filter to only active projects
         const activeProjects = response.data.projects.filter(p => p.status === 'active');
         setProjects(activeProjects);
       }

@@ -178,16 +178,9 @@ const TimeTrackingPage: React.FC = () => {
       let accessibleProjects: Project[] = [];
 
       if (user?.role === 'team_leader') {
-        // Team leaders: get projects from their team memberships
-        const teamRes = await apiService.getMyTeam();
-        const memberships: any[] = teamRes.data?.memberships || [];
-        const projectMap = new Map<number, Project>();
-        memberships.forEach((m: any) => {
-          if (!projectMap.has(m.project_id)) {
-            projectMap.set(m.project_id, { id: m.project_id, name: m.project_name, status: 'active' });
-          }
-        });
-        accessibleProjects = Array.from(projectMap.values());
+        // Team leaders: get all projects they lead (regardless of engineer is_active)
+        const myProjectsRes = await apiService.getMyProjects();
+        accessibleProjects = myProjectsRes.data?.projects || [];
       } else {
         // Supervisors/engineers: use the normal projects endpoint
         const projectsResponse = await apiService.getProjects();
