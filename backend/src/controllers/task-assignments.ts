@@ -232,9 +232,9 @@ export const createTaskAssignment = async (req: Request, res: Response): Promise
           const m = milestones[i]!;
           await client.query(
             `INSERT INTO task_milestones
-               (assignment_id, title, description, due_date, display_order)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [task.id, m.title, m.description || null, m.due_date, m.display_order ?? i]
+               (assignment_id, title, description, due_date, display_order, allocated_hours)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [task.id, m.title, m.description || null, m.due_date, m.display_order ?? i, (m as any).allocated_hours || null]
           );
         }
       }
@@ -539,6 +539,64 @@ export const cancelTask = async (req: Request, res: Response): Promise<void> => 
     res.status(200).json({ success: true, message: 'Task cancelled' } as ApiResponse);
   } catch (error) {
     console.error('cancelTask error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// PATCH /task-assignments/:id/reopen
+// TL or supervisor reopens a rejected task, resetting it to 'assigned'
+export const reopenTask = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const { id } = req.params;
+    const { reopen_note } = req.body;
+
+    const existing = await query(`SELECT * FROM task_assignments WHERE id = $1`, [id]);
+    if (existing.rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Task not found' });
+      return;
+    }
+
+    const task = existing.rows[0];
+    const err = assertCanManageTask(authReq.user, task);
+    if (err) { res.status(403).json({ success: false, error: err }); return; }
+
+    if (task.status !== 'rejected') {
+      res.status(400).json({ success: false, error: 'Only rejected tasks can be reopened' });
+      return;
+    }
+
+    const result = await query(
+      `UPDATE task_assignments
+       SET status = 'assigned',
+           reopen_note = $1,
+           reopened_at = NOW(),
+           reopened_by = $2,
+           review_note = NULL,
+           final_deliverable = NULL,
+           submitted_at = NULL,
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [reopen_note?.trim() || null, authReq.user.id, id]
+    );
+
+    await createNotification({
+      user_id: task.engineer_id,
+      type: 'task_approved',
+      title: 'Task reopened — action required',
+      message: `"${task.title}" has been reopened. ${reopen_note?.trim() || 'Review the feedback and start again.'}`,
+      reference_type: 'task_assignment',
+      reference_id: task.id
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Task reopened and reassigned to engineer',
+      data: { task: result.rows[0] }
+    } as ApiResponse);
+  } catch (error) {
+    console.error('reopenTask error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

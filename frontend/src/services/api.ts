@@ -902,6 +902,11 @@ class ApiService {
     return response.data;
   }
 
+  async reopenTask(id: number, data: { reopen_note?: string }): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/task-assignments/${id}/reopen`, data);
+    return response.data;
+  }
+
   // ==================== Task Milestones ====================
 
   async getTaskMilestones(taskId: number): Promise<ApiResponse<any>> {

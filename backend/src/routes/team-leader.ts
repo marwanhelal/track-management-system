@@ -78,6 +78,10 @@ router.patch('/task-assignments/:id/cancel',
   teamLeaderOrSupervisor,
   tasks.cancelTask
 );
+router.patch('/task-assignments/:id/reopen',
+  teamLeaderOrSupervisor,
+  tasks.reopenTask
+);
 
 // ─── Milestones ───────────────────────────────────────────────
 router.get('/task-assignments/:assignmentId/milestones',

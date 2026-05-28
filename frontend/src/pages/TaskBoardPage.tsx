@@ -39,9 +39,9 @@ interface Column {
 
 const COLUMNS: Column[] = [
   { key: 'assigned', statuses: ['assigned'], label: 'Assigned', color: '#1976d2', bgColor: '#e3f2fd', icon: <Assignment fontSize="small" /> },
-  { key: 'in_progress', statuses: ['in_progress'], label: 'In Progress', color: '#388e3c', bgColor: '#e8f5e9', icon: <PlayArrow fontSize="small" /> },
-  { key: 'blocked', statuses: ['blocked'], label: 'Blocked', color: '#d32f2f', bgColor: '#ffebee', icon: <Block fontSize="small" /> },
+  { key: 'in_progress', statuses: ['in_progress', 'blocked'], label: 'In Progress', color: '#388e3c', bgColor: '#e8f5e9', icon: <PlayArrow fontSize="small" /> },
   { key: 'submitted', statuses: ['submitted'], label: 'Submitted', color: '#f57c00', bgColor: '#fff8e1', icon: <CheckCircle fontSize="small" /> },
+  { key: 'rejected', statuses: ['rejected'], label: 'Rejected', color: '#c62828', bgColor: '#ffebee', icon: <Warning fontSize="small" /> },
   { key: 'done', statuses: ['approved', 'cancelled'], label: 'Done', color: '#7b1fa2', bgColor: '#f3e5f5', icon: <CheckCircle fontSize="small" /> },
 ];
 
@@ -69,14 +69,14 @@ const CreateTaskDialog: React.FC<{
     description: '',
     allocated_hours: '',
     due_date: '',
-    milestones: [] as { title: string; due_date: string; description: string }[],
+    milestones: [] as { title: string; due_date: string; description: string; allocated_hours: string }[],
   });
 
   useEffect(() => {
     if (open) {
       setStep(0);
       setError(null);
-      setForm({ project_id: '', phase_id: '', engineer_id: '', title: '', description: '', allocated_hours: '', due_date: '', milestones: [] });
+      setForm({ project_id: '', phase_id: '', engineer_id: '', title: '', description: '', allocated_hours: '', due_date: '', milestones: [] as { title: string; due_date: string; description: string; allocated_hours: string }[] });
       setPhases([]);
       setEngineers([]);
       loadProjects();
@@ -123,7 +123,7 @@ const CreateTaskDialog: React.FC<{
     }
   };
 
-  const addMilestone = () => setForm(p => ({ ...p, milestones: [...p.milestones, { title: '', due_date: '', description: '' }] }));
+  const addMilestone = () => setForm(p => ({ ...p, milestones: [...p.milestones, { title: '', due_date: '', description: '', allocated_hours: '' }] }));
   const updateMilestone = (i: number, field: string, val: string) => {
     setForm(p => {
       const ms = [...p.milestones];
@@ -145,7 +145,10 @@ const CreateTaskDialog: React.FC<{
         description: form.description || undefined,
         allocated_hours: parseInt(form.allocated_hours),
         due_date: form.due_date || undefined,
-        milestones: form.milestones.filter(m => m.title.trim()),
+        milestones: form.milestones.filter(m => m.title.trim()).map(m => ({
+          ...m,
+          allocated_hours: m.allocated_hours ? parseFloat(m.allocated_hours) : undefined,
+        })),
       });
       onCreated();
       onClose();
@@ -305,19 +308,28 @@ const CreateTaskDialog: React.FC<{
                   </IconButton>
                 </Box>
                 <Grid container spacing={1.5}>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12} sm={5}>
                     <TextField
                       size="small" fullWidth label="Title" required
                       value={ms.title}
                       onChange={e => updateMilestone(i, 'title', e.target.value)}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12} sm={4}>
                     <TextField
                       size="small" fullWidth label="Due Date" type="date"
                       InputLabelProps={{ shrink: true }}
                       value={ms.due_date}
                       onChange={e => updateMilestone(i, 'due_date', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <TextField
+                      size="small" fullWidth label="Hours Budget" type="number"
+                      inputProps={{ min: 0.5, step: 0.5 }}
+                      value={ms.allocated_hours}
+                      onChange={e => updateMilestone(i, 'allocated_hours', e.target.value)}
+                      InputProps={{ endAdornment: <InputAdornment position="end">h</InputAdornment> }}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -376,7 +388,7 @@ const KanbanCard: React.FC<{ task: TaskWithStats; onClick: () => void }> = ({ ta
         cursor: 'pointer',
         borderRadius: 2,
         border: '1px solid',
-        borderColor: task.has_active_blocker ? 'error.light' : 'divider',
+        borderColor: task.status === 'rejected' ? 'error.light' : 'divider',
         mb: 1.5,
         transition: 'all 0.15s ease',
         '&:hover': { transform: 'translateY(-1px)', boxShadow: 3 },
@@ -392,9 +404,9 @@ const KanbanCard: React.FC<{ task: TaskWithStats; onClick: () => void }> = ({ ta
           <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1 }}>
             {task.engineer_name || `Engineer #${task.engineer_id}`}
           </Typography>
-          {task.has_active_blocker && (
-            <Tooltip title="Active blocker">
-              <Flag sx={{ fontSize: 14, color: 'error.main' }} />
+          {task.status === 'rejected' && (
+            <Tooltip title="Rejected — reopen to reassign">
+              <Warning sx={{ fontSize: 14, color: 'error.main' }} />
             </Tooltip>
           )}
         </Box>
@@ -494,8 +506,8 @@ const TaskBoardPage: React.FC = () => {
     filteredTasks.filter(t => col.statuses.includes(t.status));
 
   const urgentTasks = tasks.filter(t =>
-    t.has_active_blocker ||
-    (t.status === 'submitted') ||
+    t.status === 'submitted' ||
+    t.status === 'rejected' ||
     ((t.overdue_milestones || 0) > 0 && ['assigned', 'in_progress'].includes(t.status))
   );
 
@@ -539,7 +551,7 @@ const TaskBoardPage: React.FC = () => {
                 size="small"
                 clickable
                 onClick={() => navigate(`/tasks/${t.id}`)}
-                color={t.has_active_blocker ? 'error' : 'warning'}
+                color={t.status === 'rejected' ? 'error' : 'warning'}
                 sx={{ fontSize: '0.7rem' }}
               />
             ))}

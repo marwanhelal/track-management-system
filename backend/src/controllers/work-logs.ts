@@ -174,8 +174,9 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
       phase_id,
       hours,
       description,
-      date
-    }: WorkLogCreateInput = req.body;
+      date,
+      task_milestone_id,
+    }: WorkLogCreateInput & { task_milestone_id?: number } = req.body;
 
     // Validate phase exists and engineer can work on it
     const phaseResult = await query(`
@@ -214,11 +215,13 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Check if engineer already has work log for this phase on this date
+    // Check if engineer already has work log for this phase on this date (and same milestone)
+    const logDate = date || new Date().toISOString().split('T')[0];
     const existingLogResult = await query(`
       SELECT id, hours FROM work_logs
       WHERE engineer_id = $1 AND phase_id = $2 AND date = $3
-    `, [authReq.user.id, phase_id, date || new Date().toISOString().split('T')[0]]);
+        AND (task_milestone_id IS NOT DISTINCT FROM $4)
+    `, [authReq.user.id, phase_id, logDate, task_milestone_id || null]);
 
     let workLog;
 
@@ -241,8 +244,8 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
     } else {
       // Create new work log
       const result = await query(`
-        INSERT INTO work_logs (project_id, engineer_id, phase_id, hours, description, date)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO work_logs (project_id, engineer_id, phase_id, hours, description, date, task_milestone_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
       `, [
         phase.project_id,
@@ -250,7 +253,8 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
         phase_id,
         hours,
         description,
-        date || new Date().toISOString().split('T')[0]
+        logDate,
+        task_milestone_id || null,
       ]);
 
       workLog = result.rows[0];
@@ -286,7 +290,7 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
         phaseId: phase_id,
         phaseName: phase.phase_name,
         hours,
-        date: date || new Date().toISOString().split('T')[0],
+        date: logDate,
         action: 'work_logged'
       });
     } catch (socketError) {

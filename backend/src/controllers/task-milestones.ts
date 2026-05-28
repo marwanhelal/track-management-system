@@ -45,10 +45,17 @@ export const getMilestones = async (req: Request, res: Response): Promise<void> 
     const result = await query(
       `SELECT m.*,
               u_comp.name AS completed_by_name,
-              u_rev.name  AS reviewed_by_name
+              u_rev.name  AS reviewed_by_name,
+              COALESCE(wl_sum.logged_hours, 0) AS logged_hours
        FROM task_milestones m
        LEFT JOIN users u_comp ON u_comp.id = m.completed_by
        LEFT JOIN users u_rev  ON u_rev.id  = m.reviewed_by
+       LEFT JOIN (
+         SELECT task_milestone_id, SUM(hours) AS logged_hours
+         FROM work_logs
+         WHERE task_milestone_id IS NOT NULL AND deleted_at IS NULL
+         GROUP BY task_milestone_id
+       ) wl_sum ON wl_sum.task_milestone_id = m.id
        WHERE m.assignment_id = $1
        ORDER BY m.display_order, m.due_date`,
       [assignmentId]
@@ -70,7 +77,7 @@ export const createMilestone = async (req: Request, res: Response): Promise<void
   const authReq = req as any;
   try {
     const { assignmentId } = req.params;
-    const { title, description, due_date, display_order }: TaskMilestoneCreateInput = req.body;
+    const { title, description, due_date, display_order, allocated_hours }: TaskMilestoneCreateInput & { allocated_hours?: number } = req.body;
 
     if (!title || !due_date) {
       res.status(400).json({ success: false, error: 'title and due_date are required' });
@@ -100,10 +107,10 @@ export const createMilestone = async (req: Request, res: Response): Promise<void
     const nextOrder = display_order ?? orderResult.rows[0].next_order;
 
     const result = await query(
-      `INSERT INTO task_milestones (assignment_id, title, description, due_date, display_order)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO task_milestones (assignment_id, title, description, due_date, display_order, allocated_hours)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [assignmentId, title, description || null, due_date, nextOrder]
+      [assignmentId, title, description || null, due_date, nextOrder, allocated_hours || null]
     );
 
     // Notify the engineer

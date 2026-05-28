@@ -8,17 +8,16 @@ import {
   StepLabel, StepContent, Menu, MenuItem as MuiMenuItem, Snackbar
 } from '@mui/material';
 import {
-  ArrowBack, CheckCircle, PlayArrow, Block, Warning, Send,
-  Add, Delete, MoreVert, AccessTime, CalendarToday, Person,
-  Assignment, Notifications, Edit, Link as LinkIcon, Code,
-  Description, FiberManualRecord, CheckCircleOutline, Lock,
-  ThumbUp, ThumbDown, Flag, Chat, Attachment, Download,
-  Timeline, NotificationsActive, ContentCopy
+  ArrowBack, CheckCircle, PlayArrow, Warning, Send,
+  Add, Delete, AccessTime, CalendarToday,
+  Assignment, Link as LinkIcon, Code,
+  Description, CheckCircleOutline,
+  ThumbUp, ThumbDown, Timeline, Cancel
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
-import { TaskAssignment, TaskStatus, TaskMilestone, TaskNote, TaskResource, TaskBlocker, ResourceType } from '../types';
+import { TaskAssignment, TaskStatus, TaskMilestone, TaskNote, TaskResource, ResourceType } from '../types';
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<TaskStatus, { label: string; color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' }> = {
@@ -35,9 +34,11 @@ const STATUS_CONFIG: Record<TaskStatus, { label: string; color: 'default' | 'pri
 const MilestoneTimeline: React.FC<{
   milestones: TaskMilestone[];
   canComplete: boolean;
+  canLogTime: boolean;
   onComplete: (id: number, note: string) => void;
+  onLogTime?: (milestone: TaskMilestone) => void;
   onDelete?: (id: number) => void;
-}> = ({ milestones, canComplete, onComplete, onDelete }) => {
+}> = ({ milestones, canComplete, canLogTime, onComplete, onLogTime, onDelete }) => {
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [note, setNote] = useState('');
 
@@ -50,6 +51,11 @@ const MilestoneTimeline: React.FC<{
       ) : (
         milestones.map((ms, idx) => {
           const isOverdue = ms.status === 'overdue' || (!ms.completed_at && ms.due_date && new Date(ms.due_date) < new Date());
+          const loggedHours = (ms as any).logged_hours ? parseFloat((ms as any).logged_hours) : 0;
+          const allocatedHours = (ms as any).allocated_hours ? parseFloat((ms as any).allocated_hours) : 0;
+          const hoursPercent = allocatedHours > 0 ? Math.min(100, (loggedHours / allocatedHours) * 100) : 0;
+          const isOverBudget = allocatedHours > 0 && loggedHours > allocatedHours;
+
           return (
             <Box key={ms.id} sx={{ display: 'flex', gap: 2, mb: 2 }}>
               {/* Timeline dot */}
@@ -76,15 +82,40 @@ const MilestoneTimeline: React.FC<{
                     }}>
                       {ms.title}
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 1, mt: 0.3 }}>
+                    <Box sx={{ display: 'flex', gap: 1, mt: 0.3, flexWrap: 'wrap' }}>
                       <Typography variant="caption" color={isOverdue && !ms.completed_at ? 'error.main' : 'text.secondary'}>
                         <CalendarToday sx={{ fontSize: 10, mr: 0.3, verticalAlign: 'middle' }} />
                         {ms.due_date ? new Date(ms.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'No date'}
                         {isOverdue && !ms.completed_at && ' — Overdue'}
                       </Typography>
+                      {allocatedHours > 0 && (
+                        <Typography variant="caption" color={isOverBudget ? 'error.main' : 'text.secondary'}>
+                          <AccessTime sx={{ fontSize: 10, mr: 0.3, verticalAlign: 'middle' }} />
+                          {loggedHours}h / {allocatedHours}h
+                        </Typography>
+                      )}
                     </Box>
+                    {allocatedHours > 0 && (
+                      <LinearProgress
+                        variant="determinate"
+                        value={hoursPercent}
+                        sx={{ height: 3, borderRadius: 2, mt: 0.5, width: 120, '& .MuiLinearProgress-bar': { bgcolor: isOverBudget ? 'error.main' : 'primary.main' } }}
+                      />
+                    )}
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {canLogTime && !ms.completed_at && onLogTime && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="primary"
+                        startIcon={<AccessTime sx={{ fontSize: 12 }} />}
+                        onClick={() => onLogTime(ms)}
+                        sx={{ fontSize: '0.7rem', px: 1, py: 0.3 }}
+                      >
+                        Log Time
+                      </Button>
+                    )}
                     {canComplete && !ms.completed_at && (
                       <Button
                         size="small"
@@ -379,7 +410,6 @@ const TaskDetailPage: React.FC = () => {
   const [milestones, setMilestones] = useState<TaskMilestone[]>([]);
   const [notes, setNotes] = useState<TaskNote[]>([]);
   const [resources, setResources] = useState<TaskResource[]>([]);
-  const [blockers, setBlockers] = useState<TaskBlocker[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -391,11 +421,15 @@ const TaskDetailPage: React.FC = () => {
   const [submitText, setSubmitText] = useState('');
   const [reviewDialog, setReviewDialog] = useState<{ open: boolean; action: 'approve' | 'reject' }>({ open: false, action: 'approve' });
   const [reviewNote, setReviewNote] = useState('');
-  const [blockerDialog, setBlockerDialog] = useState(false);
-  const [blockerText, setBlockerText] = useState('');
+  const [reopenDialog, setReopenDialog] = useState(false);
+  const [reopenNote, setReopenNote] = useState('');
+  const [cancelDialog, setCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   const [addMilestoneDialog, setAddMilestoneDialog] = useState(false);
-  const [newMilestone, setNewMilestone] = useState({ title: '', description: '', due_date: '' });
+  const [newMilestone, setNewMilestone] = useState({ title: '', description: '', due_date: '', allocated_hours: '' });
   const [addResourceDialog, setAddResourceDialog] = useState(false);
+  const [logTimeDialog, setLogTimeDialog] = useState<{ open: boolean; milestone: TaskMilestone | null }>({ open: false, milestone: null });
+  const [logTimeForm, setLogTimeForm] = useState({ hours: '', date: new Date().toISOString().split('T')[0], description: '' });
 
   const taskId = parseInt(id || '0');
 
@@ -407,18 +441,16 @@ const TaskDetailPage: React.FC = () => {
     if (!taskId) return;
     setLoading(true);
     try {
-      const [taskRes, msRes, notesRes, resRes, blockersRes] = await Promise.all([
+      const [taskRes, msRes, notesRes, resRes] = await Promise.all([
         apiService.getTaskAssignment(taskId),
         apiService.getTaskMilestones(taskId),
         apiService.getTaskNotes(taskId),
         apiService.getTaskResources(taskId),
-        apiService.getTaskBlockers(taskId),
       ]);
       if (taskRes.success) setTask(taskRes.data?.task || taskRes.data);
       if (msRes.success) setMilestones(msRes.data?.milestones || msRes.data || []);
       if (notesRes.success) setNotes(notesRes.data?.notes || notesRes.data || []);
       if (resRes.success) setResources(resRes.data?.resources || resRes.data || []);
-      if (blockersRes.success) setBlockers(blockersRes.data?.blockers || blockersRes.data || []);
     } catch (err: any) {
       toast(err.response?.data?.error || 'Failed to load task', 'error');
     } finally {
@@ -466,30 +498,29 @@ const TaskDetailPage: React.FC = () => {
     } finally { setActionLoading(false); }
   };
 
-  const handleReportBlocker = async () => {
-    if (!blockerText.trim()) return;
+  const handleCancelTask = async () => {
     setActionLoading(true);
     try {
-      await apiService.reportBlocker(taskId, { reason: blockerText });
-      toast('Blocker reported. Your team leader has been notified.');
-      setBlockerDialog(false);
-      setBlockerText('');
-      loadTask();
+      await apiService.cancelTask(taskId, cancelReason.trim() || undefined);
+      toast('Task cancelled.');
+      setCancelDialog(false);
+      setCancelReason('');
+      navigate(isEngineer ? '/my-tasks' : '/task-board');
     } catch (err: any) {
-      toast(err.response?.data?.error || 'Failed to report blocker', 'error');
+      toast(err.response?.data?.error || 'Failed to cancel task', 'error');
     } finally { setActionLoading(false); }
   };
 
-  const handleResolveBlocker = async (blockerId: number) => {
-    const note = prompt('Resolution note:');
-    if (note === null) return;
+  const handleReopenTask = async () => {
     setActionLoading(true);
     try {
-      await apiService.resolveBlocker(taskId, blockerId, { resolved_note: note });
-      toast('Blocker resolved!');
+      await apiService.reopenTask(taskId, { reopen_note: reopenNote });
+      toast('Task reopened and assigned back to engineer!');
+      setReopenDialog(false);
+      setReopenNote('');
       loadTask();
     } catch (err: any) {
-      toast(err.response?.data?.error || 'Failed to resolve', 'error');
+      toast(err.response?.data?.error || 'Failed to reopen task', 'error');
     } finally { setActionLoading(false); }
   };
 
@@ -534,12 +565,15 @@ const TaskDetailPage: React.FC = () => {
 
   const handleAddMilestone = async () => {
     try {
-      await apiService.createTaskMilestone(taskId, newMilestone);
+      await apiService.createTaskMilestone(taskId, {
+        ...newMilestone,
+        allocated_hours: newMilestone.allocated_hours ? parseFloat(newMilestone.allocated_hours) : undefined,
+      } as any);
       const res = await apiService.getTaskMilestones(taskId);
       if (res.success) setMilestones(res.data?.milestones || res.data || []);
       toast('Milestone added!');
       setAddMilestoneDialog(false);
-      setNewMilestone({ title: '', description: '', due_date: '' });
+      setNewMilestone({ title: '', description: '', due_date: '', allocated_hours: '' });
     } catch (err: any) {
       toast(err.response?.data?.error || 'Failed to add milestone', 'error');
     }
@@ -562,6 +596,41 @@ const TaskDetailPage: React.FC = () => {
       setMilestones(prev => prev.filter(m => m.id !== msId));
     } catch (err: any) {
       toast(err.response?.data?.error || 'Failed to delete', 'error');
+    }
+  };
+
+  const handleOpenLogTime = (milestone: TaskMilestone) => {
+    setLogTimeForm({ hours: '', date: new Date().toISOString().split('T')[0], description: '' });
+    setLogTimeDialog({ open: true, milestone });
+  };
+
+  const handleLogTime = async () => {
+    if (!task || !logTimeDialog.milestone) return;
+    const hours = parseFloat(logTimeForm.hours);
+    if (isNaN(hours) || hours <= 0) {
+      toast('Hours must be greater than 0', 'error');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await apiService.createWorkLog({
+        phase_id: task.phase_id,
+        hours,
+        description: logTimeForm.description.trim() || undefined,
+        date: logTimeForm.date,
+        task_milestone_id: logTimeDialog.milestone.id,
+      } as any);
+      toast('Time logged successfully!');
+      setLogTimeDialog({ open: false, milestone: null });
+      // Refresh milestones to update logged hours
+      const res = await apiService.getTaskMilestones(taskId);
+      if (res.success) setMilestones(res.data?.milestones || res.data || []);
+      // Also reload full task to refresh hours budget
+      loadTask();
+    } catch (err: any) {
+      toast(err.response?.data?.error || 'Failed to log time', 'error');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -589,12 +658,12 @@ const TaskDetailPage: React.FC = () => {
 
   const statusCfg = STATUS_CONFIG[task.status];
   const canStart = isEngineer && task.status === 'assigned';
-  const canSubmit = isEngineer && task.status === 'in_progress';
-  const canBlock = isEngineer && task.status === 'in_progress';
+  const canSubmit = isEngineer && ['in_progress', 'blocked'].includes(task.status);
   const canReview = (isTeamLeader || isSupervisor) && task.status === 'submitted';
+  const canReopen = (isTeamLeader || isSupervisor) && task.status === 'rejected';
+  const canCancel = (isTeamLeader || isSupervisor) && !['approved', 'cancelled'].includes(task.status);
   const canManageMilestones = isTeamLeader || isSupervisor;
   const canAddResources = isEngineer || isTeamLeader;
-  const hasActiveBlocker = blockers.some(b => !b.resolved_at);
 
   const hoursPercent = task.allocated_hours > 0
     ? Math.min(100, (((task as any).logged_hours || 0) / task.allocated_hours) * 100) : 0;
@@ -618,7 +687,6 @@ const TaskDetailPage: React.FC = () => {
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <Chip label={statusCfg.label} color={statusCfg.color} size="small" sx={{ fontWeight: 700 }} />
-                {hasActiveBlocker && <Chip label="BLOCKED" color="error" variant="outlined" size="small" sx={{ fontWeight: 700 }} />}
                 <Chip label={`Project #${task.project_id}`} variant="outlined" size="small" />
               </Box>
               <Typography variant="h5" fontWeight={800} sx={{ mb: 1 }}>{task.title}</Typography>
@@ -639,11 +707,6 @@ const TaskDetailPage: React.FC = () => {
                   Submit Work
                 </Button>
               )}
-              {canBlock && !hasActiveBlocker && (
-                <Button variant="outlined" color="error" startIcon={<Flag />} onClick={() => setBlockerDialog(true)}>
-                  Report Blocker
-                </Button>
-              )}
               {canReview && (
                 <>
                   <Button variant="contained" color="success" startIcon={<ThumbUp />} onClick={() => setReviewDialog({ open: true, action: 'approve' })}>
@@ -653,6 +716,16 @@ const TaskDetailPage: React.FC = () => {
                     Reject
                   </Button>
                 </>
+              )}
+              {canReopen && (
+                <Button variant="contained" color="warning" startIcon={<PlayArrow />} onClick={() => setReopenDialog(true)}>
+                  Reopen Task
+                </Button>
+              )}
+              {canCancel && (
+                <Button variant="outlined" color="error" startIcon={<Cancel />} onClick={() => setCancelDialog(true)}>
+                  Cancel Task
+                </Button>
               )}
             </Box>
           </Box>
@@ -706,39 +779,27 @@ const TaskDetailPage: React.FC = () => {
             </Paper>
           )}
 
-          {/* Review Note */}
-          {task.review_note && (
-            <Paper sx={{ mt: 1, p: 2, bgcolor: task.status === 'rejected' ? 'error.50' : 'success.50', borderRadius: 2, border: '1px solid', borderColor: task.status === 'rejected' ? 'error.light' : 'success.light' }}>
-              <Typography variant="caption" fontWeight={700} color={task.status === 'rejected' ? 'error.dark' : 'success.dark'} sx={{ display: 'block', mb: 0.5 }}>
-                Review Note
+          {/* Review Note (rejection reason) */}
+          {task.review_note && task.status === 'rejected' && (
+            <Paper sx={{ mt: 1, p: 2, bgcolor: 'error.50', borderRadius: 2, border: '1px solid', borderColor: 'error.light' }}>
+              <Typography variant="caption" fontWeight={700} color="error.dark" sx={{ display: 'block', mb: 0.5 }}>
+                Rejection Reason
               </Typography>
               <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{task.review_note}</Typography>
             </Paper>
           )}
+
+          {/* Reopen Note — shown when task was reopened (status is 'assigned' and reopen_note exists) */}
+          {(task as any).reopen_note && task.status === 'assigned' && (
+            <Paper sx={{ mt: 1, p: 2, bgcolor: 'warning.50', borderRadius: 2, border: '1px solid', borderColor: 'warning.light' }}>
+              <Typography variant="caption" fontWeight={700} color="warning.dark" sx={{ display: 'block', mb: 0.5 }}>
+                Task Reopened — Instructions from Team Leader
+              </Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{(task as any).reopen_note}</Typography>
+            </Paper>
+          )}
         </CardContent>
       </Card>
-
-      {/* Active Blocker Alert */}
-      {hasActiveBlocker && blockers.filter(b => !b.resolved_at).map(b => (
-        <Alert
-          key={b.id}
-          severity="error"
-          sx={{ mb: 2, borderRadius: 2 }}
-          action={
-            (isTeamLeader || isSupervisor) && (
-              <Button color="inherit" size="small" onClick={() => handleResolveBlocker(b.id)}>
-                Resolve
-              </Button>
-            )
-          }
-        >
-          <Typography variant="body2" fontWeight={700}>Active Blocker</Typography>
-          <Typography variant="body2">{b.reason}</Typography>
-          <Typography variant="caption" color="text.secondary">
-            Reported by engineer · {new Date(b.created_at).toLocaleDateString()}
-          </Typography>
-        </Alert>
-      ))}
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
@@ -746,7 +807,6 @@ const TaskDetailPage: React.FC = () => {
           <Tab label={`Milestones (${milestones.length})`} />
           <Tab label={`Notes (${notes.length})`} />
           <Tab label={`Resources (${resources.length})`} />
-          {(isTeamLeader || isSupervisor) && <Tab label={`Blockers (${blockers.length})`} />}
         </Tabs>
       </Box>
 
@@ -765,7 +825,9 @@ const TaskDetailPage: React.FC = () => {
             <MilestoneTimeline
               milestones={milestones}
               canComplete={isEngineer && ['in_progress', 'blocked'].includes(task.status)}
+              canLogTime={isEngineer && ['in_progress', 'blocked'].includes(task.status)}
               onComplete={handleCompleteMilestone}
+              onLogTime={handleOpenLogTime}
               onDelete={canManageMilestones ? handleDeleteMilestone : undefined}
             />
           </CardContent>
@@ -810,45 +872,6 @@ const TaskDetailPage: React.FC = () => {
                   canDelete={canAddResources && r.author_id === user?.id}
                   onDelete={() => handleDeleteResource(r.id)}
                 />
-              ))
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {tab === 3 && (isTeamLeader || isSupervisor) && (
-        <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Blockers History</Typography>
-            {blockers.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
-                No blockers reported.
-              </Typography>
-            ) : (
-              blockers.map(b => (
-                <Paper key={b.id} sx={{ p: 2, mb: 1.5, borderRadius: 2, border: '1px solid', borderColor: b.resolved_at ? 'success.light' : 'error.light', bgcolor: b.resolved_at ? 'success.50' : 'error.50' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Box>
-                      <Typography variant="body2" fontWeight={600}>{b.reason}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Reported {new Date(b.created_at).toLocaleDateString('en-GB')}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
-                      <Chip label={b.resolved_at ? 'Resolved' : 'Active'} size="small" color={b.resolved_at ? 'success' : 'error'} />
-                      {!b.resolved_at && (
-                        <Button size="small" variant="outlined" color="success" onClick={() => handleResolveBlocker(b.id)}>
-                          Resolve
-                        </Button>
-                      )}
-                    </Box>
-                  </Box>
-                  {b.resolved_note && (
-                    <Typography variant="body2" color="success.dark" sx={{ mt: 1, fontSize: '0.8rem' }}>
-                      Resolution: {b.resolved_note}
-                    </Typography>
-                  )}
-                </Paper>
               ))
             )}
           </CardContent>
@@ -924,28 +947,54 @@ const TaskDetailPage: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Blocker Dialog */}
-      <Dialog open={blockerDialog} onClose={() => setBlockerDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Report a Blocker</DialogTitle>
+      {/* Cancel Task Dialog */}
+      <Dialog open={cancelDialog} onClose={() => setCancelDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Cancel Task</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+            This will permanently cancel the task. The engineer will be notified.
+          </Alert>
+          <TextField
+            autoFocus
+            multiline
+            rows={3}
+            fullWidth
+            label="Reason (optional)"
+            placeholder="Why is this task being cancelled?"
+            value={cancelReason}
+            onChange={e => setCancelReason(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCancelDialog(false)}>Keep Task</Button>
+          <Button variant="contained" color="error" onClick={handleCancelTask} disabled={actionLoading}>
+            {actionLoading ? <CircularProgress size={18} /> : 'Cancel Task'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Reopen Dialog */}
+      <Dialog open={reopenDialog} onClose={() => setReopenDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: 'warning.dark' }}>Reopen Task</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Describe what is blocking you. Your team leader will be notified immediately.
+            This will send the task back to the engineer as <strong>Assigned</strong>. Tell them what to fix or what to do differently.
           </Typography>
           <TextField
             autoFocus
             multiline
             rows={4}
             fullWidth
-            label="Blocker Description"
-            placeholder="What is blocking you? Be specific..."
-            value={blockerText}
-            onChange={e => setBlockerText(e.target.value)}
+            label="Instructions for Engineer (optional)"
+            placeholder="e.g. The structural report is missing the load calculations. Please revise section 3 and resubmit."
+            value={reopenNote}
+            onChange={e => setReopenNote(e.target.value)}
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setBlockerDialog(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleReportBlocker} disabled={!blockerText.trim() || actionLoading}>
-            {actionLoading ? <CircularProgress size={18} /> : 'Report Blocker'}
+          <Button onClick={() => setReopenDialog(false)}>Cancel</Button>
+          <Button variant="contained" color="warning" onClick={handleReopenTask} disabled={actionLoading}>
+            {actionLoading ? <CircularProgress size={18} /> : 'Reopen & Reassign'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -965,18 +1014,76 @@ const TaskDetailPage: React.FC = () => {
               value={newMilestone.description}
               onChange={e => setNewMilestone(p => ({ ...p, description: e.target.value }))}
             />
-            <TextField
-              label="Due Date" type="date" fullWidth size="small"
-              InputLabelProps={{ shrink: true }}
-              value={newMilestone.due_date}
-              onChange={e => setNewMilestone(p => ({ ...p, due_date: e.target.value }))}
-            />
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label="Due Date" type="date" fullWidth size="small"
+                InputLabelProps={{ shrink: true }}
+                value={newMilestone.due_date}
+                onChange={e => setNewMilestone(p => ({ ...p, due_date: e.target.value }))}
+              />
+              <TextField
+                label="Hours Budget" type="number" size="small" sx={{ width: 160 }}
+                inputProps={{ min: 0.5, step: 0.5 }}
+                value={newMilestone.allocated_hours}
+                onChange={e => setNewMilestone(p => ({ ...p, allocated_hours: e.target.value }))}
+                InputProps={{ endAdornment: <span style={{ fontSize: '0.8rem', color: '#888' }}>h</span> }}
+              />
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setAddMilestoneDialog(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleAddMilestone} disabled={!newMilestone.title.trim()}>
             Add Milestone
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Log Time Dialog */}
+      <Dialog open={logTimeDialog.open} onClose={() => setLogTimeDialog({ open: false, milestone: null })} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Log Time
+          {logTimeDialog.milestone && (
+            <Typography variant="body2" color="text.secondary" fontWeight={400}>
+              {logTimeDialog.milestone.title}
+              {(logTimeDialog.milestone as any).allocated_hours && ` · Budget: ${(logTimeDialog.milestone as any).allocated_hours}h`}
+            </Typography>
+          )}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label="Date" type="date" required size="small" fullWidth
+                InputLabelProps={{ shrink: true }}
+                inputProps={{ max: new Date().toISOString().split('T')[0] }}
+                value={logTimeForm.date}
+                onChange={e => setLogTimeForm(p => ({ ...p, date: e.target.value }))}
+              />
+              <TextField
+                label="Hours" type="number" required size="small" sx={{ width: 140 }}
+                inputProps={{ min: 0.25, step: 0.25 }}
+                value={logTimeForm.hours}
+                onChange={e => setLogTimeForm(p => ({ ...p, hours: e.target.value }))}
+                InputProps={{ endAdornment: <span style={{ fontSize: '0.8rem', color: '#888' }}>h</span> }}
+              />
+            </Box>
+            <TextField
+              label="Description (optional)" multiline rows={3} fullWidth size="small"
+              placeholder="What did you work on?"
+              value={logTimeForm.description}
+              onChange={e => setLogTimeForm(p => ({ ...p, description: e.target.value }))}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setLogTimeDialog({ open: false, milestone: null })}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleLogTime}
+            disabled={!logTimeForm.hours || parseFloat(logTimeForm.hours) <= 0 || actionLoading}
+          >
+            {actionLoading ? <CircularProgress size={18} /> : 'Save Time'}
           </Button>
         </DialogActions>
       </Dialog>
