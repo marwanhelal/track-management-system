@@ -42,10 +42,11 @@ import WorkLogSummaryCard from '../components/dashboard/WorkLogSummaryCard';
 import QuickTimeEntry from '../components/time-tracking/QuickTimeEntry';
 
 const Dashboard = () => {
-  const { isSupervisor, isEngineer } = useAuth();
+  const { isSupervisor, isEngineer, isTeamLeader } = useAuth();
   const { joinProject, on, off, connected } = useSocket();
 
   const [projects, setProjects] = useState<Project[]>([]);
+  const [teamLeaderProjects, setTeamLeaderProjects] = useState<{ id: number; name: string; status: string }[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [workLogSummary, setWorkLogSummary] = useState<{
     projectSummary: WorkLogSummary[];
@@ -84,7 +85,7 @@ const Dashboard = () => {
         setLoading(true);
         setError(null);
 
-        const requests = [
+        const requests: Promise<any>[] = [
           apiService.getProjects(),
           apiService.getWorkLogsSummary(),
         ];
@@ -94,8 +95,13 @@ const Dashboard = () => {
           requests.push(apiService.getArchivedProjects());
         }
 
+        // Load team leader's own projects for Quick Time Entry
+        if (isTeamLeader) {
+          requests.push(apiService.getMyProjects());
+        }
+
         const responses = await Promise.all(requests);
-        const [projectsResponse, summaryResponse, archivedResponse] = responses;
+        const [projectsResponse, summaryResponse, archivedResponse, tlProjectsResponse] = responses;
 
         if (projectsResponse.success && projectsResponse.data) {
           const projectsData = projectsResponse.data as { projects: Project[] };
@@ -116,6 +122,11 @@ const Dashboard = () => {
           const archivedData = archivedResponse.data as { projects: Project[] };
           setArchivedProjects(archivedData.projects);
         }
+
+        // Set team leader projects for Quick Time Entry
+        if (isTeamLeader && tlProjectsResponse?.success && tlProjectsResponse.data) {
+          setTeamLeaderProjects(tlProjectsResponse.data.projects || []);
+        }
       } catch (error: any) {
         setError(error.message || 'Failed to load dashboard data');
       } finally {
@@ -124,7 +135,7 @@ const Dashboard = () => {
     };
 
     loadDashboardData();
-  }, [isSupervisor]);
+  }, [isSupervisor, isTeamLeader]);
 
   // Join project rooms when socket connects and projects are loaded
   useEffect(() => {
@@ -575,6 +586,25 @@ const Dashboard = () => {
                         ...response.data,
                         phaseEngineerDetail: (response.data as any).phaseEngineerDetail || []
                       });
+                    }
+                  });
+                }}
+              />
+            </Paper>
+          )}
+
+          {/* Team Leader Quick Time Entry */}
+          {isTeamLeader && (
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h5" gutterBottom>
+                Quick Time Entry
+              </Typography>
+              <QuickTimeEntry
+                filteredProjects={teamLeaderProjects.length > 0 ? teamLeaderProjects : undefined}
+                onSuccess={() => {
+                  apiService.getMyProjects().then(response => {
+                    if (response.success && response.data) {
+                      setTeamLeaderProjects(response.data.projects || []);
                     }
                   });
                 }}
