@@ -196,14 +196,33 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
 
     const phase = phaseResult.rows[0];
 
-    // Check if phase is in a state where work can be logged
+    // Engineers with an active task assignment on this phase can log time regardless of phase status.
+    // For everyone else, the phase must be in a workable state.
     const allowedStatuses = ['ready', 'in_progress', 'submitted'];
     if (!allowedStatuses.includes(phase.status)) {
-      res.status(403).json({
-        success: false,
-        error: `Cannot log time on this phase. Phase status: ${phase.status}. Phase must be ready, in progress, or submitted.`
-      });
-      return;
+      if (authReq.user.role === 'engineer') {
+        const taskCheck = await query(
+          `SELECT id FROM task_assignments
+           WHERE engineer_id = $1 AND phase_id = $2
+             AND status NOT IN ('cancelled', 'approved')
+           LIMIT 1`,
+          [authReq.user.id, phase_id]
+        );
+        if (taskCheck.rows.length === 0) {
+          res.status(403).json({
+            success: false,
+            error: `Cannot log time on this phase. Phase status: ${phase.status}. Phase must be ready, in progress, or submitted.`
+          });
+          return;
+        }
+        // Has a task assignment — allowed to log time; fall through
+      } else {
+        res.status(403).json({
+          success: false,
+          error: `Cannot log time on this phase. Phase status: ${phase.status}. Phase must be ready, in progress, or submitted.`
+        });
+        return;
+      }
     }
 
     // Validate hours (positive number, no upper limit to allow catch-up logging)
@@ -260,8 +279,8 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
       workLog = result.rows[0];
     }
 
-    // Update phase status to in_progress if it was ready
-    if (phase.status === 'ready') {
+    // Auto-transition phase to in_progress if it was ready or not_started
+    if (phase.status === 'ready' || phase.status === 'not_started') {
       await query(
         'UPDATE project_phases SET status = $1, actual_start_date = COALESCE(actual_start_date, NOW()), updated_at = NOW() WHERE id = $2',
         ['in_progress', phase_id]
