@@ -68,7 +68,6 @@ export const getTaskAssignments = async (req: Request, res: Response): Promise<v
               COALESCE(ms.total_milestones, 0)     AS total_milestones,
               COALESCE(ms.completed_milestones, 0) AS completed_milestones,
               COALESCE(ms.overdue_milestones, 0)   AS overdue_milestones,
-              COALESCE(bl.has_blocker, false)       AS has_active_blocker,
               eng.name   AS engineer_name,
               eng.email  AS engineer_email,
               tl.name    AS team_leader_name,

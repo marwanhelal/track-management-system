@@ -30,7 +30,6 @@ interface TaskWithStats extends TaskAssignment {
   milestone_count?: number;
   completed_milestones?: number;
   overdue_milestones?: number;
-  has_active_blocker?: boolean;
   team_leader_name?: string;
   project_name?: string;
 }
@@ -52,12 +51,11 @@ const TaskCard: React.FC<{ task: TaskWithStats; onClick: () => void }> = ({ task
         cursor: 'pointer',
         borderRadius: 3,
         border: '1px solid',
-        borderColor: task.has_active_blocker ? 'error.light' : 'divider',
+        borderColor: 'divider',
         borderLeft: '4px solid',
-        borderLeftColor: task.has_active_blocker
-          ? 'error.main'
-          : task.status === 'in_progress' ? 'primary.main'
+        borderLeftColor: task.status === 'in_progress' ? 'primary.main'
           : task.status === 'submitted' ? 'warning.main'
+          : task.status === 'rejected' ? 'error.main'
           : task.status === 'approved' ? 'success.main'
           : 'grey.300',
         transition: 'all 0.2s ease',
@@ -99,9 +97,6 @@ const TaskCard: React.FC<{ task: TaskWithStats; onClick: () => void }> = ({ task
               color={statusCfg.color}
               sx={{ fontWeight: 600 }}
             />
-            {task.has_active_blocker && (
-              <Chip label="BLOCKED" size="small" color="error" variant="outlined" sx={{ fontSize: '0.65rem', height: 18 }} />
-            )}
           </Box>
         </Box>
 
@@ -220,6 +215,9 @@ const MyTasksPage: React.FC = () => {
     if (statusFilter === 'pending_review') {
       return matchesSearch && task.status === 'submitted';
     }
+    if (statusFilter === 'rejected') {
+      return matchesSearch && task.status === 'rejected';
+    }
     if (statusFilter === 'completed') {
       return matchesSearch && ['approved', 'cancelled'].includes(task.status);
     }
@@ -229,8 +227,8 @@ const MyTasksPage: React.FC = () => {
   const counts = {
     active: tasks.filter(t => ['assigned', 'in_progress', 'blocked'].includes(t.status)).length,
     submitted: tasks.filter(t => t.status === 'submitted').length,
+    rejected: tasks.filter(t => t.status === 'rejected').length,
     completed: tasks.filter(t => ['approved', 'cancelled'].includes(t.status)).length,
-    blocked: tasks.filter(t => t.has_active_blocker).length,
   };
 
   const todaysFocus = tasks.filter(t =>
@@ -261,7 +259,7 @@ const MyTasksPage: React.FC = () => {
         {[
           { label: 'Active', value: counts.active, color: 'primary.main', icon: <PlayArrow /> },
           { label: 'Awaiting Review', value: counts.submitted, color: 'warning.main', icon: <CheckCircle /> },
-          { label: 'Blocked', value: counts.blocked, color: 'error.main', icon: <Block /> },
+          { label: 'Rejected', value: counts.rejected, color: 'error.main', icon: <Warning /> },
           { label: 'Completed', value: counts.completed, color: 'success.main', icon: <TrendingUp /> },
         ].map(({ label, value, color, icon }) => (
           <Grid item xs={6} sm={3} key={label}>
@@ -322,6 +320,9 @@ const MyTasksPage: React.FC = () => {
             </MenuItem>
             <MenuItem value="pending_review">
               Awaiting Review <Chip label={counts.submitted} size="small" sx={{ ml: 1 }} />
+            </MenuItem>
+            <MenuItem value="rejected">
+              Rejected <Chip label={counts.rejected} size="small" sx={{ ml: 1 }} />
             </MenuItem>
             <MenuItem value="completed">Completed</MenuItem>
             <MenuItem value="all">All</MenuItem>

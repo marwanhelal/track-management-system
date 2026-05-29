@@ -12,7 +12,7 @@ import {
   Add, Delete, AccessTime, CalendarToday,
   Assignment, Link as LinkIcon, Code,
   Description, CheckCircleOutline,
-  ThumbUp, ThumbDown, Timeline, Cancel
+  ThumbUp, ThumbDown, Timeline, Cancel, Edit
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -430,6 +430,8 @@ const TaskDetailPage: React.FC = () => {
   const [addResourceDialog, setAddResourceDialog] = useState(false);
   const [logTimeDialog, setLogTimeDialog] = useState<{ open: boolean; milestone: TaskMilestone | null }>({ open: false, milestone: null });
   const [logTimeForm, setLogTimeForm] = useState({ hours: '', date: new Date().toISOString().split('T')[0], description: '' });
+  const [editDialog, setEditDialog] = useState(false);
+  const [editForm, setEditForm] = useState({ title: '', description: '', allocated_hours: '', deadline: '' });
 
   const taskId = parseInt(id || '0');
 
@@ -521,6 +523,35 @@ const TaskDetailPage: React.FC = () => {
       loadTask();
     } catch (err: any) {
       toast(err.response?.data?.error || 'Failed to reopen task', 'error');
+    } finally { setActionLoading(false); }
+  };
+
+  const handleOpenEditTask = () => {
+    if (!task) return;
+    setEditForm({
+      title: task.title,
+      description: task.description || '',
+      allocated_hours: String(task.allocated_hours || ''),
+      deadline: ((task as any).deadline || (task as any).due_date || '').split('T')[0],
+    });
+    setEditDialog(true);
+  };
+
+  const handleEditTask = async () => {
+    if (!editForm.title.trim() || !editForm.allocated_hours) return;
+    setActionLoading(true);
+    try {
+      await apiService.updateTaskAssignment(taskId, {
+        title: editForm.title.trim(),
+        description: editForm.description.trim() || undefined,
+        allocated_hours: parseFloat(editForm.allocated_hours),
+        deadline: editForm.deadline || undefined,
+      });
+      toast('Task updated!');
+      setEditDialog(false);
+      loadTask();
+    } catch (err: any) {
+      toast(err.response?.data?.error || 'Failed to update task', 'error');
     } finally { setActionLoading(false); }
   };
 
@@ -662,6 +693,7 @@ const TaskDetailPage: React.FC = () => {
   const canReview = (isTeamLeader || isSupervisor) && task.status === 'submitted';
   const canReopen = (isTeamLeader || isSupervisor) && task.status === 'rejected';
   const canCancel = (isTeamLeader || isSupervisor) && !['approved', 'cancelled'].includes(task.status);
+  const canEdit = (isTeamLeader || isSupervisor) && !['approved', 'cancelled'].includes(task.status);
   const canManageMilestones = isTeamLeader || isSupervisor;
   const canAddResources = isEngineer || isTeamLeader;
 
@@ -720,6 +752,11 @@ const TaskDetailPage: React.FC = () => {
               {canReopen && (
                 <Button variant="contained" color="warning" startIcon={<PlayArrow />} onClick={() => setReopenDialog(true)}>
                   Reopen Task
+                </Button>
+              )}
+              {canEdit && (
+                <Button variant="outlined" color="primary" startIcon={<Edit />} onClick={handleOpenEditTask}>
+                  Edit Task
                 </Button>
               )}
               {canCancel && (
@@ -995,6 +1032,50 @@ const TaskDetailPage: React.FC = () => {
           <Button onClick={() => setReopenDialog(false)}>Cancel</Button>
           <Button variant="contained" color="warning" onClick={handleReopenTask} disabled={actionLoading}>
             {actionLoading ? <CircularProgress size={18} /> : 'Reopen & Reassign'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Task Dialog */}
+      <Dialog open={editDialog} onClose={() => setEditDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Edit Task</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <TextField
+              label="Title" required fullWidth size="small"
+              value={editForm.title}
+              onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))}
+            />
+            <TextField
+              label="Description" fullWidth size="small" multiline rows={3}
+              value={editForm.description}
+              onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
+            />
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label="Hours Budget" type="number" size="small" required sx={{ flex: 1 }}
+                inputProps={{ min: 0.5, step: 0.5 }}
+                value={editForm.allocated_hours}
+                onChange={e => setEditForm(p => ({ ...p, allocated_hours: e.target.value }))}
+                InputProps={{ endAdornment: <span style={{ fontSize: '0.8rem', color: '#888' }}>h</span> }}
+              />
+              <TextField
+                label="Due Date" type="date" size="small" sx={{ flex: 1 }}
+                InputLabelProps={{ shrink: true }}
+                value={editForm.deadline}
+                onChange={e => setEditForm(p => ({ ...p, deadline: e.target.value }))}
+              />
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleEditTask}
+            disabled={!editForm.title.trim() || !editForm.allocated_hours || actionLoading}
+          >
+            {actionLoading ? <CircularProgress size={18} /> : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>
