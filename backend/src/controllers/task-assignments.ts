@@ -80,10 +80,12 @@ export const getTaskAssignments = async (req: Request, res: Response): Promise<v
        JOIN projects      pr  ON pr.id  = t.project_id
        JOIN project_phases ph  ON ph.id  = t.phase_id
        LEFT JOIN (
-         SELECT task_assignment_id, SUM(hours) AS logged_hours
-         FROM work_logs WHERE task_assignment_id IS NOT NULL
-         GROUP BY task_assignment_id
-       ) wl ON wl.task_assignment_id = t.id
+         SELECT tm.assignment_id, COALESCE(SUM(wl.hours), 0) AS logged_hours
+         FROM work_logs wl
+         JOIN task_milestones tm ON tm.id = wl.task_milestone_id
+         WHERE wl.deleted_at IS NULL
+         GROUP BY tm.assignment_id
+       ) wl ON wl.assignment_id = t.id
        LEFT JOIN (
          SELECT assignment_id,
                 COUNT(*)                                                            AS total_milestones,
@@ -91,11 +93,6 @@ export const getTaskAssignments = async (req: Request, res: Response): Promise<v
                 COUNT(*) FILTER (WHERE status = 'pending' AND due_date < NOW())    AS overdue_milestones
          FROM task_milestones GROUP BY assignment_id
        ) ms ON ms.assignment_id = t.id
-       LEFT JOIN (
-         SELECT assignment_id, true AS has_blocker
-         FROM task_blockers WHERE status = 'active'
-         GROUP BY assignment_id
-       ) bl ON bl.assignment_id = t.id
        ${whereClause}
        ORDER BY t.created_at DESC`,
       params
@@ -131,10 +128,12 @@ export const getTaskAssignmentById = async (req: Request, res: Response): Promis
        JOIN projects      pr  ON pr.id  = t.project_id
        JOIN project_phases ph  ON ph.id  = t.phase_id
        LEFT JOIN (
-         SELECT task_assignment_id, SUM(hours) AS logged_hours
-         FROM work_logs WHERE task_assignment_id IS NOT NULL
-         GROUP BY task_assignment_id
-       ) wl ON wl.task_assignment_id = t.id
+         SELECT tm.assignment_id, COALESCE(SUM(wl.hours), 0) AS logged_hours
+         FROM work_logs wl
+         JOIN task_milestones tm ON tm.id = wl.task_milestone_id
+         WHERE wl.deleted_at IS NULL
+         GROUP BY tm.assignment_id
+       ) wl ON wl.assignment_id = t.id
        WHERE t.id = $1`,
       [id]
     );
