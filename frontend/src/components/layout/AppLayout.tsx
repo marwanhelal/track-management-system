@@ -21,6 +21,7 @@ import {
   BarChart,
   NotificationsNone,
   FiberManualRecord,
+  SupervisorAccount,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -92,11 +93,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   // ─── Navigation items per role ──────────────────────────────
 
   const supervisorNav = [
-    { text: 'Dashboard',         icon: <Dashboard />,     path: '/dashboard' },
-    { text: 'Projects',          icon: <Assignment />,    path: '/projects' },
-    { text: 'Team Management',   icon: <People />,        path: '/team' },
-    { text: 'Engineer Activity', icon: <BarChart />,      path: '/engineer-activity' },
-    { text: 'Smart Warnings',    icon: <Psychology />,    path: '/smart-warnings' },
+    { text: 'Dashboard',         icon: <Dashboard />,          path: '/dashboard' },
+    { text: 'Projects',          icon: <Assignment />,         path: '/projects' },
+    { text: 'Task Board',        icon: <ViewKanban />,         path: '/task-board' },
+    { text: 'Team Management',   icon: <People />,             path: '/team' },
+    { text: 'Engineer Activity', icon: <BarChart />,           path: '/engineer-activity' },
+    { text: 'Smart Warnings',    icon: <Psychology />,         path: '/smart-warnings' },
   ];
 
   const teamLeaderNav = [

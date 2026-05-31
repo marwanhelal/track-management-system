@@ -134,6 +134,71 @@ export const createMilestone = async (req: Request, res: Response): Promise<void
   }
 };
 
+// PATCH /milestones/:id
+// TL or supervisor edits a milestone's title, description, due_date, allocated_hours
+export const updateMilestone = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const { id } = req.params;
+    const { title, description, due_date, allocated_hours } = req.body;
+
+    const existing = await query(
+      `SELECT m.*, ta.team_leader_id, ta.status AS task_status
+       FROM task_milestones m
+       JOIN task_assignments ta ON ta.id = m.assignment_id
+       WHERE m.id = $1`,
+      [id]
+    );
+
+    if (existing.rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Milestone not found' });
+      return;
+    }
+
+    const milestone = existing.rows[0];
+    if (authReq.user.role !== 'supervisor' && authReq.user.id !== milestone.team_leader_id) {
+      res.status(403).json({ success: false, error: 'Access denied' });
+      return;
+    }
+
+    if (['submitted', 'approved'].includes(milestone.task_status)) {
+      res.status(400).json({ success: false, error: 'Cannot edit milestones on a submitted or approved task' });
+      return;
+    }
+
+    const fields: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (title !== undefined) { fields.push(`title = $${idx++}`); values.push(title); }
+    if (description !== undefined) { fields.push(`description = $${idx++}`); values.push(description || null); }
+    if (due_date !== undefined) { fields.push(`due_date = $${idx++}`); values.push(due_date); }
+    if (allocated_hours !== undefined) { fields.push(`allocated_hours = $${idx++}`); values.push(allocated_hours || null); }
+
+    if (fields.length === 0) {
+      res.status(400).json({ success: false, error: 'No fields to update' });
+      return;
+    }
+
+    fields.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const result = await query(
+      `UPDATE task_milestones SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Milestone updated',
+      data: { milestone: enrichMilestone(result.rows[0]) }
+    } as ApiResponse);
+  } catch (error) {
+    console.error('updateMilestone error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // PATCH /milestones/:id/complete
 // Engineer marks a milestone complete and writes what they did
 export const completeMilestone = async (req: Request, res: Response): Promise<void> => {

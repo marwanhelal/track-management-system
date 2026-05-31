@@ -929,6 +929,11 @@ class ApiService {
     return response.data;
   }
 
+  async updateTaskMilestone(milestoneId: number, data: any): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/milestones/${milestoneId}`, data);
+    return response.data;
+  }
+
   async deleteMilestone(taskId: number, milestoneId: number): Promise<ApiResponse<any>> {
     const response = await this.api.delete(`/milestones/${milestoneId}`);
     return response.data;

@@ -92,6 +92,10 @@ router.post('/task-assignments/:assignmentId/milestones',
   teamLeaderOrSupervisor,
   milestones.createMilestone
 );
+router.patch('/milestones/:id',
+  teamLeaderOrSupervisor,
+  milestones.updateMilestone
+);
 router.patch('/milestones/:id/complete',
   canLogTime,
   milestones.completeMilestone

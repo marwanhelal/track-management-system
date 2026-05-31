@@ -38,7 +38,8 @@ const MilestoneTimeline: React.FC<{
   onComplete: (id: number, note: string) => void;
   onLogTime?: (milestone: TaskMilestone) => void;
   onDelete?: (id: number) => void;
-}> = ({ milestones, canComplete, canLogTime, onComplete, onLogTime, onDelete }) => {
+  onEdit?: (milestone: TaskMilestone) => void;
+}> = ({ milestones, canComplete, canLogTime, onComplete, onLogTime, onDelete, onEdit }) => {
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [note, setNote] = useState('');
 
@@ -126,6 +127,11 @@ const MilestoneTimeline: React.FC<{
                       >
                         Mark Done
                       </Button>
+                    )}
+                    {onEdit && !ms.completed_at && (
+                      <IconButton size="small" color="default" onClick={() => onEdit(ms)}>
+                        <Edit sx={{ fontSize: 14 }} />
+                      </IconButton>
                     )}
                     {onDelete && !ms.completed_at && (
                       <IconButton size="small" color="error" onClick={() => onDelete(ms.id)}>
@@ -432,6 +438,8 @@ const TaskDetailPage: React.FC = () => {
   const [logTimeForm, setLogTimeForm] = useState({ hours: '', date: new Date().toISOString().split('T')[0], description: '' });
   const [editDialog, setEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', description: '', allocated_hours: '', deadline: '' });
+  const [editMilestoneDialog, setEditMilestoneDialog] = useState<{ open: boolean; milestone: TaskMilestone | null }>({ open: false, milestone: null });
+  const [editMilestoneForm, setEditMilestoneForm] = useState({ title: '', description: '', due_date: '', allocated_hours: '' });
 
   const taskId = parseInt(id || '0');
 
@@ -628,6 +636,35 @@ const TaskDetailPage: React.FC = () => {
     } catch (err: any) {
       toast(err.response?.data?.error || 'Failed to delete', 'error');
     }
+  };
+
+  const handleOpenEditMilestone = (ms: TaskMilestone) => {
+    setEditMilestoneForm({
+      title: ms.title,
+      description: ms.description || '',
+      due_date: ms.due_date ? ms.due_date.split('T')[0] : '',
+      allocated_hours: (ms as any).allocated_hours ? String((ms as any).allocated_hours) : '',
+    });
+    setEditMilestoneDialog({ open: true, milestone: ms });
+  };
+
+  const handleEditMilestone = async () => {
+    if (!editMilestoneDialog.milestone || !editMilestoneForm.title.trim()) return;
+    setActionLoading(true);
+    try {
+      await apiService.updateTaskMilestone(editMilestoneDialog.milestone.id, {
+        title: editMilestoneForm.title.trim(),
+        description: editMilestoneForm.description.trim() || undefined,
+        due_date: editMilestoneForm.due_date || undefined,
+        allocated_hours: editMilestoneForm.allocated_hours ? parseFloat(editMilestoneForm.allocated_hours) : null,
+      });
+      toast('Milestone updated!');
+      setEditMilestoneDialog({ open: false, milestone: null });
+      const res = await apiService.getTaskMilestones(taskId);
+      if (res.success) setMilestones(res.data?.milestones || res.data || []);
+    } catch (err: any) {
+      toast(err.response?.data?.error || 'Failed to update milestone', 'error');
+    } finally { setActionLoading(false); }
   };
 
   const handleOpenLogTime = (milestone: TaskMilestone) => {
@@ -866,6 +903,7 @@ const TaskDetailPage: React.FC = () => {
               onComplete={handleCompleteMilestone}
               onLogTime={handleOpenLogTime}
               onDelete={canManageMilestones ? handleDeleteMilestone : undefined}
+              onEdit={canManageMilestones ? handleOpenEditMilestone : undefined}
             />
           </CardContent>
         </Card>
@@ -1075,6 +1113,46 @@ const TaskDetailPage: React.FC = () => {
             onClick={handleEditTask}
             disabled={!editForm.title.trim() || !editForm.allocated_hours || actionLoading}
           >
+            {actionLoading ? <CircularProgress size={18} /> : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Milestone Dialog */}
+      <Dialog open={editMilestoneDialog.open} onClose={() => setEditMilestoneDialog({ open: false, milestone: null })} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Edit Milestone</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <TextField
+              label="Title" required fullWidth size="small"
+              value={editMilestoneForm.title}
+              onChange={e => setEditMilestoneForm(p => ({ ...p, title: e.target.value }))}
+            />
+            <TextField
+              label="Description" fullWidth size="small" multiline rows={2}
+              value={editMilestoneForm.description}
+              onChange={e => setEditMilestoneForm(p => ({ ...p, description: e.target.value }))}
+            />
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label="Due Date" type="date" fullWidth size="small"
+                InputLabelProps={{ shrink: true }}
+                value={editMilestoneForm.due_date}
+                onChange={e => setEditMilestoneForm(p => ({ ...p, due_date: e.target.value }))}
+              />
+              <TextField
+                label="Hours Budget" type="number" size="small" sx={{ width: 160 }}
+                inputProps={{ min: 0.5, step: 0.5 }}
+                value={editMilestoneForm.allocated_hours}
+                onChange={e => setEditMilestoneForm(p => ({ ...p, allocated_hours: e.target.value }))}
+                InputProps={{ endAdornment: <span style={{ fontSize: '0.8rem', color: '#888' }}>h</span> }}
+              />
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditMilestoneDialog({ open: false, milestone: null })}>Cancel</Button>
+          <Button variant="contained" onClick={handleEditMilestone} disabled={!editMilestoneForm.title.trim() || actionLoading}>
             {actionLoading ? <CircularProgress size={18} /> : 'Save Changes'}
           </Button>
         </DialogActions>
