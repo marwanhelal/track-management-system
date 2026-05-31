@@ -77,19 +77,22 @@ const MilestoneTimeline: React.FC<{
               <Box sx={{ flex: 1, pb: 1 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.2 }}>
-                      {(ms as any).priority === 'high' && (
-                        <Tooltip title="High Priority"><Warning sx={{ fontSize: 14, color: '#d32f2f' }} /></Tooltip>
-                      )}
-                      {(ms as any).priority === 'medium' && (
-                        <Tooltip title="Medium Priority"><Warning sx={{ fontSize: 14, color: '#f57c00' }} /></Tooltip>
-                      )}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.2, flexWrap: 'wrap' }}>
                       <Typography variant="subtitle2" fontWeight={600} sx={{
                         textDecoration: ms.completed_at ? 'line-through' : 'none',
                         color: ms.completed_at ? 'text.secondary' : 'text.primary'
                       }}>
                         {ms.title}
                       </Typography>
+                      {(ms as any).priority === 'high' && (
+                        <Chip label="HIGH" size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, bgcolor: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', '& .MuiChip-label': { px: 0.8 } }} />
+                      )}
+                      {(ms as any).priority === 'medium' && (
+                        <Chip label="MED" size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, bgcolor: '#fff8e1', color: '#e65100', border: '1px solid #ffe082', '& .MuiChip-label': { px: 0.8 } }} />
+                      )}
+                      {(ms as any).priority === 'low' && (
+                        <Chip label="LOW" size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, bgcolor: '#f1f8e9', color: '#558b2f', border: '1px solid #aed581', '& .MuiChip-label': { px: 0.8 } }} />
+                      )}
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1, mt: 0.3, flexWrap: 'wrap' }}>
                       <Typography variant="caption" color={isOverdue && !ms.completed_at ? 'error.main' : 'text.secondary'}>
