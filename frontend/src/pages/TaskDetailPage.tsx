@@ -77,12 +77,20 @@ const MilestoneTimeline: React.FC<{
               <Box sx={{ flex: 1, pb: 1 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Box>
-                    <Typography variant="subtitle2" fontWeight={600} sx={{
-                      textDecoration: ms.completed_at ? 'line-through' : 'none',
-                      color: ms.completed_at ? 'text.secondary' : 'text.primary'
-                    }}>
-                      {ms.title}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.2 }}>
+                      {(ms as any).priority === 'high' && (
+                        <Tooltip title="High Priority"><Warning sx={{ fontSize: 14, color: '#d32f2f' }} /></Tooltip>
+                      )}
+                      {(ms as any).priority === 'medium' && (
+                        <Tooltip title="Medium Priority"><Warning sx={{ fontSize: 14, color: '#f57c00' }} /></Tooltip>
+                      )}
+                      <Typography variant="subtitle2" fontWeight={600} sx={{
+                        textDecoration: ms.completed_at ? 'line-through' : 'none',
+                        color: ms.completed_at ? 'text.secondary' : 'text.primary'
+                      }}>
+                        {ms.title}
+                      </Typography>
+                    </Box>
                     <Box sx={{ display: 'flex', gap: 1, mt: 0.3, flexWrap: 'wrap' }}>
                       <Typography variant="caption" color={isOverdue && !ms.completed_at ? 'error.main' : 'text.secondary'}>
                         <CalendarToday sx={{ fontSize: 10, mr: 0.3, verticalAlign: 'middle' }} />
@@ -432,7 +440,7 @@ const TaskDetailPage: React.FC = () => {
   const [cancelDialog, setCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [addMilestoneDialog, setAddMilestoneDialog] = useState(false);
-  const [newMilestone, setNewMilestone] = useState({ title: '', description: '', due_date: '', allocated_hours: '' });
+  const [newMilestone, setNewMilestone] = useState({ title: '', description: '', due_date: '', allocated_hours: '', priority: 'medium' });
   const [addResourceDialog, setAddResourceDialog] = useState(false);
   const [logTimeDialog, setLogTimeDialog] = useState<{ open: boolean; milestone: TaskMilestone | null }>({ open: false, milestone: null });
   const [logTimeForm, setLogTimeForm] = useState({ hours: '', date: new Date().toISOString().split('T')[0], description: '' });
@@ -441,7 +449,7 @@ const TaskDetailPage: React.FC = () => {
   const [history, setHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [editMilestoneDialog, setEditMilestoneDialog] = useState<{ open: boolean; milestone: TaskMilestone | null }>({ open: false, milestone: null });
-  const [editMilestoneForm, setEditMilestoneForm] = useState({ title: '', description: '', due_date: '', allocated_hours: '' });
+  const [editMilestoneForm, setEditMilestoneForm] = useState({ title: '', description: '', due_date: '', allocated_hours: '', priority: 'medium' });
 
   const taskId = parseInt(id || '0');
 
@@ -625,7 +633,7 @@ const TaskDetailPage: React.FC = () => {
       if (res.success) setMilestones(res.data?.milestones || res.data || []);
       toast('Milestone added!');
       setAddMilestoneDialog(false);
-      setNewMilestone({ title: '', description: '', due_date: '', allocated_hours: '' });
+      setNewMilestone({ title: '', description: '', due_date: '', allocated_hours: '', priority: 'medium' });
     } catch (err: any) {
       toast(err.response?.data?.error || 'Failed to add milestone', 'error');
     }
@@ -657,6 +665,7 @@ const TaskDetailPage: React.FC = () => {
       description: ms.description || '',
       due_date: ms.due_date ? ms.due_date.split('T')[0] : '',
       allocated_hours: (ms as any).allocated_hours ? String((ms as any).allocated_hours) : '',
+      priority: (ms as any).priority || 'medium',
     });
     setEditMilestoneDialog({ open: true, milestone: ms });
   };
@@ -670,6 +679,7 @@ const TaskDetailPage: React.FC = () => {
         description: editMilestoneForm.description.trim() || undefined,
         due_date: editMilestoneForm.due_date || undefined,
         allocated_hours: editMilestoneForm.allocated_hours ? parseFloat(editMilestoneForm.allocated_hours) : null,
+        priority: editMilestoneForm.priority,
       });
       toast('Milestone updated!');
       setEditMilestoneDialog({ open: false, milestone: null });
@@ -1222,13 +1232,22 @@ const TaskDetailPage: React.FC = () => {
                 onChange={e => setEditMilestoneForm(p => ({ ...p, due_date: e.target.value }))}
               />
               <TextField
-                label="Hours Budget" type="number" size="small" sx={{ width: 160 }}
+                label="Hours Budget" type="number" size="small" sx={{ width: 130 }}
                 inputProps={{ min: 0.5, step: 0.5 }}
                 value={editMilestoneForm.allocated_hours}
                 onChange={e => setEditMilestoneForm(p => ({ ...p, allocated_hours: e.target.value }))}
                 InputProps={{ endAdornment: <span style={{ fontSize: '0.8rem', color: '#888' }}>h</span> }}
               />
             </Box>
+            <TextField
+              select label="Priority" size="small" fullWidth
+              value={editMilestoneForm.priority}
+              onChange={e => setEditMilestoneForm(p => ({ ...p, priority: e.target.value }))}
+            >
+              <MenuItem value="high">🔴 High</MenuItem>
+              <MenuItem value="medium">🟡 Medium</MenuItem>
+              <MenuItem value="low">🟢 Low</MenuItem>
+            </TextField>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -1262,13 +1281,22 @@ const TaskDetailPage: React.FC = () => {
                 onChange={e => setNewMilestone(p => ({ ...p, due_date: e.target.value }))}
               />
               <TextField
-                label="Hours Budget" type="number" size="small" sx={{ width: 160 }}
+                label="Hours Budget" type="number" size="small" sx={{ width: 130 }}
                 inputProps={{ min: 0.5, step: 0.5 }}
                 value={newMilestone.allocated_hours}
                 onChange={e => setNewMilestone(p => ({ ...p, allocated_hours: e.target.value }))}
                 InputProps={{ endAdornment: <span style={{ fontSize: '0.8rem', color: '#888' }}>h</span> }}
               />
             </Box>
+            <TextField
+              select label="Priority" size="small" fullWidth
+              value={newMilestone.priority}
+              onChange={e => setNewMilestone(p => ({ ...p, priority: e.target.value }))}
+            >
+              <MenuItem value="high">🔴 High</MenuItem>
+              <MenuItem value="medium">🟡 Medium</MenuItem>
+              <MenuItem value="low">🟢 Low</MenuItem>
+            </TextField>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

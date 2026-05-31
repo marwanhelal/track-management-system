@@ -227,6 +227,7 @@ const MyTasksPage: React.FC = () => {
     return matchesSearch;
   }).sort((a, b) => {
     if (sortBy === 'priority') return (PRIORITY_ORDER[(a as any).priority] ?? 1) - (PRIORITY_ORDER[(b as any).priority] ?? 1);
+    if (sortBy === 'milestone_priority') return (PRIORITY_ORDER[(a as any).max_milestone_priority] ?? 1) - (PRIORITY_ORDER[(b as any).max_milestone_priority] ?? 1);
     if (sortBy === 'due_date') return new Date(a.due_date || '9999').getTime() - new Date(b.due_date || '9999').getTime();
     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   });
@@ -339,7 +340,8 @@ const MyTasksPage: React.FC = () => {
           <InputLabel>Sort By</InputLabel>
           <Select value={sortBy} onChange={e => setSortBy(e.target.value)} label="Sort By">
             <MenuItem value="newest">Newest First</MenuItem>
-            <MenuItem value="priority">Priority</MenuItem>
+            <MenuItem value="priority">Task Priority</MenuItem>
+            <MenuItem value="milestone_priority">Milestone Priority</MenuItem>
             <MenuItem value="due_date">Due Date</MenuItem>
           </Select>
         </FormControl>

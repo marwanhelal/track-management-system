@@ -77,7 +77,7 @@ export const createMilestone = async (req: Request, res: Response): Promise<void
   const authReq = req as any;
   try {
     const { assignmentId } = req.params;
-    const { title, description, due_date, display_order, allocated_hours }: TaskMilestoneCreateInput & { allocated_hours?: number } = req.body;
+    const { title, description, due_date, display_order, allocated_hours, priority }: TaskMilestoneCreateInput & { allocated_hours?: number; priority?: string } = req.body;
 
     if (!title || !due_date) {
       res.status(400).json({ success: false, error: 'title and due_date are required' });
@@ -106,11 +106,13 @@ export const createMilestone = async (req: Request, res: Response): Promise<void
     );
     const nextOrder = display_order ?? orderResult.rows[0].next_order;
 
+    const validPriority = ['low', 'medium', 'high'].includes(priority || '') ? priority : 'medium';
+
     const result = await query(
-      `INSERT INTO task_milestones (assignment_id, title, description, due_date, display_order, allocated_hours)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO task_milestones (assignment_id, title, description, due_date, display_order, allocated_hours, priority)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [assignmentId, title, description || null, due_date, nextOrder, allocated_hours || null]
+      [assignmentId, title, description || null, due_date, nextOrder, allocated_hours || null, validPriority]
     );
 
     // Notify the engineer
@@ -140,7 +142,7 @@ export const updateMilestone = async (req: Request, res: Response): Promise<void
   const authReq = req as any;
   try {
     const { id } = req.params;
-    const { title, description, due_date, allocated_hours } = req.body;
+    const { title, description, due_date, allocated_hours, priority } = req.body;
 
     const existing = await query(
       `SELECT m.*, ta.team_leader_id, ta.status AS task_status
@@ -174,6 +176,7 @@ export const updateMilestone = async (req: Request, res: Response): Promise<void
     if (description !== undefined) { fields.push(`description = $${idx++}`); values.push(description || null); }
     if (due_date !== undefined) { fields.push(`due_date = $${idx++}`); values.push(due_date); }
     if (allocated_hours !== undefined) { fields.push(`allocated_hours = $${idx++}`); values.push(allocated_hours || null); }
+    if (priority !== undefined && ['low', 'medium', 'high'].includes(priority)) { fields.push(`priority = $${idx++}`); values.push(priority); }
 
     if (fields.length === 0) {
       res.status(400).json({ success: false, error: 'No fields to update' });

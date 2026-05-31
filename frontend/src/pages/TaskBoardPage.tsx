@@ -73,14 +73,14 @@ const CreateTaskDialog: React.FC<{
     allocated_hours: '',
     due_date: '',
     priority: 'medium',
-    milestones: [] as { title: string; due_date: string; description: string; allocated_hours: string }[],
+    milestones: [] as { title: string; due_date: string; description: string; allocated_hours: string; priority: string }[],
   });
 
   useEffect(() => {
     if (open) {
       setStep(0);
       setError(null);
-      setForm({ project_id: '', phase_id: '', engineer_id: '', title: '', description: '', allocated_hours: '', due_date: '', priority: 'medium', milestones: [] as { title: string; due_date: string; description: string; allocated_hours: string }[] });
+      setForm({ project_id: '', phase_id: '', engineer_id: '', title: '', description: '', allocated_hours: '', due_date: '', priority: 'medium', milestones: [] as { title: string; due_date: string; description: string; allocated_hours: string; priority: string }[] });
       setPhases([]);
       apiService.getTaskTemplates().then(res => { if (res.success) setTemplates(res.data?.templates || []); }).catch(() => {});
       setEngineers([]);
@@ -128,7 +128,7 @@ const CreateTaskDialog: React.FC<{
     }
   };
 
-  const addMilestone = () => setForm(p => ({ ...p, milestones: [...p.milestones, { title: '', due_date: '', description: '', allocated_hours: '' }] }));
+  const addMilestone = () => setForm(p => ({ ...p, milestones: [...p.milestones, { title: '', due_date: '', description: '', allocated_hours: '', priority: 'medium' }] }));
   const updateMilestone = (i: number, field: string, val: string) => {
     setForm(p => {
       const ms = [...p.milestones];
@@ -359,14 +359,14 @@ const CreateTaskDialog: React.FC<{
                   </IconButton>
                 </Box>
                 <Grid container spacing={1.5}>
-                  <Grid item xs={12} sm={5}>
+                  <Grid item xs={12} sm={4}>
                     <TextField
                       size="small" fullWidth label="Title" required
                       value={ms.title}
                       onChange={e => updateMilestone(i, 'title', e.target.value)}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid item xs={12} sm={3}>
                     <TextField
                       size="small" fullWidth label="Due Date" type="date"
                       InputLabelProps={{ shrink: true }}
@@ -374,14 +374,24 @@ const CreateTaskDialog: React.FC<{
                       onChange={e => updateMilestone(i, 'due_date', e.target.value)}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={3}>
+                  <Grid item xs={6} sm={2}>
                     <TextField
-                      size="small" fullWidth label="Hours Budget" type="number"
+                      size="small" fullWidth label="Hrs" type="number"
                       inputProps={{ min: 0.5, step: 0.5 }}
                       value={ms.allocated_hours}
                       onChange={e => updateMilestone(i, 'allocated_hours', e.target.value)}
                       InputProps={{ endAdornment: <InputAdornment position="end">h</InputAdornment> }}
                     />
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Priority</InputLabel>
+                      <Select value={ms.priority || 'medium'} onChange={e => updateMilestone(i, 'priority', e.target.value)} label="Priority">
+                        <MenuItem value="high"><Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Flag sx={{ fontSize: 14, color: '#d32f2f' }} />High</Box></MenuItem>
+                        <MenuItem value="medium"><Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Flag sx={{ fontSize: 14, color: '#f57c00' }} />Med</Box></MenuItem>
+                        <MenuItem value="low"><Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Flag sx={{ fontSize: 14, color: '#388e3c' }} />Low</Box></MenuItem>
+                      </Select>
+                    </FormControl>
                   </Grid>
                   <Grid item xs={12}>
                     <TextField
@@ -480,8 +490,10 @@ const KanbanCard: React.FC<{ task: TaskWithStats; onClick: () => void }> = ({ ta
           <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1 }}>
             {task.engineer_name || `Engineer #${task.engineer_id}`}
           </Typography>
-          {(task as any).priority === 'high' && <Tooltip title="High Priority"><Flag sx={{ fontSize: 14, color: '#d32f2f' }} /></Tooltip>}
-          {(task as any).priority === 'medium' && <Tooltip title="Medium Priority"><Flag sx={{ fontSize: 14, color: '#f57c00' }} /></Tooltip>}
+          {(task as any).priority === 'high' && <Tooltip title="Task: High Priority"><Flag sx={{ fontSize: 14, color: '#d32f2f' }} /></Tooltip>}
+          {(task as any).priority === 'medium' && <Tooltip title="Task: Medium Priority"><Flag sx={{ fontSize: 14, color: '#f57c00' }} /></Tooltip>}
+          {(task as any).max_milestone_priority === 'high' && <Tooltip title="Milestone: High Priority"><Flag sx={{ fontSize: 12, color: '#b71c1c', opacity: 0.7 }} /></Tooltip>}
+          {(task as any).max_milestone_priority === 'medium' && <Tooltip title="Milestone: Medium Priority"><Flag sx={{ fontSize: 12, color: '#e65100', opacity: 0.7 }} /></Tooltip>}
           {task.status === 'rejected' && (
             <Tooltip title="Rejected — reopen to reassign">
               <Warning sx={{ fontSize: 14, color: 'error.main' }} />
@@ -550,6 +562,7 @@ const TaskBoardPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [engineerFilter, setEngineerFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+  const [milestonePriorityFilter, setMilestonePriorityFilter] = useState('');
   const [createDialog, setCreateDialog] = useState(false);
   const [snack, setSnack] = useState<{ open: boolean; msg: string }>({ open: false, msg: '' });
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -583,7 +596,8 @@ const TaskBoardPage: React.FC = () => {
       (task.project_name || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesEngineer = !engineerFilter || String(task.engineer_id) === engineerFilter;
     const matchesPriority = !priorityFilter || (task as any).priority === priorityFilter;
-    return matchesSearch && matchesEngineer && matchesPriority;
+    const matchesMilestonePriority = !milestonePriorityFilter || (task as any).max_milestone_priority === milestonePriorityFilter;
+    return matchesSearch && matchesEngineer && matchesPriority && matchesMilestonePriority;
   });
 
   const handleBulkReview = async () => {
@@ -686,8 +700,17 @@ const TaskBoardPage: React.FC = () => {
           </FormControl>
         )}
         <FormControl size="small" sx={{ minWidth: 130 }}>
-          <InputLabel>Priority</InputLabel>
-          <Select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} label="Priority">
+          <InputLabel>Task Priority</InputLabel>
+          <Select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} label="Task Priority">
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="high"><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Flag sx={{ fontSize: 14, color: '#d32f2f' }} />High</Box></MenuItem>
+            <MenuItem value="medium"><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Flag sx={{ fontSize: 14, color: '#f57c00' }} />Medium</Box></MenuItem>
+            <MenuItem value="low"><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Flag sx={{ fontSize: 14, color: '#388e3c' }} />Low</Box></MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Milestone Priority</InputLabel>
+          <Select value={milestonePriorityFilter} onChange={e => setMilestonePriorityFilter(e.target.value)} label="Milestone Priority">
             <MenuItem value="">All</MenuItem>
             <MenuItem value="high"><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Flag sx={{ fontSize: 14, color: '#d32f2f' }} />High</Box></MenuItem>
             <MenuItem value="medium"><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Flag sx={{ fontSize: 14, color: '#f57c00' }} />Medium</Box></MenuItem>

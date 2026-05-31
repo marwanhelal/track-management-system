@@ -18,6 +18,7 @@ interface CalendarMilestone {
   due_date: string;
   completed_at: string | null;
   status: 'overdue' | 'pending' | 'completed';
+  priority: 'high' | 'medium' | 'low';
   project_name?: string;
 }
 
@@ -29,6 +30,12 @@ const STATUS_STYLE = {
   overdue:   { bg: '#ffebee', color: '#c62828', border: '#ef9a9a' },
   pending:   { bg: '#fff8e1', color: '#e65100', border: '#ffe082' },
   completed: { bg: '#e8f5e9', color: '#2e7d32', border: '#a5d6a7' },
+};
+
+const MILESTONE_PRIORITY_STYLE = {
+  high:   { bg: '#ffebee', color: '#c62828', border: '#ef9a9a', label: '🔴' },
+  medium: { bg: '#fff8e1', color: '#e65100', border: '#ffe082', label: '🟡' },
+  low:    { bg: '#f1f8e9', color: '#558b2f', border: '#aed581', label: '🟢' },
 };
 
 const MyCalendarPage: React.FC = () => {
@@ -71,6 +78,7 @@ const MyCalendarPage: React.FC = () => {
                     : ms.due_date && new Date(ms.due_date) < today
                     ? 'overdue'
                     : 'pending',
+                  priority: ms.priority || 'medium',
                   project_name: task.project_name,
                 });
               });
@@ -239,7 +247,9 @@ const MyCalendarPage: React.FC = () => {
 
                         {/* Milestone text chips inside the box */}
                         {dayMilestones.slice(0, 2).map(ms => {
-                          const style = STATUS_STYLE[ms.status];
+                          const style = ms.status === 'completed' || ms.status === 'overdue'
+                            ? STATUS_STYLE[ms.status]
+                            : MILESTONE_PRIORITY_STYLE[ms.priority] || STATUS_STYLE.pending;
                           const isHighlighted = selectedMilestoneId === ms.id;
                           return (
                             <Box
@@ -266,9 +276,9 @@ const MyCalendarPage: React.FC = () => {
                                 lineHeight: 1.6,
                                 '&:hover': { opacity: 0.85, transform: 'scale(1.02)' },
                               }}
-                              title={`${ms.title} — ${ms.task_title}`}
+                              title={`${ms.title} — ${ms.task_title} [${ms.priority} priority]`}
                             >
-                              {ms.title}
+                              {ms.status !== 'completed' && ms.priority === 'high' ? '🔴 ' : ms.priority === 'medium' && ms.status !== 'completed' ? '🟡 ' : ''}{ms.title}
                             </Box>
                           );
                         })}
@@ -341,9 +351,11 @@ const MyCalendarPage: React.FC = () => {
                       >
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Box sx={{ flex: 1, mr: 1 }}>
-                            <Typography variant="body2" fontWeight={700} sx={{ color: style.color }}>
-                              {ms.title}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Typography variant="body2" fontWeight={700} sx={{ color: style.color }}>
+                                {ms.priority === 'high' ? '🔴' : ms.priority === 'medium' ? '🟡' : '🟢'} {ms.title}
+                              </Typography>
+                            </Box>
                             <Typography variant="caption" color="text.secondary" display="block">
                               Task: {ms.task_title}
                             </Typography>

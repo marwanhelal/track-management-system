@@ -69,6 +69,7 @@ export const getTaskAssignments = async (req: Request, res: Response): Promise<v
               COALESCE(ms.total_milestones, 0)     AS total_milestones,
               COALESCE(ms.completed_milestones, 0) AS completed_milestones,
               COALESCE(ms.overdue_milestones, 0)   AS overdue_milestones,
+              mp.max_milestone_priority,
               eng.name   AS engineer_name,
               eng.email  AS engineer_email,
               tl.name    AS team_leader_name,
@@ -93,6 +94,14 @@ export const getTaskAssignments = async (req: Request, res: Response): Promise<v
                 COUNT(*) FILTER (WHERE status = 'pending' AND due_date < NOW())    AS overdue_milestones
          FROM task_milestones GROUP BY assignment_id
        ) ms ON ms.assignment_id = t.id
+       LEFT JOIN (
+         SELECT assignment_id,
+                CASE MIN(CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 2 END)
+                  WHEN 1 THEN 'high' WHEN 2 THEN 'medium' WHEN 3 THEN 'low' ELSE 'medium' END AS max_milestone_priority
+         FROM task_milestones
+         WHERE completed_at IS NULL
+         GROUP BY assignment_id
+       ) mp ON mp.assignment_id = t.id
        ${whereClause}
        ORDER BY t.created_at DESC`,
       params
@@ -117,6 +126,7 @@ export const getTaskAssignmentById = async (req: Request, res: Response): Promis
     const result = await query(
       `SELECT t.*,
               COALESCE(wl.logged_hours, 0)         AS logged_hours,
+              mp.max_milestone_priority,
               eng.name   AS engineer_name,
               eng.email  AS engineer_email,
               tl.name    AS team_leader_name,
@@ -134,6 +144,14 @@ export const getTaskAssignmentById = async (req: Request, res: Response): Promis
          WHERE wl.deleted_at IS NULL
          GROUP BY tm.assignment_id
        ) wl ON wl.assignment_id = t.id
+       LEFT JOIN (
+         SELECT assignment_id,
+                CASE MIN(CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 2 END)
+                  WHEN 1 THEN 'high' WHEN 2 THEN 'medium' WHEN 3 THEN 'low' ELSE 'medium' END AS max_milestone_priority
+         FROM task_milestones
+         WHERE completed_at IS NULL
+         GROUP BY assignment_id
+       ) mp ON mp.assignment_id = t.id
        WHERE t.id = $1`,
       [id]
     );
@@ -233,9 +251,9 @@ export const createTaskAssignment = async (req: Request, res: Response): Promise
           const m = milestones[i]!;
           await client.query(
             `INSERT INTO task_milestones
-               (assignment_id, title, description, due_date, display_order, allocated_hours)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [task.id, m.title, m.description || null, m.due_date, m.display_order ?? i, (m as any).allocated_hours || null]
+               (assignment_id, title, description, due_date, display_order, allocated_hours, priority)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [task.id, m.title, m.description || null, m.due_date, m.display_order ?? i, (m as any).allocated_hours || null, ['low','medium','high'].includes((m as any).priority) ? (m as any).priority : 'medium']
           );
         }
       }
