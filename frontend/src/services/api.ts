@@ -907,6 +907,31 @@ class ApiService {
     return response.data;
   }
 
+  async bulkReviewTasks(data: { ids: number[]; action: 'approve' | 'reject'; review_note?: string }): Promise<ApiResponse<any>> {
+    const response = await this.api.post('/task-assignments/bulk-review', data);
+    return response.data;
+  }
+
+  async getTaskHistory(taskId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/task-assignments/${taskId}/history`);
+    return response.data;
+  }
+
+  async getTaskTemplates(): Promise<ApiResponse<any>> {
+    const response = await this.api.get('/task-templates');
+    return response.data;
+  }
+
+  async createTaskTemplate(data: any): Promise<ApiResponse<any>> {
+    const response = await this.api.post('/task-templates', data);
+    return response.data;
+  }
+
+  async deleteTaskTemplate(id: number): Promise<ApiResponse<any>> {
+    const response = await this.api.delete(`/task-templates/${id}`);
+    return response.data;
+  }
+
   // ==================== Task Milestones ====================
 
   async getTaskMilestones(taskId: number): Promise<ApiResponse<any>> {

@@ -10,7 +10,7 @@ import {
   Add, Search, Refresh, Assignment, PlayArrow, Block,
   CheckCircle, Warning, AccessTime, CalendarToday, Person,
   ArrowForward, FilterList, FiberManualRecord, Flag, Close,
-  MoreVert, OpenInNew
+  MoreVert, OpenInNew, ThumbUp, ThumbDown, BookmarkBorder, Bookmark
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -61,6 +61,9 @@ const CreateTaskDialog: React.FC<{
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+
   const [form, setForm] = useState({
     project_id: '',
     phase_id: '',
@@ -69,6 +72,7 @@ const CreateTaskDialog: React.FC<{
     description: '',
     allocated_hours: '',
     due_date: '',
+    priority: 'medium',
     milestones: [] as { title: string; due_date: string; description: string; allocated_hours: string }[],
   });
 
@@ -76,8 +80,9 @@ const CreateTaskDialog: React.FC<{
     if (open) {
       setStep(0);
       setError(null);
-      setForm({ project_id: '', phase_id: '', engineer_id: '', title: '', description: '', allocated_hours: '', due_date: '', milestones: [] as { title: string; due_date: string; description: string; allocated_hours: string }[] });
+      setForm({ project_id: '', phase_id: '', engineer_id: '', title: '', description: '', allocated_hours: '', due_date: '', priority: 'medium', milestones: [] as { title: string; due_date: string; description: string; allocated_hours: string }[] });
       setPhases([]);
+      apiService.getTaskTemplates().then(res => { if (res.success) setTemplates(res.data?.templates || []); }).catch(() => {});
       setEngineers([]);
       loadProjects();
     }
@@ -145,11 +150,12 @@ const CreateTaskDialog: React.FC<{
         description: form.description || undefined,
         allocated_hours: parseInt(form.allocated_hours),
         due_date: form.due_date || undefined,
+        priority: form.priority,
         milestones: form.milestones.filter(m => m.title.trim()).map(m => ({
           ...m,
           allocated_hours: m.allocated_hours ? parseFloat(m.allocated_hours) : undefined,
         })),
-      });
+      } as any);
       onCreated();
       onClose();
     } catch (err: any) {
@@ -257,6 +263,11 @@ const CreateTaskDialog: React.FC<{
 
         {step === 1 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {templates.length > 0 && (
+              <Button size="small" variant="outlined" startIcon={<Bookmark />} onClick={() => setTemplatePickerOpen(true)}>
+                Load from Template
+              </Button>
+            )}
             <TextField
               label="Task Title" required fullWidth
               value={form.title}
@@ -270,7 +281,7 @@ const CreateTaskDialog: React.FC<{
               placeholder="Detailed description of what needs to be done..."
             />
             <Grid container spacing={2}>
-              <Grid item xs={6}>
+              <Grid item xs={4}>
                 <TextField
                   label="Allocated Hours" required fullWidth type="number"
                   inputProps={{ min: 1, max: 9999 }}
@@ -279,7 +290,7 @@ const CreateTaskDialog: React.FC<{
                   InputProps={{ endAdornment: <InputAdornment position="end">hrs</InputAdornment> }}
                 />
               </Grid>
-              <Grid item xs={6}>
+              <Grid item xs={4}>
                 <TextField
                   label="Due Date" type="date" fullWidth
                   InputLabelProps={{ shrink: true }}
@@ -288,7 +299,47 @@ const CreateTaskDialog: React.FC<{
                   inputProps={{ min: new Date().toISOString().split('T')[0] }}
                 />
               </Grid>
+              <Grid item xs={4}>
+                <FormControl fullWidth size="small" sx={{ mt: 0 }}>
+                  <InputLabel>Priority</InputLabel>
+                  <Select value={form.priority} onChange={e => setForm(p => ({ ...p, priority: e.target.value }))} label="Priority">
+                    <MenuItem value="high"><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Flag sx={{ fontSize: 16, color: '#d32f2f' }} />High</Box></MenuItem>
+                    <MenuItem value="medium"><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Flag sx={{ fontSize: 16, color: '#f57c00' }} />Medium</Box></MenuItem>
+                    <MenuItem value="low"><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Flag sx={{ fontSize: 16, color: '#388e3c' }} />Low</Box></MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
             </Grid>
+
+            {/* Template Picker Dialog */}
+            <Dialog open={templatePickerOpen} onClose={() => setTemplatePickerOpen(false)} maxWidth="sm" fullWidth>
+              <DialogTitle>Load Template</DialogTitle>
+              <DialogContent>
+                {templates.map((t: any) => (
+                  <Paper key={t.id} sx={{ p: 2, mb: 1, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
+                    onClick={() => {
+                      setForm(p => ({
+                        ...p,
+                        title: t.name,
+                        description: t.description || '',
+                        allocated_hours: t.allocated_hours ? String(t.allocated_hours) : '',
+                        milestones: (t.milestones || []).map((m: any) => ({
+                          title: m.title, description: m.description || '', due_date: '', allocated_hours: m.allocated_hours ? String(m.allocated_hours) : ''
+                        }))
+                      }));
+                      setTemplatePickerOpen(false);
+                    }}>
+                    <Typography variant="subtitle2" fontWeight={700}>{t.name}</Typography>
+                    {t.description && <Typography variant="caption" color="text.secondary">{t.description}</Typography>}
+                    <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                      {t.allocated_hours && <Chip label={`${t.allocated_hours}h`} size="small" />}
+                      {(t.milestones || []).length > 0 && <Chip label={`${t.milestones.length} milestones`} size="small" />}
+                    </Box>
+                  </Paper>
+                ))}
+              </DialogContent>
+              <DialogActions><Button onClick={() => setTemplatePickerOpen(false)}>Cancel</Button></DialogActions>
+            </Dialog>
           </Box>
         )}
 
@@ -361,14 +412,39 @@ const CreateTaskDialog: React.FC<{
             Next
           </Button>
         ) : (
-          <Button
-            variant="contained"
-            color="success"
-            onClick={handleSubmit}
-            disabled={submitting || !canNextStep1}
-          >
-            {submitting ? <CircularProgress size={18} /> : 'Assign Task'}
-          </Button>
+          <>
+            {form.title && (
+              <Button
+                variant="outlined"
+                startIcon={<BookmarkBorder />}
+                onClick={async () => {
+                  try {
+                    await apiService.createTaskTemplate({
+                      name: form.title,
+                      description: form.description || undefined,
+                      allocated_hours: form.allocated_hours ? parseFloat(form.allocated_hours) : undefined,
+                      milestones: form.milestones.filter(m => m.title.trim()).map((m, i) => ({
+                        title: m.title, description: m.description || undefined,
+                        allocated_hours: m.allocated_hours ? parseFloat(m.allocated_hours) : undefined,
+                        display_order: i
+                      }))
+                    });
+                  } catch {}
+                }}
+                sx={{ mr: 'auto' }}
+              >
+                Save as Template
+              </Button>
+            )}
+            <Button
+              variant="contained"
+              color="success"
+              onClick={handleSubmit}
+              disabled={submitting || !canNextStep1}
+            >
+              {submitting ? <CircularProgress size={18} /> : 'Assign Task'}
+            </Button>
+          </>
         )}
       </DialogActions>
     </Dialog>
@@ -404,6 +480,8 @@ const KanbanCard: React.FC<{ task: TaskWithStats; onClick: () => void }> = ({ ta
           <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1 }}>
             {task.engineer_name || `Engineer #${task.engineer_id}`}
           </Typography>
+          {(task as any).priority === 'high' && <Tooltip title="High Priority"><Flag sx={{ fontSize: 14, color: '#d32f2f' }} /></Tooltip>}
+          {(task as any).priority === 'medium' && <Tooltip title="Medium Priority"><Flag sx={{ fontSize: 14, color: '#f57c00' }} /></Tooltip>}
           {task.status === 'rejected' && (
             <Tooltip title="Rejected — reopen to reassign">
               <Warning sx={{ fontSize: 14, color: 'error.main' }} />
@@ -471,8 +549,13 @@ const TaskBoardPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [engineerFilter, setEngineerFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
   const [createDialog, setCreateDialog] = useState(false);
   const [snack, setSnack] = useState<{ open: boolean; msg: string }>({ open: false, msg: '' });
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkDialog, setBulkDialog] = useState<{ open: boolean; action: 'approve' | 'reject' }>({ open: false, action: 'approve' });
+  const [bulkNote, setBulkNote] = useState('');
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -499,8 +582,27 @@ const TaskBoardPage: React.FC = () => {
       (task.engineer_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (task.project_name || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesEngineer = !engineerFilter || String(task.engineer_id) === engineerFilter;
-    return matchesSearch && matchesEngineer;
+    const matchesPriority = !priorityFilter || (task as any).priority === priorityFilter;
+    return matchesSearch && matchesEngineer && matchesPriority;
   });
+
+  const handleBulkReview = async () => {
+    if (selectedIds.length === 0) return;
+    setBulkLoading(true);
+    try {
+      await apiService.bulkReviewTasks({ ids: selectedIds, action: bulkDialog.action, review_note: bulkNote || undefined });
+      setSnack({ open: true, msg: `${selectedIds.length} task(s) ${bulkDialog.action === 'approve' ? 'approved' : 'rejected'}!` });
+      setSelectedIds([]);
+      setBulkDialog({ open: false, action: 'approve' });
+      setBulkNote('');
+      loadTasks();
+    } catch (err: any) {
+      setSnack({ open: true, msg: err.response?.data?.error || 'Bulk action failed' });
+    } finally { setBulkLoading(false); }
+  };
+
+  const submittedTasks = filteredTasks.filter(t => t.status === 'submitted');
+  const toggleSelect = (id: number) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
   const getColumnTasks = (col: Column) =>
     filteredTasks.filter(t => col.statuses.includes(t.status));
@@ -563,7 +665,7 @@ const TaskBoardPage: React.FC = () => {
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
       {/* Filters */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', gap: 2, mb: selectedIds.length > 0 ? 1 : 3, flexWrap: 'wrap' }}>
         <TextField
           placeholder="Search tasks or engineers..."
           value={searchQuery}
@@ -573,9 +675,9 @@ const TaskBoardPage: React.FC = () => {
           InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
         />
         {engineers.length > 0 && (
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel>Filter by Engineer</InputLabel>
-            <Select value={engineerFilter} onChange={e => setEngineerFilter(e.target.value)} label="Filter by Engineer">
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel>Engineer</InputLabel>
+            <Select value={engineerFilter} onChange={e => setEngineerFilter(e.target.value)} label="Engineer">
               <MenuItem value="">All Engineers</MenuItem>
               {engineers.map(e => (
                 <MenuItem key={e.id} value={String(e.id)}>{e.name}</MenuItem>
@@ -583,7 +685,26 @@ const TaskBoardPage: React.FC = () => {
             </Select>
           </FormControl>
         )}
+        <FormControl size="small" sx={{ minWidth: 130 }}>
+          <InputLabel>Priority</InputLabel>
+          <Select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} label="Priority">
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="high"><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Flag sx={{ fontSize: 14, color: '#d32f2f' }} />High</Box></MenuItem>
+            <MenuItem value="medium"><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Flag sx={{ fontSize: 14, color: '#f57c00' }} />Medium</Box></MenuItem>
+            <MenuItem value="low"><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Flag sx={{ fontSize: 14, color: '#388e3c' }} />Low</Box></MenuItem>
+          </Select>
+        </FormControl>
       </Box>
+
+      {/* Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, p: 1.5, bgcolor: 'primary.50', borderRadius: 2, border: '1px solid', borderColor: 'primary.light' }}>
+          <Typography variant="body2" fontWeight={700}>{selectedIds.length} task(s) selected</Typography>
+          <Button size="small" variant="contained" color="success" startIcon={<ThumbUp />} onClick={() => setBulkDialog({ open: true, action: 'approve' })}>Approve All</Button>
+          <Button size="small" variant="outlined" color="error" startIcon={<ThumbDown />} onClick={() => setBulkDialog({ open: true, action: 'reject' })}>Reject All</Button>
+          <Button size="small" onClick={() => setSelectedIds([])}>Clear</Button>
+        </Box>
+      )}
 
       {/* Kanban Board */}
       {loading ? (
@@ -639,11 +760,23 @@ const TaskBoardPage: React.FC = () => {
                     </Box>
                   ) : (
                     colTasks.map(task => (
-                      <KanbanCard
-                        key={task.id}
-                        task={task}
-                        onClick={() => navigate(`/tasks/${task.id}`)}
-                      />
+                      <Box key={task.id} sx={{ position: 'relative' }}>
+                        {col.key === 'submitted' && (isTeamLeader || isSupervisor) && (
+                          <Box
+                            sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1, width: 18, height: 18,
+                              border: '2px solid', borderColor: selectedIds.includes(task.id) ? 'primary.main' : 'grey.400',
+                              borderRadius: '3px', bgcolor: selectedIds.includes(task.id) ? 'primary.main' : 'white',
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            onClick={e => { e.stopPropagation(); toggleSelect(task.id); }}
+                          >
+                            {selectedIds.includes(task.id) && <CheckCircle sx={{ fontSize: 14, color: 'white' }} />}
+                          </Box>
+                        )}
+                        <KanbanCard
+                          task={task}
+                          onClick={() => navigate(`/tasks/${task.id}`)}
+                        />
+                      </Box>
                     ))
                   )}
                 </Box>
@@ -673,6 +806,29 @@ const TaskBoardPage: React.FC = () => {
           })}
         </Box>
       )}
+
+      {/* Bulk Review Dialog */}
+      <Dialog open={bulkDialog.open} onClose={() => setBulkDialog({ open: false, action: 'approve' })} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: bulkDialog.action === 'approve' ? 'success.main' : 'error.main' }}>
+          {bulkDialog.action === 'approve' ? `Approve ${selectedIds.length} Task(s)` : `Reject ${selectedIds.length} Task(s)`}
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus fullWidth multiline rows={3}
+            label={bulkDialog.action === 'approve' ? 'Note (optional)' : 'Rejection Reason'}
+            value={bulkNote}
+            onChange={e => setBulkNote(e.target.value)}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setBulkDialog({ open: false, action: 'approve' })}>Cancel</Button>
+          <Button variant="contained" color={bulkDialog.action === 'approve' ? 'success' : 'error'}
+            onClick={handleBulkReview} disabled={bulkLoading}>
+            {bulkLoading ? <CircularProgress size={18} /> : bulkDialog.action === 'approve' ? 'Approve All' : 'Reject All'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <CreateTaskDialog
         open={createDialog}

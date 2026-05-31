@@ -5,7 +5,7 @@ import {
   Tooltip, Badge, Tabs, Tab, Dialog, DialogTitle, DialogContent,
   DialogActions, List, ListItem, ListItemText, ListItemAvatar,
   CircularProgress, Skeleton, Breadcrumbs, Link, Stepper, Step,
-  StepLabel, StepContent, Menu, MenuItem as MuiMenuItem, Snackbar
+  StepLabel, StepContent, Menu, MenuItem as MuiMenuItem, MenuItem, Snackbar
 } from '@mui/material';
 import {
   ArrowBack, CheckCircle, PlayArrow, Warning, Send,
@@ -437,7 +437,9 @@ const TaskDetailPage: React.FC = () => {
   const [logTimeDialog, setLogTimeDialog] = useState<{ open: boolean; milestone: TaskMilestone | null }>({ open: false, milestone: null });
   const [logTimeForm, setLogTimeForm] = useState({ hours: '', date: new Date().toISOString().split('T')[0], description: '' });
   const [editDialog, setEditDialog] = useState(false);
-  const [editForm, setEditForm] = useState({ title: '', description: '', allocated_hours: '', deadline: '' });
+  const [editForm, setEditForm] = useState({ title: '', description: '', allocated_hours: '', deadline: '', priority: 'medium' });
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [editMilestoneDialog, setEditMilestoneDialog] = useState<{ open: boolean; milestone: TaskMilestone | null }>({ open: false, milestone: null });
   const [editMilestoneForm, setEditMilestoneForm] = useState({ title: '', description: '', due_date: '', allocated_hours: '' });
 
@@ -541,8 +543,18 @@ const TaskDetailPage: React.FC = () => {
       description: task.description || '',
       allocated_hours: String(task.allocated_hours || ''),
       deadline: ((task as any).deadline || (task as any).due_date || '').split('T')[0],
+      priority: (task as any).priority || 'medium',
     });
     setEditDialog(true);
+  };
+
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await apiService.getTaskHistory(taskId);
+      if (res.success) setHistory(res.data?.history || []);
+    } catch {}
+    finally { setHistoryLoading(false); }
   };
 
   const handleEditTask = async () => {
@@ -554,6 +566,7 @@ const TaskDetailPage: React.FC = () => {
         description: editForm.description.trim() || undefined,
         allocated_hours: parseFloat(editForm.allocated_hours),
         deadline: editForm.deadline || undefined,
+        priority: editForm.priority,
       });
       toast('Task updated!');
       setEditDialog(false);
@@ -754,9 +767,12 @@ const TaskDetailPage: React.FC = () => {
         <CardContent sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2, mb: 2 }}>
             <Box sx={{ flex: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                 <Chip label={statusCfg.label} color={statusCfg.color} size="small" sx={{ fontWeight: 700 }} />
                 <Chip label={task.project_name || `Project #${task.project_id}`} variant="outlined" size="small" />
+                {(task as any).priority === 'high' && <Chip icon={<Warning sx={{ fontSize: 14 }} />} label="High Priority" size="small" sx={{ bgcolor: '#ffebee', color: '#c62828', fontWeight: 600 }} />}
+                {(task as any).priority === 'medium' && <Chip icon={<AccessTime sx={{ fontSize: 14 }} />} label="Medium Priority" size="small" sx={{ bgcolor: '#fff8e1', color: '#f57c00', fontWeight: 600 }} />}
+                {(task as any).priority === 'low' && <Chip label="Low Priority" size="small" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 600 }} />}
               </Box>
               <Typography variant="h5" fontWeight={800} sx={{ mb: 1 }}>{task.title}</Typography>
               {task.description && (
@@ -877,10 +893,11 @@ const TaskDetailPage: React.FC = () => {
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)}>
+        <Tabs value={tab} onChange={(_, v) => { setTab(v); if (v === 3 && history.length === 0) loadHistory(); }}>
           <Tab label={`Milestones (${milestones.length})`} />
           <Tab label={`Notes (${notes.length})`} />
           <Tab label={`Resources (${resources.length})`} />
+          <Tab label="History" />
         </Tabs>
       </Box>
 
@@ -948,6 +965,61 @@ const TaskDetailPage: React.FC = () => {
                   onDelete={() => handleDeleteResource(r.id)}
                 />
               ))
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === 3 && (
+        <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Task History</Typography>
+            {historyLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={24} /></Box>
+            ) : history.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>No history yet.</Typography>
+            ) : (
+              <Box>
+                {history.map((h, idx) => {
+                  const ACTION_CONFIG: Record<string, { label: string; color: string }> = {
+                    assigned: { label: 'Task Assigned', color: '#1976d2' },
+                    started: { label: 'Work Started', color: '#388e3c' },
+                    submitted: { label: 'Submitted for Review', color: '#f57c00' },
+                    approved: { label: 'Approved', color: '#2e7d32' },
+                    rejected: { label: 'Rejected', color: '#d32f2f' },
+                    cancelled: { label: 'Cancelled', color: '#616161' },
+                    reopened: { label: 'Reopened', color: '#f57c00' },
+                  };
+                  const cfg = ACTION_CONFIG[h.action] || { label: h.action, color: '#616161' };
+                  return (
+                    <Box key={h.id} sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: cfg.color, mt: 0.5, flexShrink: 0 }} />
+                        {idx < history.length - 1 && <Box sx={{ width: 2, flex: 1, bgcolor: 'divider', minHeight: 20, mt: 0.5 }} />}
+                      </Box>
+                      <Box sx={{ flex: 1, pb: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="body2" fontWeight={700} sx={{ color: cfg.color }}>{cfg.label}</Typography>
+                          <Typography variant="caption" color="text.disabled">
+                            {new Date(h.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">by {h.performed_by_name}</Typography>
+                        {h.from_status && h.to_status && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            {h.from_status} → {h.to_status}
+                          </Typography>
+                        )}
+                        {h.note && (
+                          <Paper sx={{ mt: 0.5, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                            <Typography variant="caption" sx={{ whiteSpace: 'pre-wrap' }}>{h.note}</Typography>
+                          </Paper>
+                        )}
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
             )}
           </CardContent>
         </Card>
@@ -1104,6 +1176,15 @@ const TaskDetailPage: React.FC = () => {
                 onChange={e => setEditForm(p => ({ ...p, deadline: e.target.value }))}
               />
             </Box>
+            <TextField
+              select label="Priority" size="small" fullWidth
+              value={editForm.priority}
+              onChange={e => setEditForm(p => ({ ...p, priority: e.target.value }))}
+            >
+              <MenuItem value="high">🔴 High</MenuItem>
+              <MenuItem value="medium">🟡 Medium</MenuItem>
+              <MenuItem value="low">🟢 Low</MenuItem>
+            </TextField>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

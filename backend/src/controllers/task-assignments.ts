@@ -8,6 +8,7 @@ import {
   TaskReviewInput
 } from '@/types';
 import { createNotification } from './notifications';
+import { logHistory } from './task-history';
 
 // ─── Helper: assert caller can manage a task ──────────────────
 const assertCanManageTask = (authUser: any, task: any): string | null => {
@@ -176,8 +177,9 @@ export const createTaskAssignment = async (req: Request, res: Response): Promise
       description,
       allocated_hours,
       deadline,
+      priority,
       milestones = []
-    }: TaskAssignmentCreateInput = req.body;
+    }: TaskAssignmentCreateInput & { priority?: string } = req.body;
 
     if (!engineer_id || !project_id || !phase_id || !title || !allocated_hours) {
       res.status(400).json({
@@ -207,8 +209,8 @@ export const createTaskAssignment = async (req: Request, res: Response): Promise
       const taskResult = await client.query(
         `INSERT INTO task_assignments
            (team_leader_id, engineer_id, project_id, phase_id,
-            title, description, allocated_hours, deadline)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            title, description, allocated_hours, deadline, priority)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
         [
           authReq.user.id,
@@ -218,7 +220,8 @@ export const createTaskAssignment = async (req: Request, res: Response): Promise
           title,
           description || null,
           allocated_hours,
-          deadline || null
+          deadline || null,
+          ['low','medium','high'].includes(priority || '') ? priority : 'medium'
         ]
       );
 
@@ -239,6 +242,9 @@ export const createTaskAssignment = async (req: Request, res: Response): Promise
 
       return task;
     });
+
+    // Log history
+    await logHistory(result.id, 'assigned', null, 'assigned', null, authReq.user.id, authReq.user.name);
 
     // Notify the engineer
     await createNotification({
@@ -278,7 +284,7 @@ export const updateTaskAssignment = async (req: Request, res: Response): Promise
     const err = assertCanManageTask(authReq.user, existing.rows[0]);
     if (err) { res.status(403).json({ success: false, error: err }); return; }
 
-    const allowedFields = ['title', 'description', 'allocated_hours', 'deadline'];
+    const allowedFields = ['title', 'description', 'allocated_hours', 'deadline', 'priority'];
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -341,6 +347,8 @@ export const startTask = async (req: Request, res: Response): Promise<void> => {
       [id]
     );
 
+    await logHistory(task.id, 'started', 'assigned', 'in_progress', null, authReq.user.id, authReq.user.name);
+
     res.status(200).json({
       success: true,
       message: 'Task started',
@@ -391,6 +399,8 @@ export const submitTask = async (req: Request, res: Response): Promise<void> => 
        RETURNING *`,
       [final_deliverable.trim(), id]
     );
+
+    await logHistory(task.id, 'submitted', task.status, 'submitted', final_deliverable.trim().slice(0, 200), authReq.user.id, authReq.user.name);
 
     // Notify the team leader
     await createNotification({
@@ -468,6 +478,8 @@ export const reviewTask = async (req: Request, res: Response): Promise<void> => 
       [newStatus, review_note || null, authReq.user.id, id]
     );
 
+    await logHistory(task.id, action === 'approve' ? 'approved' : 'rejected', 'submitted', newStatus, review_note || null, authReq.user.id, authReq.user.name);
+
     // Notify the engineer
     const notifType = action === 'approve' ? 'task_approved' : 'task_rejected';
     const notifTitle = action === 'approve' ? 'Task approved ✅' : 'Task needs revision';
@@ -525,6 +537,8 @@ export const cancelTask = async (req: Request, res: Response): Promise<void> => 
       [reason || null, id]
     );
 
+    await logHistory(task.id, 'cancelled', task.status, 'cancelled', reason || null, authReq.user.id, authReq.user.name);
+
     await createNotification({
       user_id: task.engineer_id,
       type: 'task_cancelled',
@@ -579,6 +593,8 @@ export const reopenTask = async (req: Request, res: Response): Promise<void> => 
       [reopen_note?.trim() || null, authReq.user.id, id]
     );
 
+    await logHistory(task.id, 'reopened', 'rejected', 'assigned', reopen_note?.trim() || null, authReq.user.id, authReq.user.name);
+
     await createNotification({
       user_id: task.engineer_id,
       type: 'task_approved',
@@ -595,6 +611,66 @@ export const reopenTask = async (req: Request, res: Response): Promise<void> => 
     } as ApiResponse);
   } catch (error) {
     console.error('reopenTask error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// POST /task-assignments/bulk-review
+// TL or supervisor approves or rejects multiple submitted tasks at once
+export const bulkReviewTasks = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const { ids, action, review_note } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ success: false, error: 'ids must be a non-empty array' });
+      return;
+    }
+    if (!['approve', 'reject'].includes(action)) {
+      res.status(400).json({ success: false, error: 'action must be "approve" or "reject"' });
+      return;
+    }
+
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    const updatedIds: number[] = [];
+
+    for (const id of ids) {
+      const existing = await query(`SELECT * FROM task_assignments WHERE id = $1`, [id]);
+      if (existing.rows.length === 0) continue;
+
+      const task = existing.rows[0];
+      const err = assertCanManageTask(authReq.user, task);
+      if (err) continue;
+      if (task.status !== 'submitted') continue;
+
+      await query(
+        `UPDATE task_assignments
+         SET status = $1, review_note = $2, reviewed_at = NOW(), reviewed_by = $3, updated_at = NOW()
+         WHERE id = $4`,
+        [newStatus, review_note || null, authReq.user.id, id]
+      );
+
+      await logHistory(task.id, action === 'approve' ? 'approved' : 'rejected', 'submitted', newStatus, review_note || null, authReq.user.id, authReq.user.name);
+
+      await createNotification({
+        user_id: task.engineer_id,
+        type: action === 'approve' ? 'task_approved' : 'task_rejected',
+        title: action === 'approve' ? 'Task approved ✅' : 'Task needs revision',
+        message: `"${task.title}" was ${action === 'approve' ? 'approved' : 'rejected'}. ${review_note || ''}`,
+        reference_type: 'task_assignment',
+        reference_id: task.id
+      });
+
+      updatedIds.push(Number(id));
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `${updatedIds.length} task(s) ${action === 'approve' ? 'approved' : 'rejected'}`,
+      data: { updated_count: updatedIds.length, updated_ids: updatedIds }
+    } as ApiResponse);
+  } catch (error) {
+    console.error('bulkReviewTasks error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

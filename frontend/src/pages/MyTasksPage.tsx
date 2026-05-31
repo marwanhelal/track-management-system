@@ -182,6 +182,7 @@ const MyTasksPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('active');
+  const [sortBy, setSortBy] = useState<string>('newest');
   const [tab, setTab] = useState(0);
 
   const fetchTasks = useCallback(async () => {
@@ -203,6 +204,8 @@ const MyTasksPage: React.FC = () => {
     fetchTasks();
   }, [fetchTasks]);
 
+  const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = !searchQuery ||
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -222,6 +225,10 @@ const MyTasksPage: React.FC = () => {
       return matchesSearch && ['approved', 'cancelled'].includes(task.status);
     }
     return matchesSearch;
+  }).sort((a, b) => {
+    if (sortBy === 'priority') return (PRIORITY_ORDER[(a as any).priority] ?? 1) - (PRIORITY_ORDER[(b as any).priority] ?? 1);
+    if (sortBy === 'due_date') return new Date(a.due_date || '9999').getTime() - new Date(b.due_date || '9999').getTime();
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   });
 
   const counts = {
@@ -326,6 +333,14 @@ const MyTasksPage: React.FC = () => {
             </MenuItem>
             <MenuItem value="completed">Completed</MenuItem>
             <MenuItem value="all">All</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <InputLabel>Sort By</InputLabel>
+          <Select value={sortBy} onChange={e => setSortBy(e.target.value)} label="Sort By">
+            <MenuItem value="newest">Newest First</MenuItem>
+            <MenuItem value="priority">Priority</MenuItem>
+            <MenuItem value="due_date">Due Date</MenuItem>
           </Select>
         </FormControl>
       </Box>

@@ -13,10 +13,6 @@ import {
   Chip,
   IconButton,
   Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   List,
   ListItem,
   ListItemText,
@@ -30,8 +26,8 @@ import {
   Warning,
   Archive as ArchiveIcon,
   Unarchive as UnarchiveIcon,
-  FilterList,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import apiService from '../services/api';
@@ -42,12 +38,14 @@ import WorkLogSummaryCard from '../components/dashboard/WorkLogSummaryCard';
 import QuickTimeEntry from '../components/time-tracking/QuickTimeEntry';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { isSupervisor, isEngineer, isTeamLeader } = useAuth();
   const { joinProject, on, off, connected } = useSocket();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [teamLeaderProjects, setTeamLeaderProjects] = useState<{ id: number; name: string; status: string }[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
+  const [overdueTasks, setOverdueTasks] = useState<any[]>([]);
   const [workLogSummary, setWorkLogSummary] = useState<{
     projectSummary: WorkLogSummary[];
     phaseSummary: PhaseSummary[];
@@ -127,6 +125,20 @@ const Dashboard = () => {
         if (isTeamLeader && tlProjectsResponse?.success && tlProjectsResponse.data) {
           setTeamLeaderProjects(tlProjectsResponse.data.projects || []);
         }
+
+        // Load overdue tasks for TL/supervisor/engineer
+        try {
+          const tasksRes = await apiService.getTaskAssignments();
+          const allTasks: any[] = tasksRes.data?.tasks || tasksRes.data || [];
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const overdue = allTasks.filter((t: any) =>
+            ['assigned', 'in_progress', 'blocked'].includes(t.status) &&
+            (t.deadline || t.due_date) &&
+            new Date(t.deadline || t.due_date) < today
+          );
+          setOverdueTasks(overdue);
+        } catch {}
       } catch (error: any) {
         setError(error.message || 'Failed to load dashboard data');
       } finally {
@@ -337,6 +349,29 @@ const Dashboard = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
+        </Alert>
+      )}
+
+      {overdueTasks.length > 0 && (
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} icon={<Warning />}>
+          <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
+            {overdueTasks.length} task{overdueTasks.length > 1 ? 's are' : ' is'} past deadline
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
+            {overdueTasks.slice(0, 5).map((t: any) => (
+              <Chip
+                key={t.id}
+                label={t.title}
+                size="small"
+                color="error"
+                variant="outlined"
+                clickable
+                onClick={() => navigate(`/tasks/${t.id}`)}
+                sx={{ fontSize: '0.7rem' }}
+              />
+            ))}
+            {overdueTasks.length > 5 && <Chip label={`+${overdueTasks.length - 5} more`} size="small" color="error" variant="outlined" />}
+          </Box>
         </Alert>
       )}
 

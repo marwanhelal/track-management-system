@@ -42,7 +42,8 @@ import {
   CardActions,
   ToggleButton,
   ToggleButtonGroup,
-  Snackbar
+  Snackbar,
+  CircularProgress
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -80,7 +81,9 @@ import {
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
   FastForward as FastForwardIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  TaskAlt as TaskAltIcon,
+  Flag as FlagIcon
 } from '@mui/icons-material';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiService } from '../services/api';
@@ -201,6 +204,105 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index, ...other })
     >
       {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
     </div>
+  );
+};
+
+// ── Project Tasks Panel ───────────────────────────────────────────────────────
+const PRIORITY_COLORS: Record<string, { bg: string; color: string; label: string }> = {
+  high:   { bg: '#ffebee', color: '#c62828', label: 'High' },
+  medium: { bg: '#fff8e1', color: '#f57c00', label: 'Medium' },
+  low:    { bg: '#e8f5e9', color: '#2e7d32', label: 'Low' },
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  assigned: '#1976d2', in_progress: '#388e3c', submitted: '#f57c00',
+  approved: '#2e7d32', rejected: '#d32f2f', cancelled: '#616161', blocked: '#e65100',
+};
+
+const ProjectTasksPanel: React.FC<{ projectId?: number }> = ({ projectId }) => {
+  const navigate = useNavigate();
+  const [tasks, setTasks] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!projectId) return;
+    setLoading(true);
+    apiService.getTaskAssignments({ project_id: projectId } as any)
+      .then(res => setTasks(res.data?.tasks || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [projectId]);
+
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>;
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6" fontWeight={700}>Tasks in this Project</Typography>
+        <Typography variant="body2" color="text.secondary">{tasks.length} total</Typography>
+      </Box>
+      {tasks.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+          No tasks assigned for this project yet.
+        </Typography>
+      ) : (
+        <TableContainer component={Paper} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: 'grey.50' }}>
+                <TableCell sx={{ fontWeight: 700 }}>Task</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Engineer</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Priority</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Hours</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Due Date</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {tasks.map((t: any) => {
+                const p = PRIORITY_COLORS[t.priority] || PRIORITY_COLORS.medium;
+                return (
+                  <TableRow
+                    key={t.id}
+                    hover
+                    sx={{ cursor: 'pointer' }}
+                    onClick={() => navigate(`/tasks/${t.id}`)}
+                  >
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={600}>{t.title}</Typography>
+                      <Typography variant="caption" color="text.secondary">{t.team_leader_name}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{t.engineer_name}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={p.label} size="small" sx={{ bgcolor: p.bg, color: p.color, fontWeight: 600, height: 20, fontSize: '0.65rem' }} />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={t.status.replace('_', ' ')}
+                        size="small"
+                        sx={{ bgcolor: `${STATUS_COLORS[t.status]}20`, color: STATUS_COLORS[t.status], fontWeight: 600, height: 20, fontSize: '0.65rem' }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" color={t.logged_hours > t.allocated_hours ? 'error.main' : 'text.primary'}>
+                        {t.logged_hours || 0}h / {t.allocated_hours}h
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" color="text.secondary">
+                        {t.deadline || t.due_date ? new Date(t.deadline || t.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </Box>
   );
 };
 
@@ -1161,6 +1263,7 @@ const ProjectDetailsPage: React.FC = () => {
             <Tab label="Team" icon={<PersonIcon />} />
             <Tab label="Project Details" icon={<InfoIcon />} />
             <Tab label="Settings" icon={<EditIcon />} />
+            <Tab label="Tasks" icon={<TaskAltIcon />} />
           </Tabs>
         </Box>
 
@@ -2950,6 +3053,11 @@ const ProjectDetailsPage: React.FC = () => {
               </CardContent>
             </Card>
           </Box>
+        </TabPanel>
+
+        {/* Tasks Tab */}
+        <TabPanel value={state.activeTab} index={5}>
+          <ProjectTasksPanel projectId={state.project?.id} />
         </TabPanel>
       </Card>
 

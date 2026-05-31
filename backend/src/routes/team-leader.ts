@@ -9,6 +9,8 @@ import * as notes from '@/controllers/task-notes';
 import * as resources from '@/controllers/task-resources';
 import * as blockers from '@/controllers/task-blockers';
 import * as notifications from '@/controllers/notifications';
+import * as history from '@/controllers/task-history';
+import * as templates from '@/controllers/task-templates';
 
 const router = Router();
 
@@ -82,6 +84,10 @@ router.patch('/task-assignments/:id/reopen',
   teamLeaderOrSupervisor,
   tasks.reopenTask
 );
+router.post('/task-assignments/bulk-review',
+  teamLeaderOrSupervisor,
+  tasks.bulkReviewTasks
+);
 
 // ─── Milestones ───────────────────────────────────────────────
 router.get('/task-assignments/:assignmentId/milestones',
@@ -107,6 +113,26 @@ router.patch('/milestones/:id/review-note',
 router.delete('/milestones/:id',
   teamLeaderOrSupervisor,
   milestones.deleteMilestone
+);
+
+// ─── History ─────────────────────────────────────────────────
+router.get('/task-assignments/:assignmentId/history',
+  authenticatedUser,
+  history.getTaskHistory
+);
+
+// ─── Templates ───────────────────────────────────────────────
+router.get('/task-templates',
+  teamLeaderOrSupervisor,
+  templates.getTemplates
+);
+router.post('/task-templates',
+  teamLeaderOrSupervisor,
+  templates.createTemplate
+);
+router.delete('/task-templates/:id',
+  teamLeaderOrSupervisor,
+  templates.deleteTemplate
 );
 
 // ─── Notes ────────────────────────────────────────────────────
