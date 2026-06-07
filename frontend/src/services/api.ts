@@ -912,6 +912,11 @@ class ApiService {
     return response.data;
   }
 
+  async deleteTask(id: number): Promise<ApiResponse<any>> {
+    const response = await this.api.delete(`/task-assignments/${id}`);
+    return response.data;
+  }
+
   async getTaskHistory(taskId: number): Promise<ApiResponse<any>> {
     const response = await this.api.get(`/task-assignments/${taskId}/history`);
     return response.data;

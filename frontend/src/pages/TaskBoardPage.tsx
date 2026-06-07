@@ -11,7 +11,7 @@ import {
   CheckCircle, Warning, AccessTime, CalendarToday, Person,
   ArrowForward, FilterList, FiberManualRecord, Flag, Close,
   MoreVert, OpenInNew, ThumbUp, ThumbDown, BookmarkBorder, Bookmark,
-  Group, ExpandMore, ChevronRight, PersonOff, FolderOff
+  Group, ExpandMore, ChevronRight, PersonOff, FolderOff, Cancel
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -44,7 +44,8 @@ const COLUMNS: Column[] = [
   { key: 'in_progress', statuses: ['in_progress', 'blocked'], label: 'In Progress', color: '#388e3c', bgColor: '#e8f5e9', icon: <PlayArrow fontSize="small" /> },
   { key: 'submitted', statuses: ['submitted'], label: 'Submitted', color: '#f57c00', bgColor: '#fff8e1', icon: <CheckCircle fontSize="small" /> },
   { key: 'rejected', statuses: ['rejected'], label: 'Rejected', color: '#c62828', bgColor: '#ffebee', icon: <Warning fontSize="small" /> },
-  { key: 'done', statuses: ['approved', 'cancelled'], label: 'Done', color: '#7b1fa2', bgColor: '#f3e5f5', icon: <CheckCircle fontSize="small" /> },
+  { key: 'done', statuses: ['approved'], label: 'Done', color: '#7b1fa2', bgColor: '#f3e5f5', icon: <CheckCircle fontSize="small" /> },
+  { key: 'cancelled', statuses: ['cancelled'], label: 'Cancelled', color: '#616161', bgColor: '#f5f5f5', icon: <Cancel fontSize="small" /> },
 ];
 
 // ── Create Task Dialog ─────────────────────────────────────────────────────────
@@ -667,7 +668,12 @@ const CreateTaskDialog: React.FC<{
 };
 
 // ── Kanban Card ────────────────────────────────────────────────────────────────
-const KanbanCard: React.FC<{ task: TaskWithStats; onClick: () => void }> = ({ task, onClick }) => {
+const KanbanCard: React.FC<{
+  task: TaskWithStats;
+  onClick: () => void;
+  onApprove?: (e: React.MouseEvent) => void;
+  onReject?: (e: React.MouseEvent) => void;
+}> = ({ task, onClick, onApprove, onReject }) => {
   const hoursPercent = task.allocated_hours > 0
     ? Math.min(100, (((task as any).logged_hours || 0) / task.allocated_hours) * 100) : 0;
   const isOverBudget = ((task as any).logged_hours || 0) > task.allocated_hours;
@@ -753,6 +759,28 @@ const KanbanCard: React.FC<{ task: TaskWithStats; onClick: () => void }> = ({ ta
             </Typography>
           )}
         </Box>
+
+        {/* Quick approve/reject for submitted tasks */}
+        {task.status === 'submitted' && onApprove && onReject && (
+          <Box sx={{ display: 'flex', gap: 1, mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+            <Button
+              size="small" variant="contained" color="success" fullWidth
+              startIcon={<ThumbUp sx={{ fontSize: 14 }} />}
+              sx={{ fontSize: '0.7rem', py: 0.3 }}
+              onClick={onApprove}
+            >
+              Approve
+            </Button>
+            <Button
+              size="small" variant="outlined" color="error" fullWidth
+              startIcon={<ThumbDown sx={{ fontSize: 14 }} />}
+              sx={{ fontSize: '0.7rem', py: 0.3 }}
+              onClick={onReject}
+            >
+              Reject
+            </Button>
+          </Box>
+        )}
       </CardContent>
     </Card>
   );
@@ -778,6 +806,9 @@ const TaskBoardPage: React.FC = () => {
   const [bulkNote, setBulkNote] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [quickReview, setQuickReview] = useState<{ open: boolean; taskId: number | null; action: 'approve' | 'reject' }>({ open: false, taskId: null, action: 'approve' });
+  const [quickReviewNote, setQuickReviewNote] = useState('');
+  const [quickReviewLoading, setQuickReviewLoading] = useState(false);
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -805,6 +836,21 @@ const TaskBoardPage: React.FC = () => {
       else next.add(key);
       return next;
     });
+  };
+
+  const handleQuickReview = async () => {
+    if (!quickReview.taskId) return;
+    if (quickReview.action === 'reject' && !quickReviewNote.trim()) return;
+    setQuickReviewLoading(true);
+    try {
+      await apiService.reviewTask(quickReview.taskId, { action: quickReview.action, review_note: quickReviewNote.trim() || undefined });
+      setSnack({ open: true, msg: `Task ${quickReview.action === 'approve' ? 'approved' : 'rejected'}!` });
+      setQuickReview({ open: false, taskId: null, action: 'approve' });
+      setQuickReviewNote('');
+      loadTasks();
+    } catch (err: any) {
+      setSnack({ open: true, msg: err.response?.data?.error || 'Action failed' });
+    } finally { setQuickReviewLoading(false); }
   };
 
   const engineers = Array.from(new Map(
@@ -1103,7 +1149,12 @@ const TaskBoardPage: React.FC = () => {
                                 {selectedIds.includes(task.id) && <CheckCircle sx={{ fontSize: 14, color: 'white' }} />}
                               </Box>
                             )}
-                            <KanbanCard task={task} onClick={() => navigate(`/tasks/${task.id}`)} />
+                            <KanbanCard
+                              task={task}
+                              onClick={() => navigate(`/tasks/${task.id}`)}
+                              onApprove={col.key === 'submitted' && (isTeamLeader || isSupervisor) ? (e) => { e.stopPropagation(); setQuickReviewNote(''); setQuickReview({ open: true, taskId: task.id, action: 'approve' }); } : undefined}
+                              onReject={col.key === 'submitted' && (isTeamLeader || isSupervisor) ? (e) => { e.stopPropagation(); setQuickReviewNote(''); setQuickReview({ open: true, taskId: task.id, action: 'reject' }); } : undefined}
+                            />
                           </Box>
                         ))}
                       </Box>
@@ -1157,6 +1208,34 @@ const TaskBoardPage: React.FC = () => {
           <Button variant="contained" color={bulkDialog.action === 'approve' ? 'success' : 'error'}
             onClick={handleBulkReview} disabled={bulkLoading}>
             {bulkLoading ? <CircularProgress size={18} /> : bulkDialog.action === 'approve' ? 'Approve All' : 'Reject All'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Quick Review Dialog (single task approve/reject from kanban card) */}
+      <Dialog open={quickReview.open} onClose={() => setQuickReview({ open: false, taskId: null, action: 'approve' })} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: quickReview.action === 'approve' ? 'success.main' : 'error.main' }}>
+          {quickReview.action === 'approve' ? 'Approve Task' : 'Reject Task'}
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus fullWidth multiline rows={3} sx={{ mt: 1 }}
+            label={quickReview.action === 'approve' ? 'Approval Note (optional)' : 'Rejection Reason *'}
+            placeholder={quickReview.action === 'approve' ? 'Great work!' : 'Describe what needs to be revised...'}
+            value={quickReviewNote}
+            onChange={e => setQuickReviewNote(e.target.value)}
+            required={quickReview.action === 'reject'}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setQuickReview({ open: false, taskId: null, action: 'approve' })}>Cancel</Button>
+          <Button
+            variant="contained"
+            color={quickReview.action === 'approve' ? 'success' : 'error'}
+            onClick={handleQuickReview}
+            disabled={quickReviewLoading || (quickReview.action === 'reject' && !quickReviewNote.trim())}
+          >
+            {quickReviewLoading ? <CircularProgress size={18} /> : quickReview.action === 'approve' ? 'Approve' : 'Reject'}
           </Button>
         </DialogActions>
       </Dialog>

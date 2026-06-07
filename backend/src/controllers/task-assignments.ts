@@ -711,6 +711,32 @@ export const bulkReviewTasks = async (req: Request, res: Response): Promise<void
   }
 };
 
+// DELETE /task-assignments/:id
+// TL or supervisor permanently deletes a task (only when cancelled or approved)
+export const deleteTaskAssignment = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const { id } = req.params;
+
+    const existing = await query(`SELECT * FROM task_assignments WHERE id = $1`, [id]);
+    if (existing.rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Task not found' });
+      return;
+    }
+
+    const task = existing.rows[0];
+    const err = assertCanManageTask(authReq.user, task);
+    if (err) { res.status(403).json({ success: false, error: err }); return; }
+
+    await query(`DELETE FROM task_assignments WHERE id = $1`, [id]);
+
+    res.status(200).json({ success: true, message: 'Task permanently deleted' } as ApiResponse);
+  } catch (error) {
+    console.error('deleteTaskAssignment error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 // GET /task-assignments/my-assigned-phases
 // Engineer: returns distinct projects + phases where they have active task assignments
 export const getMyAssignedPhases = async (req: Request, res: Response): Promise<void> => {

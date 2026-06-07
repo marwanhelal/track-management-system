@@ -455,6 +455,7 @@ const TaskDetailPage: React.FC = () => {
   const [reopenNote, setReopenNote] = useState('');
   const [cancelDialog, setCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [deleteDialog, setDeleteDialog] = useState(false);
   const [addMilestoneDialog, setAddMilestoneDialog] = useState(false);
   const [newMilestone, setNewMilestone] = useState({ title: '', description: '', due_date: '', allocated_hours: '', priority: 'medium' });
   const [addResourceDialog, setAddResourceDialog] = useState(false);
@@ -546,6 +547,18 @@ const TaskDetailPage: React.FC = () => {
       navigate(isEngineer ? '/my-tasks' : '/task-board');
     } catch (err: any) {
       toast(err.response?.data?.error || 'Failed to cancel task', 'error');
+    } finally { setActionLoading(false); }
+  };
+
+  const handleDeleteTask = async () => {
+    setActionLoading(true);
+    try {
+      await apiService.deleteTask(taskId);
+      toast('Task permanently deleted.');
+      setDeleteDialog(false);
+      navigate(isEngineer ? '/my-tasks' : '/task-board');
+    } catch (err: any) {
+      toast(err.response?.data?.error || 'Failed to delete task', 'error');
     } finally { setActionLoading(false); }
   };
 
@@ -878,6 +891,11 @@ const TaskDetailPage: React.FC = () => {
                   Cancel Task
                 </Button>
               )}
+              {(isTeamLeader || isSupervisor) && task.status === 'cancelled' && (
+                <Button variant="contained" color="error" startIcon={<Delete />} onClick={() => setDeleteDialog(true)}>
+                  Delete Task
+                </Button>
+              )}
             </Box>
           </Box>
 
@@ -1177,6 +1195,25 @@ const TaskDetailPage: React.FC = () => {
           <Button onClick={() => setCancelDialog(false)}>Keep Task</Button>
           <Button variant="contained" color="error" onClick={handleCancelTask} disabled={actionLoading}>
             {actionLoading ? <CircularProgress size={18} /> : 'Cancel Task'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Task Dialog */}
+      <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>Permanently Delete Task</DialogTitle>
+        <DialogContent>
+          <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+            This will permanently remove the task and all its milestones, notes, and resources. This cannot be undone.
+          </Alert>
+          <Typography variant="body2" color="text.secondary">
+            Task: <strong>{task?.title}</strong>
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteDialog(false)}>Keep Task</Button>
+          <Button variant="contained" color="error" startIcon={<Delete />} onClick={handleDeleteTask} disabled={actionLoading}>
+            {actionLoading ? <CircularProgress size={18} /> : 'Delete Permanently'}
           </Button>
         </DialogActions>
       </Dialog>

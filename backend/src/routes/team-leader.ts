@@ -88,6 +88,10 @@ router.post('/task-assignments/bulk-review',
   teamLeaderOrSupervisor,
   tasks.bulkReviewTasks
 );
+router.delete('/task-assignments/:id',
+  teamLeaderOrSupervisor,
+  tasks.deleteTaskAssignment
+);
 
 // ─── Milestones ───────────────────────────────────────────────
 router.get('/task-assignments/:assignmentId/milestones',
