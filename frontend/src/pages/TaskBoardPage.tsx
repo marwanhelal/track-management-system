@@ -61,6 +61,7 @@ const CreateTaskDialog: React.FC<{
   const [engineers, setEngineers] = useState<any[]>([]);
   const [selectedEngineerIds, setSelectedEngineerIds] = useState<string[]>([]);
   const [phases, setPhases] = useState<any[]>([]);
+  const [selectedPhaseIds, setSelectedPhaseIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +86,7 @@ const CreateTaskDialog: React.FC<{
       setError(null);
       setForm({ project_id: '', phase_id: '', title: '', description: '', allocated_hours: '', due_date: '', priority: 'medium', milestones: [] });
       setPhases([]);
+      setSelectedPhaseIds([]);
       setEngineers([]);
       setSelectedEngineerIds([]);
       apiService.getTaskTemplates().then(res => { if (res.success) setTemplates(res.data?.templates || []); }).catch(() => {});
@@ -125,11 +127,23 @@ const CreateTaskDialog: React.FC<{
   const handleProjectChange = (projectId: string) => {
     setForm(p => ({ ...p, project_id: projectId, phase_id: '' }));
     setPhases([]);
+    setSelectedPhaseIds([]);
     setSelectedEngineerIds([]);
-    // Filter engineers from already-loaded memberships — no extra API call
     const projectEngineers = allMemberships.filter(m => String(m.project_id) === projectId);
     setEngineers(projectEngineers);
     if (projectId) loadPhases(projectId);
+  };
+
+  const togglePhase = (id: string) => {
+    setSelectedPhaseIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAllPhases = () => {
+    setSelectedPhaseIds(prev =>
+      prev.length === phases.length ? [] : phases.map((ph: any) => String(ph.id))
+    );
   };
 
   const toggleEngineer = (id: string) => {
@@ -163,24 +177,29 @@ const CreateTaskDialog: React.FC<{
     }));
     const errors: string[] = [];
     let created = 0;
-    for (const engId of selectedEngineerIds) {
-      try {
-        await apiService.createTaskAssignment({
-          project_id: parseInt(form.project_id),
-          phase_id: parseInt(form.phase_id),
-          engineer_id: parseInt(engId),
-          title: form.title,
-          description: form.description || undefined,
-          allocated_hours: parseInt(form.allocated_hours),
-          due_date: form.due_date || undefined,
-          priority: form.priority,
-          milestones,
-        } as any);
-        created++;
-      } catch (err: any) {
-        const eng = engineers.find((e: any) => String(e.engineer_id || e.id) === engId);
-        const name = eng?.engineer_name || eng?.name || `Engineer #${engId}`;
-        errors.push(`${name}: ${err.response?.data?.error || 'Failed'}`);
+    // Create one task per phase × engineer combination
+    for (const phaseId of selectedPhaseIds) {
+      const phase = phases.find((ph: any) => String(ph.id) === phaseId);
+      for (const engId of selectedEngineerIds) {
+        try {
+          await apiService.createTaskAssignment({
+            project_id: parseInt(form.project_id),
+            phase_id: parseInt(phaseId),
+            engineer_id: parseInt(engId),
+            title: form.title,
+            description: form.description || undefined,
+            allocated_hours: parseInt(form.allocated_hours),
+            due_date: form.due_date || undefined,
+            priority: form.priority,
+            milestones,
+          } as any);
+          created++;
+        } catch (err: any) {
+          const eng = engineers.find((e: any) => String(e.engineer_id || e.id) === engId);
+          const engName = eng?.engineer_name || eng?.name || `Engineer #${engId}`;
+          const phaseName = phase?.phase_name || `Phase #${phaseId}`;
+          errors.push(`${phaseName} / ${engName}: ${err.response?.data?.error || 'Failed'}`);
+        }
       }
     }
     setSubmitting(false);
@@ -195,11 +214,16 @@ const CreateTaskDialog: React.FC<{
   const selectedEngineers = engineers.filter((e: any) =>
     selectedEngineerIds.includes(String(e.engineer_id || e.id))
   );
-  const allSelected = engineers.length > 0 && selectedEngineerIds.length === engineers.length;
-  const someSelected = selectedEngineerIds.length > 0 && selectedEngineerIds.length < engineers.length;
+  const selectedPhases = phases.filter((ph: any) => selectedPhaseIds.includes(String(ph.id)));
+  const totalTasks = selectedPhaseIds.length * selectedEngineerIds.length;
 
-  const steps = ['Project & Engineers', 'Task Details', 'Milestones (optional)'];
-  const canNextStep0 = form.project_id && form.phase_id && selectedEngineerIds.length > 0;
+  const allEngineersSelected = engineers.length > 0 && selectedEngineerIds.length === engineers.length;
+  const someEngineersSelected = selectedEngineerIds.length > 0 && selectedEngineerIds.length < engineers.length;
+  const allPhasesSelected = phases.length > 0 && selectedPhaseIds.length === phases.length;
+  const somePhasesSelected = selectedPhaseIds.length > 0 && selectedPhaseIds.length < phases.length;
+
+  const steps = ['Project, Phases & Engineers', 'Task Details', 'Milestones (optional)'];
+  const canNextStep0 = form.project_id && selectedPhaseIds.length > 0 && selectedEngineerIds.length > 0;
   const canNextStep1 = form.title.trim() && form.allocated_hours && parseInt(form.allocated_hours) > 0;
 
   return (
@@ -243,26 +267,72 @@ const CreateTaskDialog: React.FC<{
               </Select>
             </FormControl>
 
+            {/* Multi-select phases */}
             {form.project_id && (
-              <FormControl fullWidth required>
-                <InputLabel>Phase</InputLabel>
-                <Select
-                  value={form.phase_id}
-                  onChange={e => setForm(p => ({ ...p, phase_id: e.target.value }))}
-                  label="Phase"
-                  disabled={loading || phases.length === 0}
-                >
-                  {phases.length === 0 ? (
-                    <MenuItem disabled>No active phases for this project</MenuItem>
-                  ) : (
-                    phases.map((ph: any) => (
-                      <MenuItem key={ph.id} value={String(ph.id)}>
-                        {ph.phase_name} ({ph.status.replace('_', ' ')})
-                      </MenuItem>
-                    ))
-                  )}
-                </Select>
-              </FormControl>
+              <Box>
+                <Typography variant="body2" fontWeight={600} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Assignment fontSize="small" /> Select Phases
+                </Typography>
+                {loading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}>
+                    <CircularProgress size={16} />
+                    <Typography variant="body2" color="text.secondary">Loading phases...</Typography>
+                  </Box>
+                ) : phases.length === 0 ? (
+                  <Alert severity="info" sx={{ borderRadius: 2 }}>No active phases for this project.</Alert>
+                ) : (
+                  <>
+                    <Box
+                      onClick={toggleAllPhases}
+                      sx={{
+                        display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.8,
+                        borderRadius: 2, cursor: 'pointer', mb: 0.5,
+                        bgcolor: 'grey.50', border: '1px solid', borderColor: 'grey.200',
+                        '&:hover': { bgcolor: 'grey.100' },
+                      }}
+                    >
+                      <Checkbox checked={allPhasesSelected} indeterminate={somePhasesSelected} size="small" sx={{ p: 0 }} readOnly />
+                      <Typography variant="body2" fontWeight={600}>
+                        {allPhasesSelected ? 'Deselect All' : 'Select All'} ({phases.length} phases)
+                      </Typography>
+                    </Box>
+                    <Box sx={{
+                      maxHeight: 180, overflowY: 'auto', border: '1px solid', borderColor: 'grey.200',
+                      borderRadius: 2, bgcolor: 'background.paper'
+                    }}>
+                      {phases.map((ph: any) => {
+                        const id = String(ph.id);
+                        const checked = selectedPhaseIds.includes(id);
+                        return (
+                          <Box
+                            key={id}
+                            onClick={() => togglePhase(id)}
+                            sx={{
+                              display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, py: 0.7,
+                              cursor: 'pointer', borderBottom: '1px solid', borderColor: 'grey.100',
+                              bgcolor: checked ? 'primary.50' : 'transparent',
+                              '&:hover': { bgcolor: checked ? 'primary.100' : 'grey.50' },
+                              '&:last-child': { borderBottom: 'none' },
+                            }}
+                          >
+                            <Checkbox checked={checked} size="small" sx={{ p: 0 }} readOnly />
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" fontWeight={checked ? 600 : 400} noWrap>{ph.phase_name}</Typography>
+                              <Typography variant="caption" color="text.secondary">{ph.status?.replace('_', ' ')}</Typography>
+                            </Box>
+                            {checked && <CheckCircle sx={{ fontSize: 16, color: 'primary.main', flexShrink: 0 }} />}
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                    {selectedPhaseIds.length > 0 && (
+                      <Typography variant="caption" color="primary.main" fontWeight={600} sx={{ mt: 0.5, display: 'block' }}>
+                        {selectedPhaseIds.length} phase{selectedPhaseIds.length > 1 ? 's' : ''} selected
+                      </Typography>
+                    )}
+                  </>
+                )}
+              </Box>
             )}
 
             {/* Multi-select engineers */}
@@ -290,9 +360,9 @@ const CreateTaskDialog: React.FC<{
                         '&:hover': { bgcolor: 'grey.100' },
                       }}
                     >
-                      <Checkbox checked={allSelected} indeterminate={someSelected} size="small" sx={{ p: 0 }} readOnly />
+                      <Checkbox checked={allEngineersSelected} indeterminate={someEngineersSelected} size="small" sx={{ p: 0 }} readOnly />
                       <Typography variant="body2" fontWeight={600}>
-                        {allSelected ? 'Deselect All' : 'Select All'} ({engineers.length} engineers)
+                        {allEngineersSelected ? 'Deselect All' : 'Select All'} ({engineers.length} engineers)
                       </Typography>
                     </Box>
 
@@ -353,9 +423,20 @@ const CreateTaskDialog: React.FC<{
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* Assigned-to summary */}
             <Box sx={{ p: 1.5, bgcolor: 'primary.50', borderRadius: 2, border: '1px solid', borderColor: 'primary.100' }}>
+              {/* Phases row */}
+              <Typography variant="caption" fontWeight={700} color="primary.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                <Assignment fontSize="small" />
+                {selectedPhases.length} phase{selectedPhases.length > 1 ? 's' : ''}:
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                {selectedPhases.map((ph: any) => (
+                  <Chip key={ph.id} label={ph.phase_name} size="small" color="primary" variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
+                ))}
+              </Box>
+              {/* Engineers row */}
               <Typography variant="caption" fontWeight={700} color="primary.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                 <Group fontSize="small" />
-                Assigning to {selectedEngineers.length} engineer{selectedEngineers.length > 1 ? 's' : ''}:
+                {selectedEngineers.length} engineer{selectedEngineers.length > 1 ? 's' : ''}:
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {selectedEngineers.map((eng: any) => (
@@ -368,9 +449,9 @@ const CreateTaskDialog: React.FC<{
                   />
                 ))}
               </Box>
-              {selectedEngineers.length > 1 && (
+              {totalTasks > 1 && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                  The same task details and milestones will be assigned to each engineer separately.
+                  = <strong>{totalTasks} tasks</strong> will be created ({selectedPhases.length} phase{selectedPhases.length > 1 ? 's' : ''} × {selectedEngineers.length} engineer{selectedEngineers.length > 1 ? 's' : ''}) — same details for each.
                 </Typography>
               )}
             </Box>
@@ -460,10 +541,11 @@ const CreateTaskDialog: React.FC<{
         {/* ── Step 2: Milestones ── */}
         {step === 2 && (
           <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+            <Box sx={{ p: 1.5, bgcolor: 'grey.50', borderRadius: 2, border: '1px solid', borderColor: 'grey.200', mb: 2 }}>
               <Typography variant="body2" color="text.secondary">
-                Break the task into milestones. These will be created for{' '}
-                <strong>each of the {selectedEngineers.length} engineer{selectedEngineers.length > 1 ? 's' : ''}</strong> assigned.
+                Milestones will be created for{' '}
+                <strong>each of the {totalTasks} task{totalTasks > 1 ? 's' : ''}</strong>
+                {totalTasks > 1 && ` (${selectedPhases.length} phase${selectedPhases.length > 1 ? 's' : ''} × ${selectedEngineers.length} engineer${selectedEngineers.length > 1 ? 's' : ''})`}.
               </Typography>
             </Box>
             {form.milestones.map((ms, i) => (
@@ -572,9 +654,9 @@ const CreateTaskDialog: React.FC<{
               startIcon={submitting ? <CircularProgress size={16} /> : undefined}
             >
               {submitting
-                ? 'Assigning...'
-                : selectedEngineerIds.length > 1
-                  ? `Assign to ${selectedEngineerIds.length} Engineers`
+                ? `Creating ${totalTasks} task${totalTasks > 1 ? 's' : ''}...`
+                : totalTasks > 1
+                  ? `Create ${totalTasks} Tasks`
                   : 'Assign Task'}
             </Button>
           </>
