@@ -27,6 +27,7 @@ interface TaskWithStats extends TaskAssignment {
   has_active_blocker?: boolean;
   engineer_name?: string;
   project_name?: string;
+  phase_name?: string;
 }
 
 interface Column {
@@ -623,12 +624,14 @@ const KanbanCard: React.FC<{ task: TaskWithStats; onClick: () => void }> = ({ ta
           )}
         </Box>
 
-        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5, lineHeight: 1.3 }}>
+        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.3, lineHeight: 1.3 }}>
           {task.title}
         </Typography>
 
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-          {task.project_name || `Project #${task.project_id}`}
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.8 }}>
+          {task.phase_name
+            ? `${task.project_name || `Project #${task.project_id}`} › ${task.phase_name}`
+            : (task.project_name || `Project #${task.project_id}`)}
         </Typography>
 
         {/* Hours bar */}
@@ -897,33 +900,55 @@ const TaskBoardPage: React.FC = () => {
                   />
                 </Box>
 
-                {/* Cards */}
+                {/* Cards — grouped by project */}
                 <Box sx={{ flex: 1, overflowY: 'auto' }}>
                   {colTasks.length === 0 ? (
                     <Box sx={{ textAlign: 'center', py: 4 }}>
                       <Typography variant="caption" color="text.disabled">No tasks</Typography>
                     </Box>
-                  ) : (
-                    colTasks.map(task => (
-                      <Box key={task.id} sx={{ position: 'relative' }}>
-                        {col.key === 'submitted' && (isTeamLeader || isSupervisor) && (
-                          <Box
-                            sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1, width: 18, height: 18,
-                              border: '2px solid', borderColor: selectedIds.includes(task.id) ? 'primary.main' : 'grey.400',
-                              borderRadius: '3px', bgcolor: selectedIds.includes(task.id) ? 'primary.main' : 'white',
-                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            onClick={e => { e.stopPropagation(); toggleSelect(task.id); }}
-                          >
-                            {selectedIds.includes(task.id) && <CheckCircle sx={{ fontSize: 14, color: 'white' }} />}
+                  ) : (() => {
+                    // Group tasks by project_id preserving insertion order
+                    const groups = new Map<number, TaskWithStats[]>();
+                    for (const task of colTasks) {
+                      const pid = task.project_id;
+                      if (!groups.has(pid)) groups.set(pid, []);
+                      groups.get(pid)!.push(task);
+                    }
+                    return Array.from(groups.entries()).map(([pid, groupTasks]) => (
+                      <Box key={pid} sx={{ mb: 1.5 }}>
+                        {/* Project group header */}
+                        <Box sx={{
+                          display: 'flex', alignItems: 'center', gap: 0.8, px: 1, py: 0.5, mb: 0.5,
+                          borderRadius: 1.5, bgcolor: `${col.color}18`,
+                        }}>
+                          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: col.color, flexShrink: 0 }} />
+                          <Typography variant="caption" fontWeight={700} color={col.color} noWrap sx={{ flex: 1, fontSize: '0.68rem', letterSpacing: 0.3 }}>
+                            {groupTasks[0].project_name || `Project #${pid}`}
+                          </Typography>
+                          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: col.color, opacity: 0.8, flexShrink: 0 }}>
+                            {groupTasks.length}
+                          </Typography>
+                        </Box>
+                        {/* Tasks in this project */}
+                        {groupTasks.map(task => (
+                          <Box key={task.id} sx={{ position: 'relative' }}>
+                            {col.key === 'submitted' && (isTeamLeader || isSupervisor) && (
+                              <Box
+                                sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1, width: 18, height: 18,
+                                  border: '2px solid', borderColor: selectedIds.includes(task.id) ? 'primary.main' : 'grey.400',
+                                  borderRadius: '3px', bgcolor: selectedIds.includes(task.id) ? 'primary.main' : 'white',
+                                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                onClick={e => { e.stopPropagation(); toggleSelect(task.id); }}
+                              >
+                                {selectedIds.includes(task.id) && <CheckCircle sx={{ fontSize: 14, color: 'white' }} />}
+                              </Box>
+                            )}
+                            <KanbanCard task={task} onClick={() => navigate(`/tasks/${task.id}`)} />
                           </Box>
-                        )}
-                        <KanbanCard
-                          task={task}
-                          onClick={() => navigate(`/tasks/${task.id}`)}
-                        />
+                        ))}
                       </Box>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </Box>
 
                 {/* Add button in Assigned column */}
