@@ -94,15 +94,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   // ─── Navigation items per role ──────────────────────────────
 
   const supervisorNav: any[] = [
-    { section: 'Visualization' },
     { text: 'Dashboard',         icon: <Dashboard />,          path: '/dashboard' },
     { text: 'Projects',          icon: <Assignment />,         path: '/projects' },
-    { text: 'Engineer Activity', icon: <BarChart />,           path: '/engineer-activity' },
-    { text: 'Smart Warnings',    icon: <Psychology />,         path: '/smart-warnings' },
-    { section: 'Operations' },
     { text: 'Task Board',        icon: <ViewKanban />,         path: '/task-board' },
     { text: 'Team Management',   icon: <People />,             path: '/team' },
     { text: 'Project Briefings', icon: <Description />,        path: '/briefings' },
+    { text: 'Engineer Activity', icon: <BarChart />,           path: '/engineer-activity' },
+    { text: 'Smart Warnings',    icon: <Psychology />,         path: '/smart-warnings' },
   ];
 
   const teamLeaderNav: any[] = [
@@ -166,13 +164,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       </Toolbar>
 
       {/* Role chip */}
-      <Box sx={{ px: 2, pb: 1.5 }}>
+      <Box sx={{ px: 2, pb: 1.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
         <Chip
           size="small"
-          label={user?.role === 'team_leader' ? 'Team Leader' : user?.role?.charAt(0).toUpperCase() + (user?.role?.slice(1) || '')}
+          label={
+            user?.role === 'team_leader' ? 'Team Leader'
+            : user?.role === 'supervisor' ? 'Supervisor'
+            : user?.role?.charAt(0).toUpperCase() + (user?.role?.slice(1) || '')
+          }
           sx={{ bgcolor: ROLE_CHIP_COLORS[user?.role || 'engineer'], color: 'white', fontWeight: 600,
-            fontSize: '0.7rem', height: 22 }}
+            fontSize: '0.7rem', height: 22, alignSelf: 'flex-start' }}
         />
+        {user?.role === 'supervisor' && (user as any)?.supervisor_type && (
+          <Chip
+            size="small"
+            label={(user as any).supervisor_type === 'visualization' ? 'Visualization' : 'Working'}
+            sx={{
+              bgcolor: (user as any).supervisor_type === 'visualization' ? '#0284c7' : '#0d9488',
+              color: 'white', fontWeight: 600, fontSize: '0.65rem', height: 19, alignSelf: 'flex-start',
+            }}
+          />
+        )}
       </Box>
 
       <Divider />
@@ -264,7 +276,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </IconButton>
 
           <Typography variant="h6" noWrap sx={{ flexGrow: 1, fontWeight: 600, fontSize: '1rem' }}>
-            {ROLE_LABELS[user?.role || 'engineer']}
+            {user?.role === 'supervisor' && (user as any)?.supervisor_type
+              ? `${(user as any).supervisor_type === 'visualization' ? 'Visualization' : 'Working'} Supervisor Dashboard`
+              : ROLE_LABELS[user?.role || 'engineer']}
           </Typography>
 
           {/* Connection indicator */}

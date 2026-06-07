@@ -23,7 +23,8 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
 
     const result = await query(`
       SELECT
-        id, name, email, role, is_active, created_at, updated_at,
+        id, name, email, role, supervisor_type, is_active, created_at, updated_at,
+        job_description,
         (SELECT COUNT(*) FROM work_logs WHERE engineer_id = users.id) as total_work_logs,
         (SELECT SUM(hours) FROM work_logs WHERE engineer_id = users.id) as total_hours
       FROM users
@@ -111,7 +112,12 @@ export const createSupervisor = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const { name, email, password }: RegisterInput = req.body;
+    const { name, email, password, supervisor_type }: RegisterInput & { supervisor_type?: string } = req.body;
+
+    if (supervisor_type && !['visualization', 'working'].includes(supervisor_type)) {
+      res.status(400).json({ success: false, error: 'supervisor_type must be "visualization" or "working"' });
+      return;
+    }
 
     // Validate password strength
     const passwordValidation = validatePasswordStrength(password);
@@ -143,10 +149,10 @@ export const createSupervisor = async (req: Request, res: Response): Promise<voi
 
     // Create supervisor user
     const userResult = await query(
-      `INSERT INTO users (name, email, password_hash, role)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, email, role, is_active, created_at`,
-      [name, email, passwordHash, 'supervisor']
+      `INSERT INTO users (name, email, password_hash, role, supervisor_type)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, email, role, supervisor_type, is_active, created_at`,
+      [name, email, passwordHash, 'supervisor', supervisor_type || null]
     );
 
     const user = userResult.rows[0];

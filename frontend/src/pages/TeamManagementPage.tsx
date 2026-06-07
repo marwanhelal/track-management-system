@@ -57,6 +57,7 @@ interface User {
   name: string;
   email: string;
   role: 'supervisor' | 'engineer' | 'administrator' | 'team_leader';
+  supervisor_type?: 'visualization' | 'working' | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -85,6 +86,7 @@ interface TeamManagementState {
       name: string;
       email: string;
       password: string;
+      supervisor_type: 'visualization' | 'working' | '';
     };
     errors: Record<string, string>;
   };
@@ -173,7 +175,8 @@ const TeamManagementPage: React.FC = () => {
       formData: {
         name: '',
         email: '',
-        password: ''
+        password: '',
+        supervisor_type: '' as 'visualization' | 'working' | ''
       },
       errors: {}
     },
@@ -383,6 +386,9 @@ const TeamManagementPage: React.FC = () => {
     } else if (formData.password.length < 8) {
       errors.password = 'Password must be at least 8 characters long';
     }
+    if (!formData.supervisor_type) {
+      errors.supervisor_type = 'Supervisor type is required';
+    }
 
     if (Object.keys(errors).length > 0) {
       setState(prev => ({
@@ -398,7 +404,10 @@ const TeamManagementPage: React.FC = () => {
         createSupervisorDialog: { ...prev.createSupervisorDialog, loading: true, errors: {} }
       }));
 
-      const response = await apiService.createSupervisor(formData);
+      const response = await apiService.createSupervisor({
+        ...formData,
+        supervisor_type: formData.supervisor_type || undefined,
+      });
 
       if (response.success) {
         setState(prev => ({
@@ -406,7 +415,7 @@ const TeamManagementPage: React.FC = () => {
           createSupervisorDialog: {
             open: false,
             loading: false,
-            formData: { name: '', email: '', password: '' },
+            formData: { name: '', email: '', password: '', supervisor_type: '' },
             errors: {}
           }
         }));
@@ -1107,13 +1116,24 @@ const TeamManagementPage: React.FC = () => {
     }
   };
 
-  const getRoleChip = (role: string) => {
+  const getRoleChip = (role: string, supervisorType?: string | null) => {
+    const label = role === 'team_leader' ? 'Team Leader'
+      : role.charAt(0).toUpperCase() + role.slice(1);
     return (
-      <Chip
-        label={role.charAt(0).toUpperCase() + role.slice(1)}
-        color={role === 'supervisor' ? 'primary' : 'default'}
-        size="small"
-      />
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4, alignItems: 'flex-start' }}>
+        <Chip label={label} color={role === 'supervisor' ? 'primary' : 'default'} size="small" />
+        {role === 'supervisor' && supervisorType && (
+          <Chip
+            label={supervisorType === 'visualization' ? 'Visualization' : 'Working'}
+            size="small"
+            sx={{
+              height: 18, fontSize: '0.6rem', fontWeight: 700,
+              bgcolor: supervisorType === 'visualization' ? '#0284c7' : '#0d9488',
+              color: 'white',
+            }}
+          />
+        )}
+      </Box>
     );
   };
 
@@ -1389,7 +1409,7 @@ const TeamManagementPage: React.FC = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
-                  <TableCell>{getRoleChip(user.role)}</TableCell>
+                  <TableCell>{getRoleChip(user.role, user.supervisor_type)}</TableCell>
                   <TableCell>{getStatusChip(user)}</TableCell>
                   <TableCell>{user.total_work_logs || 0}</TableCell>
                   <TableCell>{user.total_hours || 0}</TableCell>
@@ -1661,6 +1681,34 @@ const TeamManagementPage: React.FC = () => {
             error={!!state.createSupervisorDialog.errors.password}
             helperText={state.createSupervisorDialog.errors.password || 'Password must be at least 8 characters with uppercase, lowercase, number, and special character'}
           />
+
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Supervisor Type *</InputLabel>
+            <Select
+              value={state.createSupervisorDialog.formData.supervisor_type}
+              label="Supervisor Type *"
+              onChange={e => setState(prev => ({
+                ...prev,
+                createSupervisorDialog: {
+                  ...prev.createSupervisorDialog,
+                  formData: { ...prev.createSupervisorDialog.formData, supervisor_type: e.target.value as 'visualization' | 'working' }
+                }
+              }))}
+            >
+              <MenuItem value="visualization">
+                <Box>
+                  <Typography variant="body2" fontWeight={600}>Visualization Supervisor</Typography>
+                  <Typography variant="caption" color="text.secondary">Focuses on monitoring, reports, and data analysis</Typography>
+                </Box>
+              </MenuItem>
+              <MenuItem value="working">
+                <Box>
+                  <Typography variant="body2" fontWeight={600}>Working Supervisor</Typography>
+                  <Typography variant="caption" color="text.secondary">Focuses on operational work, briefings, and team oversight</Typography>
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setState(prev => ({ ...prev, createSupervisorDialog: { ...prev.createSupervisorDialog, open: false } }))}>

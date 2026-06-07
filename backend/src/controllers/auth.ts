@@ -116,7 +116,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Get user from database
     const userResult = await query(
-      'SELECT id, name, email, password_hash, role, job_description, is_active, is_super_admin FROM users WHERE email = $1',
+      'SELECT id, name, email, password_hash, role, supervisor_type, job_description, is_active, is_super_admin FROM users WHERE email = $1',
       [email]
     );
 
@@ -201,6 +201,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           name: user.name,
           email: user.email,
           role: user.role,
+          supervisor_type: user.supervisor_type || null,
           job_description: user.job_description,
           is_active: user.is_active,
           is_super_admin: user.is_super_admin || false,
@@ -299,7 +300,7 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
 
     // Get full user details from database
     const userResult = await query(
-      'SELECT id, name, email, role, job_description, is_active, created_at, updated_at FROM users WHERE id = $1',
+      'SELECT id, name, email, role, supervisor_type, job_description, is_active, created_at, updated_at FROM users WHERE id = $1',
       [authReq.user.id]
     );
 
