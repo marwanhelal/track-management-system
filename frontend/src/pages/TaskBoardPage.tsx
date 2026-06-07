@@ -55,6 +55,7 @@ const CreateTaskDialog: React.FC<{
   const { user } = useAuth();
 
   const [step, setStep] = useState(0);
+  const [allMemberships, setAllMemberships] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [engineers, setEngineers] = useState<any[]>([]);
   const [selectedEngineerIds, setSelectedEngineerIds] = useState<string[]>([]);
@@ -86,26 +87,26 @@ const CreateTaskDialog: React.FC<{
       setEngineers([]);
       setSelectedEngineerIds([]);
       apiService.getTaskTemplates().then(res => { if (res.success) setTemplates(res.data?.templates || []); }).catch(() => {});
-      loadProjects();
+      loadTeamProjects();
     }
   }, [open]);
 
-  const loadProjects = async () => {
-    setLoading(true);
-    try {
-      const res = await apiService.getProjects();
-      setProjects((res.data as any)?.projects || []);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadEngineers = async (projectId: string) => {
+  const loadTeamProjects = async () => {
     setLoading(true);
     try {
       const res = await apiService.getMyTeam();
-      const all: any[] = res.data?.memberships || [];
-      setEngineers(all.filter(m => String(m.project_id) === projectId));
+      const memberships: any[] = res.data?.memberships || [];
+      setAllMemberships(memberships);
+      // Derive unique projects from memberships (only projects TL has engineers in)
+      const seen = new Set<string>();
+      const uniqueProjects: any[] = [];
+      for (const m of memberships) {
+        if (!seen.has(String(m.project_id))) {
+          seen.add(String(m.project_id));
+          uniqueProjects.push({ id: m.project_id, name: m.project_name });
+        }
+      }
+      setProjects(uniqueProjects);
     } finally {
       setLoading(false);
     }
@@ -123,12 +124,11 @@ const CreateTaskDialog: React.FC<{
   const handleProjectChange = (projectId: string) => {
     setForm(p => ({ ...p, project_id: projectId, phase_id: '' }));
     setPhases([]);
-    setEngineers([]);
     setSelectedEngineerIds([]);
-    if (projectId) {
-      loadEngineers(projectId);
-      loadPhases(projectId);
-    }
+    // Filter engineers from already-loaded memberships — no extra API call
+    const projectEngineers = allMemberships.filter(m => String(m.project_id) === projectId);
+    setEngineers(projectEngineers);
+    if (projectId) loadPhases(projectId);
   };
 
   const toggleEngineer = (id: string) => {
