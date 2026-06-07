@@ -28,6 +28,8 @@ const MyCalendarPage = React.lazy(() => import('./pages/MyCalendarPage'));
 const MyPerformancePage = React.lazy(() => import('./pages/MyPerformancePage'));
 const MyTeamPage = React.lazy(() => import('./pages/MyTeamPage'));
 const TaskBoardPage = React.lazy(() => import('./pages/TaskBoardPage'));
+const ProjectBriefingsPage = React.lazy(() => import('./pages/ProjectBriefingsPage'));
+const BriefingDetailPage = React.lazy(() => import('./pages/BriefingDetailPage'));
 
 // Loading component for Suspense fallback
 const PageLoader: React.FC = () => (
@@ -255,6 +257,32 @@ function App() {
                       <AppLayout>
                         <Suspense fallback={<PageLoader />}>
                           <TaskDetailPage />
+                        </Suspense>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Project Briefings */}
+                <Route
+                  path="/briefings"
+                  element={
+                    <ProtectedRoute requireRole={["supervisor", "team_leader"]}>
+                      <AppLayout>
+                        <Suspense fallback={<PageLoader />}>
+                          <ProjectBriefingsPage />
+                        </Suspense>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/briefings/:id"
+                  element={
+                    <ProtectedRoute requireRole={["supervisor", "team_leader"]}>
+                      <AppLayout>
+                        <Suspense fallback={<PageLoader />}>
+                          <BriefingDetailPage />
                         </Suspense>
                       </AppLayout>
                     </ProtectedRoute>

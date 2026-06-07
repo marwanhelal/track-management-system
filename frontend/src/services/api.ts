@@ -1045,6 +1045,48 @@ class ApiService {
     const response = await this.api.patch('/notifications/read-all');
     return response.data;
   }
+
+  // ── Project Briefings ─────────────────────────────────────────────────────────
+  async getBriefings(params?: { project_id?: number; status?: string }): Promise<ApiResponse<any>> {
+    const response = await this.api.get('/briefings', { params });
+    return response.data;
+  }
+
+  async getBriefingById(id: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/briefings/${id}`);
+    return response.data;
+  }
+
+  async createBriefing(data: {
+    project_id: number;
+    team_leader_id: number;
+    phase_ids: number[];
+    title: string;
+    body?: string;
+    duration_notes?: string;
+    resources?: string;
+    attachments?: { name: string; path: string; type: string }[];
+  }): Promise<ApiResponse<any>> {
+    const response = await this.api.post('/briefings', data);
+    return response.data;
+  }
+
+  async updateBriefing(id: number, data: {
+    title?: string;
+    body?: string;
+    duration_notes?: string;
+    resources?: string;
+    attachments?: { name: string; path: string; type: string }[];
+    phase_ids?: number[];
+  }): Promise<ApiResponse<any>> {
+    const response = await this.api.put(`/briefings/${id}`, data);
+    return response.data;
+  }
+
+  async archiveBriefing(id: number): Promise<ApiResponse<any>> {
+    const response = await this.api.patch(`/briefings/${id}/archive`);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

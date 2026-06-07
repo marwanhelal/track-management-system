@@ -22,6 +22,7 @@ import {
   NotificationsNone,
   FiberManualRecord,
   SupervisorAccount,
+  Description,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -92,23 +93,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   // ─── Navigation items per role ──────────────────────────────
 
-  const supervisorNav = [
+  const supervisorNav: any[] = [
+    { section: 'Visualization' },
     { text: 'Dashboard',         icon: <Dashboard />,          path: '/dashboard' },
     { text: 'Projects',          icon: <Assignment />,         path: '/projects' },
-    { text: 'Task Board',        icon: <ViewKanban />,         path: '/task-board' },
-    { text: 'Team Management',   icon: <People />,             path: '/team' },
     { text: 'Engineer Activity', icon: <BarChart />,           path: '/engineer-activity' },
     { text: 'Smart Warnings',    icon: <Psychology />,         path: '/smart-warnings' },
+    { section: 'Operations' },
+    { text: 'Task Board',        icon: <ViewKanban />,         path: '/task-board' },
+    { text: 'Team Management',   icon: <People />,             path: '/team' },
+    { text: 'Project Briefings', icon: <Description />,        path: '/briefings' },
   ];
 
-  const teamLeaderNav = [
-    { text: 'Dashboard',      icon: <Dashboard />,       path: '/dashboard' },
-    { text: 'My Team',        icon: <Groups />,          path: '/my-team' },
-    { text: 'Task Board',     icon: <ViewKanban />,      path: '/task-board' },
-    { text: 'My Calendar',    icon: <CalendarMonth />,   path: '/my-calendar' },
-    { text: 'Projects',       icon: <Assignment />,      path: '/projects' },
-    { text: 'Time Tracking',  icon: <AccessTime />,      path: '/time-tracking' },
-    { text: 'My Work Logs',   icon: <AccessTime />,      path: '/my-work-logs' },
+  const teamLeaderNav: any[] = [
+    { text: 'Dashboard',         icon: <Dashboard />,     path: '/dashboard' },
+    { text: 'My Team',           icon: <Groups />,        path: '/my-team' },
+    { text: 'Task Board',        icon: <ViewKanban />,    path: '/task-board' },
+    { text: 'My Calendar',       icon: <CalendarMonth />, path: '/my-calendar' },
+    { text: 'Projects',          icon: <Assignment />,    path: '/projects' },
+    { text: 'Briefings',         icon: <Description />,   path: '/briefings' },
+    { text: 'Time Tracking',     icon: <AccessTime />,    path: '/time-tracking' },
+    { text: 'My Work Logs',      icon: <AccessTime />,    path: '/my-work-logs' },
   ];
 
   const engineerNav = [
@@ -173,37 +178,52 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       <Divider />
 
       {/* Nav items */}
-      <List sx={{ px: 1, pt: 1, flexGrow: 1 }}>
-        {navItems.map((item, index) => (
-          <motion.div key={item.text} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.25, delay: index * 0.05 }}>
-            <ListItem disablePadding sx={{ mb: 0.5 }}>
-              <ListItemButton
-                selected={location.pathname === item.path || location.pathname.startsWith(item.path + '/')}
-                onClick={() => { navigate(item.path); if (mobileOpen) setMobileOpen(false); }}
-                sx={{
-                  borderRadius: 2, py: 1.1,
-                  '&.Mui-selected': { bgcolor: 'primary.main', color: 'white',
-                    '&:hover': { bgcolor: 'primary.dark' },
-                    '& .MuiListItemIcon-root': { color: 'white' } },
-                  '&:hover': { bgcolor: 'primary.light', color: 'white',
-                    '& .MuiListItemIcon-root': { color: 'white' } },
-                  transition: 'all 0.18s ease',
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 38, transition: 'color 0.18s ease' }}>
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText primary={item.text}
-                  sx={{ '& .MuiTypography-root': {
-                    fontWeight: (location.pathname === item.path) ? 700 : 500,
-                    fontSize: '0.875rem',
-                  }}}
-                />
-              </ListItemButton>
-            </ListItem>
-          </motion.div>
-        ))}
+      <List sx={{ px: 1, pt: 1, flexGrow: 1, overflowY: 'auto' }}>
+        {navItems.map((item: any, index: number) => {
+          if (item.section) {
+            return (
+              <Box key={item.section} sx={{ px: 1.5, pt: index === 0 ? 0.5 : 1.5, pb: 0.5 }}>
+                <Typography variant="caption" sx={{
+                  fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.6rem',
+                  textTransform: 'uppercase', color: 'text.disabled',
+                }}>
+                  {item.section}
+                </Typography>
+              </Box>
+            );
+          }
+          const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+          return (
+            <motion.div key={item.text} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.25, delay: index * 0.04 }}>
+              <ListItem disablePadding sx={{ mb: 0.5 }}>
+                <ListItemButton
+                  selected={isActive}
+                  onClick={() => { navigate(item.path); if (mobileOpen) setMobileOpen(false); }}
+                  sx={{
+                    borderRadius: 2, py: 1.1,
+                    '&.Mui-selected': { bgcolor: 'primary.main', color: 'white',
+                      '&:hover': { bgcolor: 'primary.dark' },
+                      '& .MuiListItemIcon-root': { color: 'white' } },
+                    '&:hover': { bgcolor: 'primary.light', color: 'white',
+                      '& .MuiListItemIcon-root': { color: 'white' } },
+                    transition: 'all 0.18s ease',
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 38, transition: 'color 0.18s ease' }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText primary={item.text}
+                    sx={{ '& .MuiTypography-root': {
+                      fontWeight: isActive ? 700 : 500,
+                      fontSize: '0.875rem',
+                    }}}
+                  />
+                </ListItemButton>
+              </ListItem>
+            </motion.div>
+          );
+        })}
       </List>
 
       {/* User card at bottom of drawer */}
