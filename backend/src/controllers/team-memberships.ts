@@ -42,9 +42,15 @@ export const getMyTeam = async (req: Request, res: Response): Promise<void> => {
       [authReq.user.id]
     );
 
+    const memberships = result.rows.map((row: any) => ({
+      ...row,
+      active_tasks: parseInt(row.active_tasks, 10) || 0,
+      total_hours_logged: parseFloat(row.total_hours_logged) || 0,
+    }));
+
     res.status(200).json({
       success: true,
-      data: { memberships: result.rows }
+      data: { memberships }
     } as ApiResponse);
   } catch (error) {
     console.error('getMyTeam error:', error);
