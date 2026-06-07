@@ -60,7 +60,7 @@ router.delete('/:id', supervisorOnly, validateIdParam, deleteUser);
 // Reactivate user (supervisor only)
 router.post('/:id/reactivate', supervisorOnly, validateIdParam, reactivateUser);
 
-// Change user role (supervisor only)
-router.patch('/:id/role', supervisorOnly, validateIdParam, changeUserRole);
+// Change user role (super admin only)
+router.patch('/:id/role', superAdminOnly, validateIdParam, changeUserRole);
 
 export default router;

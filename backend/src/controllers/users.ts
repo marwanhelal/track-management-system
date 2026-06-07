@@ -981,3 +981,57 @@ export const getUserProjectBreakdown = async (req: Request, res: Response): Prom
     });
   }
 };
+
+// Change user role — super admin only
+export const changeUserRole = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const { id } = req.params;
+    const { role, supervisor_type } = req.body;
+
+    const validRoles = ['supervisor', 'team_leader', 'engineer', 'administrator'];
+    if (!role || !validRoles.includes(role)) {
+      res.status(400).json({ success: false, error: `role must be one of: ${validRoles.join(', ')}` });
+      return;
+    }
+    if (role === 'supervisor' && supervisor_type && !['visualization', 'working'].includes(supervisor_type)) {
+      res.status(400).json({ success: false, error: 'supervisor_type must be "visualization" or "working"' });
+      return;
+    }
+    if (parseInt(id as string, 10) === authReq.user.id) {
+      res.status(400).json({ success: false, error: 'You cannot change your own role' });
+      return;
+    }
+
+    const existing = await query('SELECT id, name, email, role FROM users WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    const prevRole = existing.rows[0].role;
+    const newSupervisorType = role === 'supervisor' ? (supervisor_type || null) : null;
+
+    const result = await query(
+      `UPDATE users SET role = $1, supervisor_type = $2, updated_at = NOW() WHERE id = $3
+       RETURNING id, name, email, role, supervisor_type, is_active`,
+      [role, newSupervisorType, id]
+    );
+
+    await query(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, user_id, note) VALUES ($1, $2, $3, $4, $5)',
+      ['users', id, 'CHANGE_ROLE', authReq.user.id,
+        `Role changed from ${prevRole} to ${role}${newSupervisorType ? ` (${newSupervisorType})` : ''} for: ${existing.rows[0].email}`]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Role updated to ${role}${newSupervisorType ? ` — ${newSupervisorType}` : ''}`,
+      data: { user: result.rows[0] },
+    } as ApiResponse);
+  } catch (error) {
+    console.error('changeUserRole error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+};
