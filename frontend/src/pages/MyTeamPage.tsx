@@ -10,8 +10,10 @@ import {
 import {
   Add, Search, Refresh, Person, Assignment, CheckCircle,
   Block, AccessTime, TrendingUp, ArrowForward, Close, Warning,
-  FiberManualRecord, GroupAdd, PersonAdd, MoreVert
+  FiberManualRecord, GroupAdd, PersonAdd, MoreVert, CheckBox,
+  CheckBoxOutlineBlank
 } from '@mui/icons-material';
+import Checkbox from '@mui/material/Checkbox';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
@@ -38,16 +40,18 @@ const AddEngineerDialog: React.FC<AddEngineerDialogProps> = ({ open, onClose, on
   const [projects, setProjects] = useState<any[]>([]);
   const [engineers, setEngineers] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState('');
-  const [selectedEngineer, setSelectedEngineer] = useState('');
+  const [selectedEngineers, setSelectedEngineers] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addedCount, setAddedCount] = useState(0);
 
   useEffect(() => {
     if (open) {
       setSelectedProject('');
-      setSelectedEngineer('');
+      setSelectedEngineers([]);
       setError(null);
+      setAddedCount(0);
       loadProjects();
     }
   }, [open]);
@@ -74,35 +78,63 @@ const AddEngineerDialog: React.FC<AddEngineerDialogProps> = ({ open, onClose, on
 
   const handleProjectChange = (value: string) => {
     setSelectedProject(value);
-    setSelectedEngineer('');
+    setSelectedEngineers([]);
+    setError(null);
     if (value) loadAvailableEngineers(value);
   };
 
-  const handleAdd = async () => {
-    setSubmitting(true);
-    setError(null);
-    try {
-      await apiService.createMembership({
-        engineer_id: parseInt(selectedEngineer),
-        project_id: parseInt(selectedProject),
-      });
-      onAdded();
-      onClose();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to add engineer');
-    } finally {
-      setSubmitting(false);
+  const handleToggleAll = () => {
+    if (selectedEngineers.length === engineers.length) {
+      setSelectedEngineers([]);
+    } else {
+      setSelectedEngineers(engineers.map((e: any) => String(e.id)));
     }
   };
+
+  const handleAdd = async () => {
+    if (selectedEngineers.length === 0) return;
+    setSubmitting(true);
+    setError(null);
+    const errors: string[] = [];
+    let added = 0;
+    for (const engId of selectedEngineers) {
+      try {
+        await apiService.createMembership({
+          engineer_id: parseInt(engId),
+          project_id: parseInt(selectedProject),
+        });
+        added++;
+      } catch (err: any) {
+        const name = engineers.find((e: any) => String(e.id) === engId)?.name || engId;
+        errors.push(`${name}: ${err.response?.data?.error || 'Failed'}`);
+      }
+    }
+    setSubmitting(false);
+    if (added > 0) onAdded();
+    if (errors.length > 0) {
+      setError(errors.join('\n'));
+      if (added > 0) setAddedCount(added);
+    } else {
+      onClose();
+    }
+  };
+
+  const allSelected = engineers.length > 0 && selectedEngineers.length === engineers.length;
+  const someSelected = selectedEngineers.length > 0 && selectedEngineers.length < engineers.length;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
       <DialogTitle sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        Add Engineer to Team
+        Add Engineers to Team
         <IconButton size="small" onClick={onClose}><Close /></IconButton>
       </DialogTitle>
       <DialogContent>
-        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+        {error && (
+          <Alert severity={addedCount > 0 ? 'warning' : 'error'} sx={{ mb: 2, borderRadius: 2, whiteSpace: 'pre-line' }}>
+            {addedCount > 0 && <strong>{addedCount} engineer(s) added successfully. </strong>}
+            {error}
+          </Alert>
+        )}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <FormControl fullWidth required disabled={loading}>
             <InputLabel>Project</InputLabel>
@@ -114,28 +146,90 @@ const AddEngineerDialog: React.FC<AddEngineerDialogProps> = ({ open, onClose, on
           </FormControl>
 
           {selectedProject && (
-            <FormControl fullWidth required disabled={loading || engineers.length === 0}>
-              <InputLabel>Engineer</InputLabel>
-              <Select value={selectedEngineer} onChange={e => setSelectedEngineer(e.target.value)} label="Engineer">
-                {loading ? (
-                  <MenuItem disabled>Loading...</MenuItem>
-                ) : engineers.length === 0 ? (
-                  <MenuItem disabled>All engineers already in your team for this project</MenuItem>
-                ) : (
-                  engineers.map((e: any) => (
-                    <MenuItem key={e.id} value={String(e.id)}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Avatar sx={{ width: 28, height: 28, fontSize: 13 }}>{e.name[0]}</Avatar>
-                        <Box>
-                          <Typography variant="body2">{e.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">{e.email}</Typography>
+            <Box>
+              {loading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}>
+                  <CircularProgress size={16} />
+                  <Typography variant="body2" color="text.secondary">Loading engineers...</Typography>
+                </Box>
+              ) : engineers.length === 0 ? (
+                <Alert severity="info" sx={{ borderRadius: 2 }}>All engineers are already in your team for this project.</Alert>
+              ) : (
+                <Box>
+                  {/* Select All row */}
+                  <Box
+                    onClick={handleToggleAll}
+                    sx={{
+                      display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1,
+                      borderRadius: 2, cursor: 'pointer', mb: 0.5,
+                      bgcolor: 'grey.50', border: '1px solid', borderColor: 'grey.200',
+                      '&:hover': { bgcolor: 'grey.100' },
+                    }}
+                  >
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      size="small"
+                      sx={{ p: 0 }}
+                      onChange={handleToggleAll}
+                      onClick={e => e.stopPropagation()}
+                    />
+                    <Typography variant="body2" fontWeight={600}>
+                      {allSelected ? 'Deselect All' : 'Select All'} ({engineers.length} engineers)
+                    </Typography>
+                  </Box>
+
+                  {/* Engineer list */}
+                  <Box sx={{
+                    maxHeight: 280, overflowY: 'auto', border: '1px solid', borderColor: 'grey.200',
+                    borderRadius: 2, bgcolor: 'background.paper'
+                  }}>
+                    {engineers.map((eng: any) => {
+                      const checked = selectedEngineers.includes(String(eng.id));
+                      return (
+                        <Box
+                          key={eng.id}
+                          onClick={() => {
+                            setSelectedEngineers(prev =>
+                              checked ? prev.filter(id => id !== String(eng.id)) : [...prev, String(eng.id)]
+                            );
+                          }}
+                          sx={{
+                            display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, py: 1,
+                            cursor: 'pointer', borderBottom: '1px solid', borderColor: 'grey.100',
+                            bgcolor: checked ? 'primary.50' : 'transparent',
+                            '&:hover': { bgcolor: checked ? 'primary.100' : 'grey.50' },
+                            '&:last-child': { borderBottom: 'none' },
+                          }}
+                        >
+                          <Checkbox checked={checked} size="small" sx={{ p: 0 }} readOnly />
+                          <Avatar sx={{ width: 32, height: 32, fontSize: 13, bgcolor: checked ? 'primary.main' : 'grey.400' }}>
+                            {eng.name[0]}
+                          </Avatar>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" fontWeight={checked ? 600 : 400} noWrap>{eng.name}</Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap>{eng.email}</Typography>
+                          </Box>
+                          {checked && <CheckCircle sx={{ fontSize: 18, color: 'primary.main', flexShrink: 0 }} />}
                         </Box>
-                      </Box>
-                    </MenuItem>
-                  ))
-                )}
-              </Select>
-            </FormControl>
+                      );
+                    })}
+                  </Box>
+
+                  {/* Selection summary */}
+                  {selectedEngineers.length > 0 && (
+                    <Box sx={{ mt: 1, px: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="caption" color="primary.main" fontWeight={600}>
+                        {selectedEngineers.length} engineer{selectedEngineers.length > 1 ? 's' : ''} selected
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        — will be added to the project
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </Box>
           )}
         </Box>
       </DialogContent>
@@ -144,10 +238,14 @@ const AddEngineerDialog: React.FC<AddEngineerDialogProps> = ({ open, onClose, on
         <Button
           variant="contained"
           onClick={handleAdd}
-          disabled={!selectedProject || !selectedEngineer || submitting}
+          disabled={!selectedProject || selectedEngineers.length === 0 || submitting}
           startIcon={submitting ? <CircularProgress size={16} /> : <PersonAdd />}
         >
-          Add to Team
+          {submitting
+            ? 'Adding...'
+            : selectedEngineers.length > 0
+              ? `Add ${selectedEngineers.length} Engineer${selectedEngineers.length > 1 ? 's' : ''} to Team`
+              : 'Add to Team'}
         </Button>
       </DialogActions>
     </Dialog>
