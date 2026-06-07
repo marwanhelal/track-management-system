@@ -8,6 +8,7 @@ export interface User {
   email: string;
   password_hash: string;
   role: UserRole;
+  supervisor_type?: 'visualization' | 'working' | null;
   job_description?: string;
   is_active: boolean;
   is_super_admin?: boolean;
