@@ -233,7 +233,7 @@ export const updateBriefing = async (req: Request, res: Response): Promise<void>
       }
     }
 
-    await logHistory(parseInt(id), 'updated', authReq.user.id, authReq.user.name || '', null, {
+    await logHistory(parseInt(id as string, 10), 'updated', authReq.user.id, authReq.user.name || '', null, {
       title: updated.rows[0].title, phase_count: phase_ids?.length ?? null,
     });
 
@@ -257,7 +257,7 @@ export const archiveBriefing = async (req: Request, res: Response): Promise<void
     if (existing.rows.length === 0) { res.status(404).json({ success: false, error: 'Briefing not found' }); return; }
 
     await query(`UPDATE project_briefings SET status = 'archived', updated_at = NOW() WHERE id = $1`, [id]);
-    await logHistory(parseInt(id), 'archived', authReq.user.id, authReq.user.name || '', null, null);
+    await logHistory(parseInt(id as string, 10), 'archived', authReq.user.id, authReq.user.name || '', null, null);
 
     res.status(200).json({ success: true, message: 'Briefing archived' } as ApiResponse);
   } catch (error) {
