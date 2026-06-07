@@ -11,7 +11,7 @@ import {
   CheckCircle, Warning, AccessTime, CalendarToday, Person,
   ArrowForward, FilterList, FiberManualRecord, Flag, Close,
   MoreVert, OpenInNew, ThumbUp, ThumbDown, BookmarkBorder, Bookmark,
-  Group
+  Group, ExpandMore, ChevronRight, PersonOff, FolderOff
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -764,6 +764,7 @@ const TaskBoardPage: React.FC = () => {
   const { user, isTeamLeader, isSupervisor } = useAuth();
 
   const [tasks, setTasks] = useState<TaskWithStats[]>([]);
+  const [teamMemberships, setTeamMemberships] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -776,13 +777,18 @@ const TaskBoardPage: React.FC = () => {
   const [bulkDialog, setBulkDialog] = useState<{ open: boolean; action: 'approve' | 'reject' }>({ open: false, action: 'approve' });
   const [bulkNote, setBulkNote] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiService.getTaskAssignments();
-      setTasks(Array.isArray(res.data?.tasks) ? res.data.tasks : []);
+      const [tasksRes, teamRes] = await Promise.all([
+        apiService.getTaskAssignments(),
+        apiService.getMyTeam(),
+      ]);
+      setTasks(Array.isArray(tasksRes.data?.tasks) ? tasksRes.data.tasks : []);
+      setTeamMemberships(teamRes.data?.memberships || []);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load tasks');
     } finally {
@@ -792,9 +798,31 @@ const TaskBoardPage: React.FC = () => {
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const engineers = Array.from(new Map(
     tasks.filter(t => t.engineer_name).map(t => [t.engineer_id, { id: t.engineer_id, name: t.engineer_name! }])
   ).values());
+
+  // ── Team stats ────────────────────────────────────────────────────────────────
+  const teamEngineers = Array.from(new Map(
+    teamMemberships.map(m => [m.engineer_id, { id: m.engineer_id, name: m.engineer_name, email: m.engineer_email }])
+  ).values());
+  const teamProjects = Array.from(new Map(
+    teamMemberships.map(m => [m.project_id, { id: m.project_id, name: m.project_name }])
+  ).values());
+  const activeTasks = tasks.filter(t => !['approved', 'cancelled'].includes(t.status));
+  const assignedEngineerIds = new Set(activeTasks.map(t => t.engineer_id));
+  const assignedProjectIds = new Set(activeTasks.map(t => t.project_id));
+  const unassignedEngineers = teamEngineers.filter(e => !assignedEngineerIds.has(e.id));
+  const unassignedProjects = teamProjects.filter(p => !assignedProjectIds.has(p.id));
 
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = !searchQuery ||
@@ -936,6 +964,45 @@ const TaskBoardPage: React.FC = () => {
         </Box>
       )}
 
+      {/* Team Assignment Stats */}
+      {!loading && (unassignedEngineers.length > 0 || unassignedProjects.length > 0) && (
+        <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+          {unassignedEngineers.length > 0 && (
+            <Paper sx={{ flex: 1, minWidth: 220, p: 1.5, borderRadius: 2, border: '1px solid', borderColor: 'warning.light', bgcolor: '#fffde7' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.8 }}>
+                <PersonOff sx={{ fontSize: 16, color: 'warning.dark' }} />
+                <Typography variant="caption" fontWeight={700} color="warning.dark">
+                  {unassignedEngineers.length} engineer{unassignedEngineers.length > 1 ? 's' : ''} with no active tasks
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {unassignedEngineers.map(e => (
+                  <Chip key={e.id} label={e.name} size="small"
+                    avatar={<Avatar sx={{ width: 16, height: 16, fontSize: 9 }}>{e.name[0]}</Avatar>}
+                    sx={{ fontSize: '0.65rem', height: 20, bgcolor: 'warning.50', color: 'warning.dark' }} />
+                ))}
+              </Box>
+            </Paper>
+          )}
+          {unassignedProjects.length > 0 && (
+            <Paper sx={{ flex: 1, minWidth: 220, p: 1.5, borderRadius: 2, border: '1px solid', borderColor: 'info.light', bgcolor: '#e3f2fd' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.8 }}>
+                <FolderOff sx={{ fontSize: 16, color: 'info.dark' }} />
+                <Typography variant="caption" fontWeight={700} color="info.dark">
+                  {unassignedProjects.length} project{unassignedProjects.length > 1 ? 's' : ''} with no tasks assigned
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {unassignedProjects.map(p => (
+                  <Chip key={p.id} label={p.name} size="small"
+                    sx={{ fontSize: '0.65rem', height: 20, bgcolor: 'info.50', color: 'info.dark' }} />
+                ))}
+              </Box>
+            </Paper>
+          )}
+        </Box>
+      )}
+
       {/* Kanban Board */}
       {loading ? (
         <Grid container spacing={2}>
@@ -996,23 +1063,34 @@ const TaskBoardPage: React.FC = () => {
                       if (!groups.has(pid)) groups.set(pid, []);
                       groups.get(pid)!.push(task);
                     }
-                    return Array.from(groups.entries()).map(([pid, groupTasks]) => (
+                    return Array.from(groups.entries()).map(([pid, groupTasks]) => {
+                      const groupKey = `${col.key}-${pid}`;
+                      const isCollapsed = collapsedGroups.has(groupKey);
+                      return (
                       <Box key={pid} sx={{ mb: 1.5 }}>
-                        {/* Project group header */}
-                        <Box sx={{
-                          display: 'flex', alignItems: 'center', gap: 0.8, px: 1, py: 0.5, mb: 0.5,
-                          borderRadius: 1.5, bgcolor: `${col.color}18`,
-                        }}>
-                          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: col.color, flexShrink: 0 }} />
+                        {/* Project group header — click to collapse */}
+                        <Box
+                          onClick={() => toggleGroup(groupKey)}
+                          sx={{
+                            display: 'flex', alignItems: 'center', gap: 0.8, px: 1, py: 0.6, mb: isCollapsed ? 0 : 0.5,
+                            borderRadius: 1.5, bgcolor: `${col.color}18`, cursor: 'pointer',
+                            '&:hover': { bgcolor: `${col.color}28` },
+                            userSelect: 'none',
+                          }}
+                        >
+                          {isCollapsed
+                            ? <ChevronRight sx={{ fontSize: 14, color: col.color, flexShrink: 0 }} />
+                            : <ExpandMore sx={{ fontSize: 14, color: col.color, flexShrink: 0 }} />}
                           <Typography variant="caption" fontWeight={700} color={col.color} noWrap sx={{ flex: 1, fontSize: '0.68rem', letterSpacing: 0.3 }}>
                             {groupTasks[0].project_name || `Project #${pid}`}
                           </Typography>
-                          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: col.color, opacity: 0.8, flexShrink: 0 }}>
-                            {groupTasks.length}
-                          </Typography>
+                          <Chip label={groupTasks.length} size="small" sx={{
+                            height: 16, fontSize: '0.6rem', fontWeight: 700,
+                            bgcolor: col.color, color: 'white', '& .MuiChip-label': { px: 0.8 }
+                          }} />
                         </Box>
-                        {/* Tasks in this project */}
-                        {groupTasks.map(task => (
+                        {/* Tasks in this project — hidden when collapsed */}
+                        {!isCollapsed && groupTasks.map(task => (
                           <Box key={task.id} sx={{ position: 'relative' }}>
                             {col.key === 'submitted' && (isTeamLeader || isSupervisor) && (
                               <Box
@@ -1029,7 +1107,8 @@ const TaskBoardPage: React.FC = () => {
                           </Box>
                         ))}
                       </Box>
-                    ));
+                    );
+                    });
                   })()}
                 </Box>
 
