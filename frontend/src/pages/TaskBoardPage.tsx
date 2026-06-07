@@ -777,7 +777,7 @@ const TaskBoardPage: React.FC = () => {
   const [bulkDialog, setBulkDialog] = useState<{ open: boolean; action: 'approve' | 'reject' }>({ open: false, action: 'approve' });
   const [bulkNote, setBulkNote] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -799,7 +799,7 @@ const TaskBoardPage: React.FC = () => {
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
   const toggleGroup = (key: string) => {
-    setCollapsedGroups(prev => {
+    setExpandedGroups(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -1065,7 +1065,7 @@ const TaskBoardPage: React.FC = () => {
                     }
                     return Array.from(groups.entries()).map(([pid, groupTasks]) => {
                       const groupKey = `${col.key}-${pid}`;
-                      const isCollapsed = collapsedGroups.has(groupKey);
+                      const isCollapsed = !expandedGroups.has(groupKey);
                       return (
                       <Box key={pid} sx={{ mb: 1.5 }}>
                         {/* Project group header — click to collapse */}
