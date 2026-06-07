@@ -1064,6 +1064,7 @@ class ApiService {
     title: string;
     body?: string;
     duration_notes?: string;
+    due_date?: string;
     resources?: string;
     attachments?: { name: string; path: string; type: string }[];
   }): Promise<ApiResponse<any>> {
@@ -1075,6 +1076,7 @@ class ApiService {
     title?: string;
     body?: string;
     duration_notes?: string;
+    due_date?: string;
     resources?: string;
     attachments?: { name: string; path: string; type: string }[];
     phase_ids?: number[];

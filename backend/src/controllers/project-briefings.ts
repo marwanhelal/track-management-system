@@ -120,7 +120,7 @@ export const getBriefingById = async (req: Request, res: Response): Promise<void
 export const createBriefing = async (req: Request, res: Response): Promise<void> => {
   const authReq = req as any;
   try {
-    const { project_id, team_leader_id, phase_ids, title, body, duration_notes, resources, attachments } = req.body;
+    const { project_id, team_leader_id, phase_ids, title, body, duration_notes, due_date, resources, attachments } = req.body;
 
     if (!project_id || !team_leader_id || !title?.trim()) {
       res.status(400).json({ success: false, error: 'project_id, team_leader_id, and title are required' });
@@ -141,14 +141,15 @@ export const createBriefing = async (req: Request, res: Response): Promise<void>
 
     const briefingRes = await query(
       `INSERT INTO project_briefings
-         (project_id, team_leader_id, created_by, title, body, duration_notes, resources, attachments)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (project_id, team_leader_id, created_by, title, body, duration_notes, due_date, resources, attachments)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         project_id, team_leader_id, authReq.user.id,
         title.trim(),
         body?.trim() || null,
         duration_notes?.trim() || null,
+        due_date || null,
         resources?.trim() || null,
         JSON.stringify(attachments || []),
       ]
@@ -192,7 +193,7 @@ export const updateBriefing = async (req: Request, res: Response): Promise<void>
   const authReq = req as any;
   try {
     const { id } = req.params;
-    const { title, body, duration_notes, resources, attachments, phase_ids } = req.body;
+    const { title, body, duration_notes, due_date, resources, attachments, phase_ids } = req.body;
 
     const existing = await query(`SELECT * FROM project_briefings WHERE id = $1`, [id]);
     if (existing.rows.length === 0) { res.status(404).json({ success: false, error: 'Briefing not found' }); return; }
@@ -205,15 +206,17 @@ export const updateBriefing = async (req: Request, res: Response): Promise<void>
        SET title          = COALESCE(NULLIF($1, ''), title),
            body           = $2,
            duration_notes = $3,
-           resources      = $4,
-           attachments    = COALESCE($5::JSONB, attachments),
+           due_date       = $4,
+           resources      = $5,
+           attachments    = COALESCE($6::JSONB, attachments),
            updated_at     = NOW()
-       WHERE id = $6
+       WHERE id = $7
        RETURNING *`,
       [
         title?.trim() || null,
         body?.trim() ?? existing.rows[0].body,
         duration_notes?.trim() ?? existing.rows[0].duration_notes,
+        due_date ?? existing.rows[0].due_date,
         resources?.trim() ?? existing.rows[0].resources,
         attachments != null ? JSON.stringify(attachments) : null,
         id,

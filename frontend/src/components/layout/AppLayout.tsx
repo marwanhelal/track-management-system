@@ -64,6 +64,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [activeBriefingCount, setActiveBriefingCount] = useState(0);
 
   // Fetch unread notification count periodically
   useEffect(() => {
@@ -78,6 +79,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     const interval = setInterval(fetchCount, 60000);
     return () => clearInterval(interval);
   }, [user]);
+
+  // Fetch active briefing count for TL badge
+  useEffect(() => {
+    if (!user || !isTeamLeader) return;
+    const fetchBriefings = async () => {
+      try {
+        const res = await apiService.getBriefings({ status: 'active' });
+        setActiveBriefingCount(res.data?.briefings?.length ?? 0);
+      } catch {}
+    };
+    fetchBriefings();
+    const interval = setInterval(fetchBriefings, 120000);
+    return () => clearInterval(interval);
+  }, [user, isTeamLeader]);
 
   const handleNotifOpen = async (event: React.MouseEvent<HTMLElement>) => {
     setNotifAnchorEl(event.currentTarget);
@@ -223,7 +238,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   }}
                 >
                   <ListItemIcon sx={{ minWidth: 38, transition: 'color 0.18s ease' }}>
-                    {item.icon}
+                    {item.path === '/briefings' && isTeamLeader && activeBriefingCount > 0
+                      ? <Badge badgeContent={activeBriefingCount} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>{item.icon}</Badge>
+                      : item.icon}
                   </ListItemIcon>
                   <ListItemText primary={item.text}
                     sx={{ '& .MuiTypography-root': {
