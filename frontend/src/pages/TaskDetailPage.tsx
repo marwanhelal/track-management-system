@@ -46,9 +46,22 @@ const MilestoneTimeline: React.FC<{
   return (
     <Box>
       {milestones.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-          No milestones set for this task.
-        </Typography>
+        <Box sx={{ py: 2, textAlign: 'center' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: canLogTime ? 1.5 : 0 }}>
+            No milestones set for this task.
+          </Typography>
+          {canLogTime && onLogTime && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AccessTime />}
+              onClick={() => onLogTime(null as any)}
+              sx={{ borderRadius: 2 }}
+            >
+              Log Hours for this Task
+            </Button>
+          )}
+        </Box>
       ) : (
         milestones.map((ms, idx) => {
           const isOverdue = ms.status === 'overdue' || (!ms.completed_at && ms.due_date && new Date(ms.due_date) < new Date());
@@ -447,6 +460,8 @@ const TaskDetailPage: React.FC = () => {
   const [addResourceDialog, setAddResourceDialog] = useState(false);
   const [logTimeDialog, setLogTimeDialog] = useState<{ open: boolean; milestone: TaskMilestone | null }>({ open: false, milestone: null });
   const [logTimeForm, setLogTimeForm] = useState({ hours: '', date: new Date().toISOString().split('T')[0], description: '' });
+  const [taskLogDialog, setTaskLogDialog] = useState(false);
+  const [taskLogForm, setTaskLogForm] = useState({ hours: '', date: new Date().toISOString().split('T')[0], description: '' });
   const [editDialog, setEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', description: '', allocated_hours: '', deadline: '', priority: 'medium' });
   const [history, setHistory] = useState<any[]>([]);
@@ -693,7 +708,13 @@ const TaskDetailPage: React.FC = () => {
     } finally { setActionLoading(false); }
   };
 
-  const handleOpenLogTime = (milestone: TaskMilestone) => {
+  const handleOpenLogTime = (milestone: TaskMilestone | null) => {
+    if (!milestone) {
+      // Task-level log (no milestones)
+      setTaskLogForm({ hours: '', date: new Date().toISOString().split('T')[0], description: '' });
+      setTaskLogDialog(true);
+      return;
+    }
     setLogTimeForm({ hours: '', date: new Date().toISOString().split('T')[0], description: '' });
     setLogTimeDialog({ open: true, milestone });
   };
@@ -720,6 +741,33 @@ const TaskDetailPage: React.FC = () => {
       const res = await apiService.getTaskMilestones(taskId);
       if (res.success) setMilestones(res.data?.milestones || res.data || []);
       // Also reload full task to refresh hours budget
+      loadTask();
+    } catch (err: any) {
+      toast(err.response?.data?.error || 'Failed to log time', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleTaskLogTime = async () => {
+    if (!task) return;
+    const hours = parseFloat(taskLogForm.hours);
+    if (isNaN(hours) || hours <= 0) {
+      toast('Hours must be greater than 0', 'error');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await apiService.createWorkLog({
+        phase_id: task.phase_id,
+        hours,
+        description: taskLogForm.description.trim() || undefined,
+        date: taskLogForm.date,
+        task_assignment_id: task.id,
+      } as any);
+      toast('Time logged successfully!');
+      setTaskLogDialog(false);
+      setTaskLogForm({ hours: '', date: new Date().toISOString().split('T')[0], description: '' });
       loadTask();
     } catch (err: any) {
       toast(err.response?.data?.error || 'Failed to log time', 'error');
@@ -1353,6 +1401,49 @@ const TaskDetailPage: React.FC = () => {
             variant="contained"
             onClick={handleLogTime}
             disabled={!logTimeForm.hours || parseFloat(logTimeForm.hours) <= 0 || actionLoading}
+          >
+            {actionLoading ? <CircularProgress size={18} /> : 'Save Time'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Task-level Log Time Dialog (for tasks with no milestones) */}
+      <Dialog open={taskLogDialog} onClose={() => setTaskLogDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Log Hours — {task?.title}
+          <Typography variant="caption" display="block" color="text.secondary">Logging directly to task (no milestones)</Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label="Date" type="date" size="small" sx={{ flex: 1 }}
+                InputLabelProps={{ shrink: true }}
+                value={taskLogForm.date}
+                onChange={e => setTaskLogForm(p => ({ ...p, date: e.target.value }))}
+              />
+              <TextField
+                label="Hours" type="number" required size="small" sx={{ width: 140 }}
+                inputProps={{ min: 0.25, step: 0.25 }}
+                value={taskLogForm.hours}
+                onChange={e => setTaskLogForm(p => ({ ...p, hours: e.target.value }))}
+                InputProps={{ endAdornment: <span style={{ fontSize: '0.8rem', color: '#888' }}>h</span> }}
+              />
+            </Box>
+            <TextField
+              label="Description (optional)" multiline rows={3} fullWidth size="small"
+              placeholder="What did you work on?"
+              value={taskLogForm.description}
+              onChange={e => setTaskLogForm(p => ({ ...p, description: e.target.value }))}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setTaskLogDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleTaskLogTime}
+            disabled={!taskLogForm.hours || parseFloat(taskLogForm.hours) <= 0 || actionLoading}
           >
             {actionLoading ? <CircularProgress size={18} /> : 'Save Time'}
           </Button>

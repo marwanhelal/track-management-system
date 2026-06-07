@@ -81,11 +81,20 @@ export const getTaskAssignments = async (req: Request, res: Response): Promise<v
        JOIN projects      pr  ON pr.id  = t.project_id
        JOIN project_phases ph  ON ph.id  = t.phase_id
        LEFT JOIN (
-         SELECT tm.assignment_id, COALESCE(SUM(wl.hours), 0) AS logged_hours
-         FROM work_logs wl
-         JOIN task_milestones tm ON tm.id = wl.task_milestone_id
-         WHERE wl.deleted_at IS NULL
-         GROUP BY tm.assignment_id
+         SELECT assignment_id, COALESCE(SUM(hours), 0) AS logged_hours
+         FROM (
+           SELECT tm.assignment_id, wl.hours
+           FROM work_logs wl
+           JOIN task_milestones tm ON tm.id = wl.task_milestone_id
+           WHERE wl.deleted_at IS NULL
+           UNION ALL
+           SELECT wl.task_assignment_id AS assignment_id, wl.hours
+           FROM work_logs wl
+           WHERE wl.task_assignment_id IS NOT NULL
+             AND wl.task_milestone_id IS NULL
+             AND wl.deleted_at IS NULL
+         ) combined
+         GROUP BY assignment_id
        ) wl ON wl.assignment_id = t.id
        LEFT JOIN (
          SELECT assignment_id,
@@ -138,11 +147,20 @@ export const getTaskAssignmentById = async (req: Request, res: Response): Promis
        JOIN projects      pr  ON pr.id  = t.project_id
        JOIN project_phases ph  ON ph.id  = t.phase_id
        LEFT JOIN (
-         SELECT tm.assignment_id, COALESCE(SUM(wl.hours), 0) AS logged_hours
-         FROM work_logs wl
-         JOIN task_milestones tm ON tm.id = wl.task_milestone_id
-         WHERE wl.deleted_at IS NULL
-         GROUP BY tm.assignment_id
+         SELECT assignment_id, COALESCE(SUM(hours), 0) AS logged_hours
+         FROM (
+           SELECT tm.assignment_id, wl.hours
+           FROM work_logs wl
+           JOIN task_milestones tm ON tm.id = wl.task_milestone_id
+           WHERE wl.deleted_at IS NULL
+           UNION ALL
+           SELECT wl.task_assignment_id AS assignment_id, wl.hours
+           FROM work_logs wl
+           WHERE wl.task_assignment_id IS NOT NULL
+             AND wl.task_milestone_id IS NULL
+             AND wl.deleted_at IS NULL
+         ) combined
+         GROUP BY assignment_id
        ) wl ON wl.assignment_id = t.id
        LEFT JOIN (
          SELECT assignment_id,

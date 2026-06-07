@@ -176,7 +176,8 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
       description,
       date,
       task_milestone_id,
-    }: WorkLogCreateInput & { task_milestone_id?: number } = req.body;
+      task_assignment_id,
+    }: WorkLogCreateInput & { task_milestone_id?: number; task_assignment_id?: number } = req.body;
 
     // Validate phase exists and engineer can work on it
     const phaseResult = await query(`
@@ -234,13 +235,14 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Check if engineer already has work log for this phase on this date (and same milestone)
+    // Check if engineer already has work log for this phase on this date (same milestone or same task)
     const logDate = date || new Date().toISOString().split('T')[0];
     const existingLogResult = await query(`
       SELECT id, hours FROM work_logs
       WHERE engineer_id = $1 AND phase_id = $2 AND date = $3
         AND (task_milestone_id IS NOT DISTINCT FROM $4)
-    `, [authReq.user.id, phase_id, logDate, task_milestone_id || null]);
+        AND (task_assignment_id IS NOT DISTINCT FROM $5)
+    `, [authReq.user.id, phase_id, logDate, task_milestone_id || null, task_assignment_id || null]);
 
     let workLog;
 
@@ -263,8 +265,8 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
     } else {
       // Create new work log
       const result = await query(`
-        INSERT INTO work_logs (project_id, engineer_id, phase_id, hours, description, date, task_milestone_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO work_logs (project_id, engineer_id, phase_id, hours, description, date, task_milestone_id, task_assignment_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
       `, [
         phase.project_id,
@@ -274,6 +276,7 @@ export const createWorkLog = async (req: Request, res: Response): Promise<void> 
         description,
         logDate,
         task_milestone_id || null,
+        task_assignment_id || null,
       ]);
 
       workLog = result.rows[0];
