@@ -4,13 +4,14 @@ import {
   Avatar, IconButton, Button, TextField, InputAdornment, Select,
   FormControl, InputLabel, MenuItem, Skeleton, Alert, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions, Divider,
-  Tooltip, Badge, Snackbar, CircularProgress
+  Tooltip, Badge, Snackbar, CircularProgress, Checkbox
 } from '@mui/material';
 import {
   Add, Search, Refresh, Assignment, PlayArrow, Block,
   CheckCircle, Warning, AccessTime, CalendarToday, Person,
   ArrowForward, FilterList, FiberManualRecord, Flag, Close,
-  MoreVert, OpenInNew, ThumbUp, ThumbDown, BookmarkBorder, Bookmark
+  MoreVert, OpenInNew, ThumbUp, ThumbDown, BookmarkBorder, Bookmark,
+  Group
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -49,13 +50,14 @@ const COLUMNS: Column[] = [
 const CreateTaskDialog: React.FC<{
   open: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (count: number) => void;
 }> = ({ open, onClose, onCreated }) => {
   const { user } = useAuth();
 
   const [step, setStep] = useState(0);
   const [projects, setProjects] = useState<any[]>([]);
   const [engineers, setEngineers] = useState<any[]>([]);
+  const [selectedEngineerIds, setSelectedEngineerIds] = useState<string[]>([]);
   const [phases, setPhases] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -67,7 +69,6 @@ const CreateTaskDialog: React.FC<{
   const [form, setForm] = useState({
     project_id: '',
     phase_id: '',
-    engineer_id: '',
     title: '',
     description: '',
     allocated_hours: '',
@@ -80,10 +81,11 @@ const CreateTaskDialog: React.FC<{
     if (open) {
       setStep(0);
       setError(null);
-      setForm({ project_id: '', phase_id: '', engineer_id: '', title: '', description: '', allocated_hours: '', due_date: '', priority: 'medium', milestones: [] as { title: string; due_date: string; description: string; allocated_hours: string; priority: string }[] });
+      setForm({ project_id: '', phase_id: '', title: '', description: '', allocated_hours: '', due_date: '', priority: 'medium', milestones: [] });
       setPhases([]);
-      apiService.getTaskTemplates().then(res => { if (res.success) setTemplates(res.data?.templates || []); }).catch(() => {});
       setEngineers([]);
+      setSelectedEngineerIds([]);
+      apiService.getTaskTemplates().then(res => { if (res.success) setTemplates(res.data?.templates || []); }).catch(() => {});
       loadProjects();
     }
   }, [open]);
@@ -119,13 +121,26 @@ const CreateTaskDialog: React.FC<{
   };
 
   const handleProjectChange = (projectId: string) => {
-    setForm(p => ({ ...p, project_id: projectId, phase_id: '', engineer_id: '' }));
+    setForm(p => ({ ...p, project_id: projectId, phase_id: '' }));
     setPhases([]);
     setEngineers([]);
+    setSelectedEngineerIds([]);
     if (projectId) {
       loadEngineers(projectId);
       loadPhases(projectId);
     }
+  };
+
+  const toggleEngineer = (id: string) => {
+    setSelectedEngineerIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAllEngineers = () => {
+    setSelectedEngineerIds(prev =>
+      prev.length === engineers.length ? [] : engineers.map((e: any) => String(e.engineer_id || e.id))
+    );
   };
 
   const addMilestone = () => setForm(p => ({ ...p, milestones: [...p.milestones, { title: '', due_date: '', description: '', allocated_hours: '', priority: 'medium' }] }));
@@ -141,32 +156,49 @@ const CreateTaskDialog: React.FC<{
   const handleSubmit = async () => {
     setSubmitting(true);
     setError(null);
-    try {
-      await apiService.createTaskAssignment({
-        project_id: parseInt(form.project_id),
-        phase_id: parseInt(form.phase_id),
-        engineer_id: parseInt(form.engineer_id),
-        title: form.title,
-        description: form.description || undefined,
-        allocated_hours: parseInt(form.allocated_hours),
-        due_date: form.due_date || undefined,
-        priority: form.priority,
-        milestones: form.milestones.filter(m => m.title.trim()).map(m => ({
-          ...m,
-          allocated_hours: m.allocated_hours ? parseFloat(m.allocated_hours) : undefined,
-        })),
-      } as any);
-      onCreated();
+    const milestones = form.milestones.filter(m => m.title.trim()).map(m => ({
+      ...m,
+      allocated_hours: m.allocated_hours ? parseFloat(m.allocated_hours) : undefined,
+    }));
+    const errors: string[] = [];
+    let created = 0;
+    for (const engId of selectedEngineerIds) {
+      try {
+        await apiService.createTaskAssignment({
+          project_id: parseInt(form.project_id),
+          phase_id: parseInt(form.phase_id),
+          engineer_id: parseInt(engId),
+          title: form.title,
+          description: form.description || undefined,
+          allocated_hours: parseInt(form.allocated_hours),
+          due_date: form.due_date || undefined,
+          priority: form.priority,
+          milestones,
+        } as any);
+        created++;
+      } catch (err: any) {
+        const eng = engineers.find((e: any) => String(e.engineer_id || e.id) === engId);
+        const name = eng?.engineer_name || eng?.name || `Engineer #${engId}`;
+        errors.push(`${name}: ${err.response?.data?.error || 'Failed'}`);
+      }
+    }
+    setSubmitting(false);
+    if (errors.length > 0) {
+      setError(errors.join('\n'));
+    } else {
+      onCreated(created);
       onClose();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create task');
-    } finally {
-      setSubmitting(false);
     }
   };
 
-  const steps = ['Project & Engineer', 'Task Details', 'Milestones (optional)'];
-  const canNextStep0 = form.project_id && form.phase_id && form.engineer_id;
+  const selectedEngineers = engineers.filter((e: any) =>
+    selectedEngineerIds.includes(String(e.engineer_id || e.id))
+  );
+  const allSelected = engineers.length > 0 && selectedEngineerIds.length === engineers.length;
+  const someSelected = selectedEngineerIds.length > 0 && selectedEngineerIds.length < engineers.length;
+
+  const steps = ['Project & Engineers', 'Task Details', 'Milestones (optional)'];
+  const canNextStep0 = form.project_id && form.phase_id && selectedEngineerIds.length > 0;
   const canNextStep1 = form.title.trim() && form.allocated_hours && parseInt(form.allocated_hours) > 0;
 
   return (
@@ -191,8 +223,9 @@ const CreateTaskDialog: React.FC<{
       </Box>
 
       <DialogContent>
-        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2, whiteSpace: 'pre-line' }}>{error}</Alert>}
 
+        {/* ── Step 0: Project, Phase, Engineers ── */}
         {step === 0 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <FormControl fullWidth required>
@@ -231,38 +264,116 @@ const CreateTaskDialog: React.FC<{
               </FormControl>
             )}
 
+            {/* Multi-select engineers */}
             {form.project_id && (
-              <FormControl fullWidth required>
-                <InputLabel>Engineer</InputLabel>
-                <Select
-                  value={form.engineer_id}
-                  onChange={e => setForm(p => ({ ...p, engineer_id: e.target.value }))}
-                  label="Engineer"
-                  disabled={loading || engineers.length === 0}
-                >
-                  {engineers.length === 0 ? (
-                    <MenuItem disabled>No engineers in your team for this project</MenuItem>
-                  ) : (
-                    engineers.map((e: any) => (
-                      <MenuItem key={e.engineer_id || e.id} value={String(e.engineer_id || e.id)}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Avatar sx={{ width: 24, height: 24, fontSize: 12 }}>{(e.engineer_name || e.name || 'E')[0]}</Avatar>
-                          {e.engineer_name || e.name}
-                          {e.active_tasks !== undefined && (
-                            <Chip label={`${e.active_tasks} active`} size="small" sx={{ ml: 'auto', fontSize: '0.65rem' }} />
-                          )}
-                        </Box>
-                      </MenuItem>
-                    ))
-                  )}
-                </Select>
-              </FormControl>
+              <Box>
+                <Typography variant="body2" fontWeight={600} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Group fontSize="small" /> Assign to Engineers
+                </Typography>
+                {loading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}>
+                    <CircularProgress size={16} />
+                    <Typography variant="body2" color="text.secondary">Loading engineers...</Typography>
+                  </Box>
+                ) : engineers.length === 0 ? (
+                  <Alert severity="info" sx={{ borderRadius: 2 }}>No engineers in your team for this project.</Alert>
+                ) : (
+                  <>
+                    {/* Select All */}
+                    <Box
+                      onClick={toggleAllEngineers}
+                      sx={{
+                        display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1,
+                        borderRadius: 2, cursor: 'pointer', mb: 0.5,
+                        bgcolor: 'grey.50', border: '1px solid', borderColor: 'grey.200',
+                        '&:hover': { bgcolor: 'grey.100' },
+                      }}
+                    >
+                      <Checkbox checked={allSelected} indeterminate={someSelected} size="small" sx={{ p: 0 }} readOnly />
+                      <Typography variant="body2" fontWeight={600}>
+                        {allSelected ? 'Deselect All' : 'Select All'} ({engineers.length} engineers)
+                      </Typography>
+                    </Box>
+
+                    {/* Engineer list */}
+                    <Box sx={{
+                      maxHeight: 220, overflowY: 'auto', border: '1px solid', borderColor: 'grey.200',
+                      borderRadius: 2, bgcolor: 'background.paper'
+                    }}>
+                      {engineers.map((eng: any) => {
+                        const id = String(eng.engineer_id || eng.id);
+                        const checked = selectedEngineerIds.includes(id);
+                        const name = eng.engineer_name || eng.name || 'Engineer';
+                        return (
+                          <Box
+                            key={id}
+                            onClick={() => toggleEngineer(id)}
+                            sx={{
+                              display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, py: 0.8,
+                              cursor: 'pointer', borderBottom: '1px solid', borderColor: 'grey.100',
+                              bgcolor: checked ? 'primary.50' : 'transparent',
+                              '&:hover': { bgcolor: checked ? 'primary.100' : 'grey.50' },
+                              '&:last-child': { borderBottom: 'none' },
+                            }}
+                          >
+                            <Checkbox checked={checked} size="small" sx={{ p: 0 }} readOnly />
+                            <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: checked ? 'primary.main' : 'grey.400' }}>
+                              {name[0]}
+                            </Avatar>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" fontWeight={checked ? 600 : 400} noWrap>{name}</Typography>
+                              <Typography variant="caption" color="text.secondary" noWrap>{eng.engineer_email || eng.email}</Typography>
+                            </Box>
+                            {eng.active_tasks !== undefined && (
+                              <Chip label={`${eng.active_tasks} active`} size="small"
+                                sx={{ fontSize: '0.6rem', height: 18, bgcolor: eng.active_tasks > 3 ? 'warning.50' : 'grey.100' }} />
+                            )}
+                            {checked && <CheckCircle sx={{ fontSize: 16, color: 'primary.main', flexShrink: 0 }} />}
+                          </Box>
+                        );
+                      })}
+                    </Box>
+
+                    {selectedEngineerIds.length > 0 && (
+                      <Typography variant="caption" color="primary.main" fontWeight={600} sx={{ mt: 0.5, display: 'block' }}>
+                        {selectedEngineerIds.length} engineer{selectedEngineerIds.length > 1 ? 's' : ''} selected
+                        {selectedEngineerIds.length > 1 && ' — task will be assigned to each individually'}
+                      </Typography>
+                    )}
+                  </>
+                )}
+              </Box>
             )}
           </Box>
         )}
 
+        {/* ── Step 1: Task Details ── */}
         {step === 1 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Assigned-to summary */}
+            <Box sx={{ p: 1.5, bgcolor: 'primary.50', borderRadius: 2, border: '1px solid', borderColor: 'primary.100' }}>
+              <Typography variant="caption" fontWeight={700} color="primary.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                <Group fontSize="small" />
+                Assigning to {selectedEngineers.length} engineer{selectedEngineers.length > 1 ? 's' : ''}:
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {selectedEngineers.map((eng: any) => (
+                  <Chip
+                    key={eng.engineer_id || eng.id}
+                    avatar={<Avatar sx={{ width: 20, height: 20, fontSize: 10 }}>{(eng.engineer_name || eng.name || 'E')[0]}</Avatar>}
+                    label={eng.engineer_name || eng.name}
+                    size="small"
+                    sx={{ fontSize: '0.7rem', height: 22 }}
+                  />
+                ))}
+              </Box>
+              {selectedEngineers.length > 1 && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                  The same task details and milestones will be assigned to each engineer separately.
+                </Typography>
+              )}
+            </Box>
+
             {templates.length > 0 && (
               <Button size="small" variant="outlined" startIcon={<Bookmark />} onClick={() => setTemplatePickerOpen(true)}>
                 Load from Template
@@ -324,7 +435,9 @@ const CreateTaskDialog: React.FC<{
                         description: t.description || '',
                         allocated_hours: t.allocated_hours ? String(t.allocated_hours) : '',
                         milestones: (t.milestones || []).map((m: any) => ({
-                          title: m.title, description: m.description || '', due_date: '', allocated_hours: m.allocated_hours ? String(m.allocated_hours) : ''
+                          title: m.title, description: m.description || '', due_date: '',
+                          allocated_hours: m.allocated_hours ? String(m.allocated_hours) : '',
+                          priority: m.priority || 'medium',
                         }))
                       }));
                       setTemplatePickerOpen(false);
@@ -343,11 +456,15 @@ const CreateTaskDialog: React.FC<{
           </Box>
         )}
 
+        {/* ── Step 2: Milestones ── */}
         {step === 2 && (
           <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Break the task into milestones to track progress. Each milestone has a due date.
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Break the task into milestones. These will be created for{' '}
+                <strong>each of the {selectedEngineers.length} engineer{selectedEngineers.length > 1 ? 's' : ''}</strong> assigned.
+              </Typography>
+            </Box>
             {form.milestones.map((ms, i) => (
               <Paper key={i} sx={{ p: 2, mb: 1.5, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -451,8 +568,13 @@ const CreateTaskDialog: React.FC<{
               color="success"
               onClick={handleSubmit}
               disabled={submitting || !canNextStep1}
+              startIcon={submitting ? <CircularProgress size={16} /> : undefined}
             >
-              {submitting ? <CircularProgress size={18} /> : 'Assign Task'}
+              {submitting
+                ? 'Assigning...'
+                : selectedEngineerIds.length > 1
+                  ? `Assign to ${selectedEngineerIds.length} Engineers`
+                  : 'Assign Task'}
             </Button>
           </>
         )}
@@ -856,9 +978,9 @@ const TaskBoardPage: React.FC = () => {
       <CreateTaskDialog
         open={createDialog}
         onClose={() => setCreateDialog(false)}
-        onCreated={() => {
+        onCreated={(count: number) => {
           loadTasks();
-          setSnack({ open: true, msg: 'Task assigned successfully!' });
+          setSnack({ open: true, msg: count > 1 ? `${count} tasks assigned successfully!` : 'Task assigned successfully!' });
         }}
       />
 
