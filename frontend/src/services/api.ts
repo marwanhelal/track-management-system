@@ -492,11 +492,6 @@ class ApiService {
     return response.data;
   }
 
-  async changeUserRole(id: number, role: string, supervisorType?: string): Promise<ApiResponse<{ user: any }>> {
-    const response = await this.api.patch(`/users/${id}/role`, { role, supervisor_type: supervisorType || undefined });
-    return response.data;
-  }
-
   // Enhanced Project Settings & Management
 
 

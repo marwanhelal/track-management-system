@@ -365,7 +365,7 @@ const TeamManagementPage: React.FC = () => {
       createSupervisorDialog: {
         ...prev.createSupervisorDialog,
         open: true,
-        formData: { name: '', email: '', password: '' },
+        formData: { name: '', email: '', password: '', supervisor_type: '' as 'visualization' | 'working' | '' },
         errors: {}
       }
     }));
