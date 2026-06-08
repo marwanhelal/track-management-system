@@ -10,5 +10,6 @@ router.get('/:id', authenticatedUser, briefings.getBriefingById);
 router.post('/', supervisorOnly, briefings.createBriefing);
 router.put('/:id', supervisorOnly, briefings.updateBriefing);
 router.patch('/:id/archive', supervisorOnly, briefings.archiveBriefing);
+router.delete('/:id', supervisorOnly, briefings.deleteBriefing);
 
 export default router;

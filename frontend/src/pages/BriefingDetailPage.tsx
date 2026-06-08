@@ -4,13 +4,13 @@ import {
   Alert, CircularProgress, Paper, IconButton, Breadcrumbs,
   Link, Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   FormControl, InputLabel, Select, MenuItem, Checkbox, Skeleton,
-  Snackbar, Tooltip,
+  Snackbar, Tooltip, Stack,
 } from '@mui/material';
 import {
   ArrowBack, Edit, Archive, Description, FolderOpen, Person,
   CalendarToday, AttachFile, Delete, CheckCircle, History,
   AccessTime, Create, Update, Inventory2, Save, People, Warning,
-  OpenInNew,
+  OpenInNew, DeleteForever, Block,
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,15 +24,16 @@ interface Briefing {
   created_by: number; created_by_name: string;
   title: string; body: string | null; duration_notes: string | null;
   due_date: string | null; resources: string | null; attachments: Attachment[];
-  status: 'active' | 'archived'; created_at: string; updated_at: string;
+  status: 'active' | 'archived' | 'deleted'; created_at: string; updated_at: string;
 }
-interface BriefingPhase { briefing_phase_id: number; phase_id: number; phase_name: string; phase_type: string; phase_status: string }
+interface BriefingPhase { briefing_phase_id: number; phase_id: number; phase_name: string; phase_status: string; phase_order: number }
 interface HistoryEntry { id: number; briefing_id: number; action: string; changed_by: number; changed_by_name: string; note: string | null; snapshot: any; created_at: string }
 
 const ACTION_META: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  created: { label: 'Briefing Created', color: '#2e7d32', icon: <Create sx={{ fontSize: 13 }} /> },
-  updated: { label: 'Updated', color: '#1565c0', icon: <Update sx={{ fontSize: 13 }} /> },
-  archived: { label: 'Archived', color: '#616161', icon: <Inventory2 sx={{ fontSize: 13 }} /> },
+  created:  { label: 'Briefing Created',  color: '#2e7d32', icon: <Create sx={{ fontSize: 13 }} /> },
+  updated:  { label: 'Briefing Updated',  color: '#1565c0', icon: <Update sx={{ fontSize: 13 }} /> },
+  archived: { label: 'Briefing Archived', color: '#616161', icon: <Inventory2 sx={{ fontSize: 13 }} /> },
+  deleted:  { label: 'Briefing Deleted',  color: '#b71c1c', icon: <DeleteForever sx={{ fontSize: 13 }} /> },
 };
 
 const isArabic = (t: string) => /[؀-ۿ]/.test(t);
@@ -41,6 +42,12 @@ const dueDaysLeft = (due: string | null) => {
   if (!due) return null;
   return Math.ceil((new Date(due).getTime() - Date.now()) / 86400000);
 };
+
+const fmt = (d: string, opts?: Intl.DateTimeFormatOptions) =>
+  new Date(d).toLocaleDateString('en-GB', opts || { day: 'numeric', month: 'long', year: 'numeric' });
+
+const fmtTime = (d: string) =>
+  new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 const BriefingDetailPage: React.FC = () => {
@@ -54,6 +61,7 @@ const BriefingDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [editDialog, setEditDialog] = useState(false);
   const [archiveDialog, setArchiveDialog] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' as 'success' | 'error' });
 
@@ -108,7 +116,7 @@ const BriefingDetailPage: React.FC = () => {
         phase_ids: editForm.phase_ids,
       });
       setEditDialog(false);
-      toast('Briefing updated successfully');
+      toast('Briefing updated — team leader has been notified');
       load();
     } catch (err: any) { toast(err.response?.data?.error || 'Failed to update', 'error'); }
     finally { setActionLoading(false); }
@@ -117,8 +125,25 @@ const BriefingDetailPage: React.FC = () => {
   const handleArchive = async () => {
     if (!briefing) return;
     setActionLoading(true);
-    try { await apiService.archiveBriefing(briefing.id); setArchiveDialog(false); toast('Briefing archived'); load(); }
+    try {
+      await apiService.archiveBriefing(briefing.id);
+      setArchiveDialog(false);
+      toast('Briefing archived — team leader has been notified');
+      load();
+    }
     catch { toast('Failed to archive', 'error'); }
+    finally { setActionLoading(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!briefing) return;
+    setActionLoading(true);
+    try {
+      await apiService.deleteBriefing(briefing.id);
+      setDeleteDialog(false);
+      toast('Briefing deleted — team leader has been notified');
+      setTimeout(() => navigate('/briefings'), 1200);
+    } catch { toast('Failed to delete', 'error'); }
     finally { setActionLoading(false); }
   };
 
@@ -151,8 +176,11 @@ const BriefingDetailPage: React.FC = () => {
   const days = dueDaysLeft(briefing.due_date);
   const isOverdue = days !== null && days < 0;
   const isUrgent = days !== null && days >= 0 && days <= 5;
+  const isDeleted = briefing.status === 'deleted';
+  const isArchived = briefing.status === 'archived';
   const rtlBody = isArabic(briefing.body || '');
   const rtlTitle = isArabic(briefing.title);
+  const canEdit = isSupervisor && !isDeleted && !isArchived;
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1000, mx: 'auto' }}>
@@ -165,59 +193,170 @@ const BriefingDetailPage: React.FC = () => {
         <Typography color="text.primary" fontSize="0.85rem" noWrap sx={{ maxWidth: 300 }}>{briefing.title}</Typography>
       </Breadcrumbs>
 
-      {/* Overdue alert */}
-      {isOverdue && briefing.status === 'active' && (
+      {/* Deleted banner */}
+      {isDeleted && (
+        <Alert severity="error" icon={<Block />} sx={{ mb: 2.5, borderRadius: 2 }}>
+          <strong>This briefing has been deleted by the supervisor.</strong> It is no longer active.
+          {history.find(h => h.action === 'deleted') && (
+            <Typography variant="caption" display="block" sx={{ mt: 0.3 }}>
+              Deleted on {fmtTime(history.find(h => h.action === 'deleted')!.created_at)}
+            </Typography>
+          )}
+        </Alert>
+      )}
+
+      {/* Overdue / urgent alerts */}
+      {!isDeleted && isOverdue && briefing.status === 'active' && (
         <Alert severity="error" icon={<Warning />} sx={{ mb: 2.5, borderRadius: 2 }}>
           <strong>Overdue by {Math.abs(days!)} day{Math.abs(days!) > 1 ? 's' : ''}.</strong> This briefing is past its delivery date.
         </Alert>
       )}
-      {isUrgent && !isOverdue && briefing.status === 'active' && (
+      {!isDeleted && isUrgent && !isOverdue && briefing.status === 'active' && (
         <Alert severity="warning" sx={{ mb: 2.5, borderRadius: 2 }}>
           <strong>Due {days === 0 ? 'today' : `in ${days} day${days > 1 ? 's' : ''}`}.</strong> Make sure engineers are on track.
         </Alert>
       )}
 
-      {/* TL action panel */}
-      {isTeamLeader && briefing.status === 'active' && (
-        <Paper sx={{ p: 2.5, mb: 2.5, borderRadius: 2.5, border: '2px solid', borderColor: 'primary.main',
-          background: 'linear-gradient(135deg, #e3f2fd 0%, #f8faff 100%)' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-              <People sx={{ color: 'primary.main', fontSize: 28, mt: 0.2 }} />
-              <Box>
-                <Typography variant="subtitle1" fontWeight={800} color="primary.dark">Action Required</Typography>
-                <Typography variant="body2" color="primary.main">
-                  Review this briefing and assign the deliverables to engineers on your team.
-                </Typography>
+      {/* ── TL: Full Briefing Summary Box ── */}
+      {isTeamLeader && !isDeleted && (
+        <Paper sx={{
+          p: 3, mb: 3, borderRadius: 3,
+          border: '2px solid',
+          borderColor: briefing.status === 'active' ? 'primary.main' : 'grey.400',
+          background: briefing.status === 'active'
+            ? 'linear-gradient(135deg, #e3f2fd 0%, #f8faff 100%)'
+            : 'linear-gradient(135deg, #f5f5f5 0%, #fafafa 100%)',
+        }}>
+          {/* Action Required header */}
+          {briefing.status === 'active' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                <People sx={{ color: 'primary.main', fontSize: 26, mt: 0.2 }} />
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={800} color="primary.dark">Action Required</Typography>
+                  <Typography variant="body2" color="primary.main">
+                    Review the details below and assign the deliverables to engineers on your team.
+                  </Typography>
+                </Box>
               </Box>
+              <Button
+                variant="contained" size="large"
+                startIcon={<People />} endIcon={<OpenInNew />}
+                onClick={handleAssignToEngineers}
+                sx={{ fontWeight: 700, borderRadius: 2, px: 3, whiteSpace: 'nowrap' }}
+              >
+                Assign to Engineers
+              </Button>
             </Box>
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={<People />}
-              endIcon={<OpenInNew />}
-              onClick={handleAssignToEngineers}
-              sx={{ fontWeight: 700, borderRadius: 2, px: 3, whiteSpace: 'nowrap' }}
-            >
-              Assign to Engineers
-            </Button>
-          </Box>
+          )}
+
+          <Divider sx={{ mb: 2 }} />
+
+          {/* Briefing metadata grid */}
+          <Typography variant="caption" fontWeight={800} color="text.secondary"
+            sx={{ textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.67rem', display: 'block', mb: 1.5 }}>
+            Briefing Details from Supervisor
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Stack spacing={1.5}>
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                  <FolderOpen sx={{ color: 'primary.main', fontSize: 18, mt: 0.2, flexShrink: 0 }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Project</Typography>
+                    <Typography variant="body2" fontWeight={700}>{briefing.project_name}</Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                  <Person sx={{ color: 'text.secondary', fontSize: 18, mt: 0.2, flexShrink: 0 }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Assigned by</Typography>
+                    <Typography variant="body2" fontWeight={700}>{briefing.created_by_name || 'Supervisor'}</Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                  <Create sx={{ color: 'text.secondary', fontSize: 18, mt: 0.2, flexShrink: 0 }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Created on</Typography>
+                    <Typography variant="body2" fontWeight={700}>{fmt(briefing.created_at)}</Typography>
+                    {briefing.updated_at !== briefing.created_at && (
+                      <Typography variant="caption" color="text.secondary">
+                        Last updated: {fmtTime(briefing.updated_at)}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </Stack>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Stack spacing={1.5}>
+                {briefing.due_date && (
+                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                    <AccessTime sx={{ color: isOverdue ? 'error.main' : 'warning.main', fontSize: 18, mt: 0.2, flexShrink: 0 }} />
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Delivery Due Date</Typography>
+                      <Typography variant="body2" fontWeight={700} color={isOverdue ? 'error.main' : 'text.primary'}>
+                        {fmt(briefing.due_date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                      </Typography>
+                      {days !== null && (
+                        <Chip size="small"
+                          label={isOverdue ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due today' : `${days}d left`}
+                          sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700, mt: 0.3,
+                            bgcolor: isOverdue ? '#ffebee' : isUrgent ? '#fff3e0' : '#e8f5e9',
+                            color: isOverdue ? '#c62828' : isUrgent ? '#e65100' : '#2e7d32' }} />
+                      )}
+                    </Box>
+                  </Box>
+                )}
+                {briefing.duration_notes && (
+                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                    <AccessTime sx={{ color: 'text.secondary', fontSize: 18, mt: 0.2, flexShrink: 0 }} />
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">Timeline Notes</Typography>
+                      <Typography variant="body2" sx={{ direction: isArabic(briefing.duration_notes) ? 'rtl' : 'ltr' }}>
+                        {briefing.duration_notes}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                  <Description sx={{ color: 'text.secondary', fontSize: 18, mt: 0.2, flexShrink: 0 }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Assigned Phases ({phases.length})</Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.4 }}>
+                      {phases.map(ph => (
+                        <Chip key={ph.phase_id} label={ph.phase_name} size="small"
+                          sx={{ bgcolor: 'primary.50', color: 'primary.dark', fontWeight: 600, fontSize: '0.7rem' }} />
+                      ))}
+                      {phases.length === 0 && <Typography variant="caption" color="text.disabled">No phases listed</Typography>}
+                    </Box>
+                  </Box>
+                </Box>
+              </Stack>
+            </Grid>
+          </Grid>
         </Paper>
       )}
 
-      {/* Hero card */}
-      <Card sx={{ borderRadius: 3, mb: 3, border: '1px solid', borderColor: isOverdue ? 'error.light' : isUrgent ? 'warning.light' : 'divider' }}>
+      {/* ── Supervisor Hero card ── */}
+      <Card sx={{ borderRadius: 3, mb: 3, border: '1px solid',
+        borderColor: isDeleted ? 'error.light' : isArchived ? 'grey.300' : isOverdue ? 'error.light' : isUrgent ? 'warning.light' : 'divider' }}>
         <CardContent sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2, mb: 2 }}>
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
                 <Chip size="small"
-                  label={briefing.status === 'archived' ? 'Archived' : 'Active'}
-                  icon={briefing.status === 'archived' ? <Archive sx={{ fontSize: 12 }} /> : <CheckCircle sx={{ fontSize: 12 }} />}
-                  sx={{ bgcolor: briefing.status === 'archived' ? 'grey.200' : '#e8f5e9',
-                    color: briefing.status === 'archived' ? 'grey.600' : '#2e7d32', fontWeight: 700 }} />
+                  label={isDeleted ? 'Deleted' : isArchived ? 'Archived' : 'Active'}
+                  icon={isDeleted
+                    ? <DeleteForever sx={{ fontSize: 12 }} />
+                    : isArchived ? <Archive sx={{ fontSize: 12 }} /> : <CheckCircle sx={{ fontSize: 12 }} />}
+                  sx={{
+                    bgcolor: isDeleted ? '#ffebee' : isArchived ? 'grey.200' : '#e8f5e9',
+                    color: isDeleted ? '#b71c1c' : isArchived ? 'grey.600' : '#2e7d32',
+                    fontWeight: 700,
+                  }} />
                 <Chip size="small" label="Project Briefing" icon={<Description sx={{ fontSize: 12 }} />} variant="outlined" />
-                {briefing.due_date && (
+                {briefing.due_date && !isDeleted && (
                   <Chip size="small"
                     icon={isOverdue ? <Warning sx={{ fontSize: 12 }} /> : <CalendarToday sx={{ fontSize: 12 }} />}
                     label={isOverdue ? `${Math.abs(days!)}d overdue` : days === 0 ? 'Due today' : `${days}d left`}
@@ -226,21 +365,31 @@ const BriefingDetailPage: React.FC = () => {
                       color: isOverdue ? '#c62828' : isUrgent ? '#e65100' : '#2e7d32' }} />
                 )}
               </Box>
-              <Typography variant="h5" fontWeight={800} sx={{ mb: 0.5, direction: rtlTitle ? 'rtl' : 'ltr', lineHeight: 1.3 }}>
+              <Typography variant="h5" fontWeight={800}
+                sx={{ mb: 0.5, direction: rtlTitle ? 'rtl' : 'ltr', lineHeight: 1.3,
+                  textDecoration: isDeleted ? 'line-through' : 'none', color: isDeleted ? 'text.disabled' : 'text.primary' }}>
                 {briefing.title}
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <CalendarToday sx={{ fontSize: 11 }} />
-                Created {new Date(briefing.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                Created {fmt(briefing.created_at)}
                 {briefing.created_by_name && ` · By ${briefing.created_by_name}`}
-                {briefing.updated_at !== briefing.created_at && ` · Updated ${new Date(briefing.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+                {briefing.updated_at !== briefing.created_at && ` · Updated ${fmt(briefing.updated_at, { day: 'numeric', month: 'short' })}`}
               </Typography>
             </Box>
 
-            {isSupervisor && briefing.status === 'active' && (
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button variant="outlined" startIcon={<Edit />} onClick={openEdit} size="small">Edit</Button>
-                <Button variant="outlined" color="warning" startIcon={<Archive />} onClick={() => setArchiveDialog(true)} size="small">Archive</Button>
+            {/* Supervisor action buttons */}
+            {isSupervisor && (
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {canEdit && (
+                  <>
+                    <Button variant="outlined" startIcon={<Edit />} onClick={openEdit} size="small">Edit</Button>
+                    <Button variant="outlined" color="warning" startIcon={<Archive />} onClick={() => setArchiveDialog(true)} size="small">Archive</Button>
+                  </>
+                )}
+                {!isDeleted && (
+                  <Button variant="outlined" color="error" startIcon={<DeleteForever />} onClick={() => setDeleteDialog(true)} size="small">Delete</Button>
+                )}
               </Box>
             )}
           </Box>
@@ -272,7 +421,7 @@ const BriefingDetailPage: React.FC = () => {
                   <Box>
                     <Typography variant="caption" color="text.secondary">Delivery Due Date</Typography>
                     <Typography variant="body2" fontWeight={700} color={isOverdue ? 'error.main' : 'text.primary'}>
-                      {new Date(briefing.due_date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                      {fmt(briefing.due_date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                     </Typography>
                   </Box>
                 </Box>
@@ -300,7 +449,8 @@ const BriefingDetailPage: React.FC = () => {
           {briefing.body && (
             <Card sx={{ borderRadius: 3, mb: 2, border: '1px solid', borderColor: 'divider' }}>
               <CardContent sx={{ p: 2.5 }}>
-                <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.67rem', display: 'block', mb: 1.5 }}>
+                <Typography variant="caption" fontWeight={800} color="text.secondary"
+                  sx={{ textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.67rem', display: 'block', mb: 1.5 }}>
                   Instructions & Notes
                 </Typography>
                 <Typography variant="body1" sx={{
@@ -320,7 +470,8 @@ const BriefingDetailPage: React.FC = () => {
               <CardContent sx={{ p: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <AccessTime sx={{ fontSize: 16, color: 'warning.dark' }} />
-                  <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.67rem' }}>
+                  <Typography variant="caption" fontWeight={800} color="text.secondary"
+                    sx={{ textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.67rem' }}>
                     Timeline Notes
                   </Typography>
                 </Box>
@@ -334,10 +485,12 @@ const BriefingDetailPage: React.FC = () => {
           {briefing.resources && (
             <Card sx={{ borderRadius: 3, mb: 2, border: '1px solid', borderColor: 'divider' }}>
               <CardContent sx={{ p: 2.5 }}>
-                <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.67rem', display: 'block', mb: 1.5 }}>
+                <Typography variant="caption" fontWeight={800} color="text.secondary"
+                  sx={{ textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.67rem', display: 'block', mb: 1.5 }}>
                   Resources
                 </Typography>
-                <Typography variant="body2" sx={{ direction: isArabic(briefing.resources) ? 'rtl' : 'ltr', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+                <Typography variant="body2"
+                  sx={{ direction: isArabic(briefing.resources) ? 'rtl' : 'ltr', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
                   {briefing.resources}
                 </Typography>
               </CardContent>
@@ -347,7 +500,8 @@ const BriefingDetailPage: React.FC = () => {
           {briefing.attachments?.length > 0 && (
             <Card sx={{ borderRadius: 3, mb: 2, border: '1px solid', borderColor: 'divider' }}>
               <CardContent sx={{ p: 2.5 }}>
-                <Typography variant="caption" fontWeight={800} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.67rem', display: 'block', mb: 1.5 }}>
+                <Typography variant="caption" fontWeight={800} color="text.secondary"
+                  sx={{ textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.67rem', display: 'block', mb: 1.5 }}>
                   File References ({briefing.attachments.length})
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -378,7 +532,7 @@ const BriefingDetailPage: React.FC = () => {
           )}
         </Grid>
 
-        {/* History timeline */}
+        {/* History / Activity log */}
         <Grid item xs={12} md={5}>
           <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', position: { md: 'sticky' }, top: 24 }}>
             <CardContent sx={{ p: 2.5 }}>
@@ -388,6 +542,8 @@ const BriefingDetailPage: React.FC = () => {
                   sx={{ textTransform: 'uppercase', fontSize: '0.67rem', letterSpacing: 0.8 }}>
                   Activity Log
                 </Typography>
+                <Chip label={history.length} size="small"
+                  sx={{ height: 18, fontSize: '0.65rem', ml: 'auto', bgcolor: 'grey.100' }} />
               </Box>
               {history.length === 0 ? (
                 <Typography variant="caption" color="text.disabled">No activity recorded yet.</Typography>
@@ -399,8 +555,8 @@ const BriefingDetailPage: React.FC = () => {
                     return (
                       <Box key={entry.id} sx={{ display: 'flex', gap: 1.5, pb: isLast ? 0 : 2.5 }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                          <Box sx={{ width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            bgcolor: meta.color, color: 'white', flexShrink: 0 }}>
+                          <Box sx={{ width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', bgcolor: meta.color, color: 'white', flexShrink: 0 }}>
                             {meta.icon}
                           </Box>
                           {!isLast && <Box sx={{ width: 2, flex: 1, minHeight: 18, bgcolor: 'divider', mt: 0.5 }} />}
@@ -408,13 +564,19 @@ const BriefingDetailPage: React.FC = () => {
                         <Box sx={{ flex: 1, pt: 0.3 }}>
                           <Typography variant="body2" fontWeight={700} sx={{ lineHeight: 1.3 }}>{meta.label}</Typography>
                           {entry.changed_by_name && (
-                            <Typography variant="caption" color="text.secondary" display="block">by {entry.changed_by_name}</Typography>
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              by {entry.changed_by_name}
+                            </Typography>
                           )}
                           {entry.note && (
-                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', display: 'block' }}>{entry.note}</Typography>
+                            <Typography variant="caption" color="text.secondary"
+                              sx={{ fontStyle: 'italic', display: 'block', mt: 0.2, bgcolor: 'grey.50',
+                                px: 1, py: 0.3, borderRadius: 1, borderLeft: '2px solid', borderColor: meta.color }}>
+                              {entry.note}
+                            </Typography>
                           )}
-                          <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.63rem' }}>
-                            {new Date(entry.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.63rem', mt: 0.3, display: 'block' }}>
+                            {fmtTime(entry.created_at)}
                           </Typography>
                         </Box>
                       </Box>
@@ -427,7 +589,7 @@ const BriefingDetailPage: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Edit Dialog */}
+      {/* ── Edit Dialog ── */}
       <Dialog open={editDialog} onClose={() => setEditDialog(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle sx={{ fontWeight: 800, borderBottom: '1px solid', borderColor: 'divider', pb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
           <Edit sx={{ color: 'primary.main' }} /> Edit Briefing
@@ -444,7 +606,7 @@ const BriefingDetailPage: React.FC = () => {
                   {allPhases.map(ph => (
                     <Box key={ph.id} onClick={() => {
                       const ids = editForm.phase_ids;
-                      setEditForm(p => ({ ...p, phase_ids: ids.includes(ph.id) ? ids.filter(x => x !== ph.id) : [...ids, ph.id] }));
+                      setEditForm(p => ({ ...p, phase_ids: ids.includes(ph.id) ? ids.filter((x: number) => x !== ph.id) : [...ids, ph.id] }));
                     }} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1, cursor: 'pointer',
                       bgcolor: editForm.phase_ids.includes(ph.id) ? 'primary.50' : 'transparent',
                       borderBottom: '1px solid', borderColor: 'divider', '&:hover': { bgcolor: 'action.hover' } }}>
@@ -505,18 +667,43 @@ const BriefingDetailPage: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Archive Dialog */}
+      {/* ── Archive Dialog ── */}
       <Dialog open={archiveDialog} onClose={() => setArchiveDialog(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ fontWeight: 700, color: 'warning.dark' }}>Archive Briefing</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, color: 'warning.dark', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Archive /> Archive Briefing
+        </DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ borderRadius: 2 }}>
-            Archiving removes this briefing from the active list. The team leader will no longer see it as requiring action.
+            Archiving removes this briefing from the active list. The team leader will be notified and will no longer see it as requiring action.
           </Alert>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setArchiveDialog(false)} color="inherit">Cancel</Button>
           <Button variant="contained" color="warning" onClick={handleArchive} disabled={actionLoading}>
             {actionLoading ? <CircularProgress size={18} /> : 'Archive'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Delete Dialog ── */}
+      <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700, color: 'error.dark', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <DeleteForever /> Delete Briefing
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="error" sx={{ borderRadius: 2, mb: 1.5 }}>
+            <strong>This action will permanently remove the briefing from the team leader's view.</strong>
+          </Alert>
+          <Typography variant="body2" color="text.secondary">
+            The team leader will be notified. The activity log will be preserved for reference.
+            This cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteDialog(false)} color="inherit">Cancel</Button>
+          <Button variant="contained" color="error" startIcon={actionLoading ? <CircularProgress size={16} color="inherit" /> : <DeleteForever />}
+            onClick={handleDelete} disabled={actionLoading}>
+            {actionLoading ? 'Deleting...' : 'Delete Briefing'}
           </Button>
         </DialogActions>
       </Dialog>

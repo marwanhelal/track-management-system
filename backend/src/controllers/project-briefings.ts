@@ -31,9 +31,18 @@ export const getBriefings = async (req: Request, res: Response): Promise<void> =
     if (authReq.user.role === 'team_leader') {
       where += ` AND pb.team_leader_id = $${idx++}`;
       params.push(authReq.user.id);
+      // TL never sees deleted briefings in the list
+      if (!status) {
+        where += ` AND pb.status != 'deleted'`;
+      } else {
+        where += ` AND pb.status = $${idx++}`;
+        params.push(status);
+      }
+    } else {
+      // Supervisors can filter by status or see all (including deleted)
+      if (status) { where += ` AND pb.status = $${idx++}`; params.push(status); }
     }
     if (project_id) { where += ` AND pb.project_id = $${idx++}`; params.push(project_id); }
-    if (status) { where += ` AND pb.status = $${idx++}`; params.push(status); }
 
     const result = await query(
       `SELECT
@@ -197,8 +206,9 @@ export const updateBriefing = async (req: Request, res: Response): Promise<void>
 
     const existing = await query(`SELECT * FROM project_briefings WHERE id = $1`, [id]);
     if (existing.rows.length === 0) { res.status(404).json({ success: false, error: 'Briefing not found' }); return; }
-    if (existing.rows[0].status === 'archived') {
-      res.status(400).json({ success: false, error: 'Cannot edit an archived briefing' }); return;
+    const prev = existing.rows[0];
+    if (prev.status === 'archived' || prev.status === 'deleted') {
+      res.status(400).json({ success: false, error: 'Cannot edit an archived or deleted briefing' }); return;
     }
 
     const updated = await query(
@@ -214,10 +224,10 @@ export const updateBriefing = async (req: Request, res: Response): Promise<void>
        RETURNING *`,
       [
         title?.trim() || null,
-        body?.trim() ?? existing.rows[0].body,
-        duration_notes?.trim() ?? existing.rows[0].duration_notes,
-        due_date ?? existing.rows[0].due_date,
-        resources?.trim() ?? existing.rows[0].resources,
+        body?.trim() ?? prev.body,
+        duration_notes?.trim() ?? prev.duration_notes,
+        due_date ?? prev.due_date,
+        resources?.trim() ?? prev.resources,
         attachments != null ? JSON.stringify(attachments) : null,
         id,
       ]
@@ -233,8 +243,29 @@ export const updateBriefing = async (req: Request, res: Response): Promise<void>
       }
     }
 
-    await logHistory(parseInt(id as string, 10), 'updated', authReq.user.id, authReq.user.name || '', null, {
+    // Build a human-readable change summary
+    const changes: string[] = [];
+    if (title?.trim() && title.trim() !== prev.title) changes.push('title');
+    if (body !== undefined && (body?.trim() || null) !== prev.body) changes.push('instructions');
+    if (duration_notes !== undefined && (duration_notes?.trim() || null) !== prev.duration_notes) changes.push('timeline notes');
+    if (due_date !== undefined && (due_date || null) !== prev.due_date) changes.push('due date');
+    if (resources !== undefined && (resources?.trim() || null) !== prev.resources) changes.push('resources');
+    if (Array.isArray(phase_ids)) changes.push('phases');
+    if (attachments != null) changes.push('file references');
+    const changeNote = changes.length > 0 ? `Changed: ${changes.join(', ')}` : 'Minor update';
+
+    await logHistory(parseInt(id as string, 10), 'updated', authReq.user.id, authReq.user.name || '', changeNote, {
       title: updated.rows[0].title, phase_count: phase_ids?.length ?? null,
+    });
+
+    // Notify team leader about the update
+    await createNotification({
+      user_id: prev.team_leader_id,
+      type: 'task_assigned',
+      title: 'Briefing Updated',
+      message: `Briefing "${updated.rows[0].title}" was updated by ${authReq.user.name || 'supervisor'}. ${changeNote}.`,
+      reference_type: 'project_briefing',
+      reference_id: parseInt(id as string, 10),
     });
 
     res.status(200).json({
@@ -257,11 +288,55 @@ export const archiveBriefing = async (req: Request, res: Response): Promise<void
     if (existing.rows.length === 0) { res.status(404).json({ success: false, error: 'Briefing not found' }); return; }
 
     await query(`UPDATE project_briefings SET status = 'archived', updated_at = NOW() WHERE id = $1`, [id]);
-    await logHistory(parseInt(id as string, 10), 'archived', authReq.user.id, authReq.user.name || '', null, null);
+    await logHistory(parseInt(id as string, 10), 'archived', authReq.user.id, authReq.user.name || '',
+      `Briefing archived by ${authReq.user.name || 'supervisor'}`, null);
+
+    await createNotification({
+      user_id: existing.rows[0].team_leader_id,
+      type: 'task_assigned',
+      title: 'Briefing Archived',
+      message: `Briefing "${existing.rows[0].title}" has been archived by ${authReq.user.name || 'supervisor'}.`,
+      reference_type: 'project_briefing',
+      reference_id: parseInt(id as string, 10),
+    });
 
     res.status(200).json({ success: true, message: 'Briefing archived' } as ApiResponse);
   } catch (error) {
     console.error('archiveBriefing error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// DELETE /briefings/:id  (soft delete — sets status = 'deleted', preserves history)
+export const deleteBriefing = async (req: Request, res: Response): Promise<void> => {
+  const authReq = req as any;
+  try {
+    const { id } = req.params;
+
+    const existing = await query(`SELECT * FROM project_briefings WHERE id = $1`, [id]);
+    if (existing.rows.length === 0) { res.status(404).json({ success: false, error: 'Briefing not found' }); return; }
+    if (existing.rows[0].status === 'deleted') {
+      res.status(400).json({ success: false, error: 'Briefing already deleted' }); return;
+    }
+
+    const briefing = existing.rows[0];
+
+    await query(`UPDATE project_briefings SET status = 'deleted', updated_at = NOW() WHERE id = $1`, [id]);
+    await logHistory(parseInt(id as string, 10), 'deleted', authReq.user.id, authReq.user.name || '',
+      `Briefing deleted by ${authReq.user.name || 'supervisor'}`, { title: briefing.title });
+
+    await createNotification({
+      user_id: briefing.team_leader_id,
+      type: 'task_assigned',
+      title: 'Briefing Deleted',
+      message: `Briefing "${briefing.title}" has been deleted by ${authReq.user.name || 'supervisor'}.`,
+      reference_type: 'project_briefing',
+      reference_id: parseInt(id as string, 10),
+    });
+
+    res.status(200).json({ success: true, message: 'Briefing deleted' } as ApiResponse);
+  } catch (error) {
+    console.error('deleteBriefing error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

@@ -1089,6 +1089,11 @@ class ApiService {
     const response = await this.api.patch(`/briefings/${id}/archive`);
     return response.data;
   }
+
+  async deleteBriefing(id: number): Promise<ApiResponse<any>> {
+    const response = await this.api.delete(`/briefings/${id}`);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();
