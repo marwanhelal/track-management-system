@@ -439,7 +439,7 @@ class ApiService {
     return response.data;
   }
 
-  async createSupervisor(userData: { name: string; email: string; password: string }): Promise<ApiResponse<{ user: any }>> {
+  async createSupervisor(userData: { name: string; email: string; password: string; supervisor_type?: string }): Promise<ApiResponse<{ user: any }>> {
     const response = await this.api.post('/users/supervisors', userData);
     return response.data;
   }
@@ -454,8 +454,8 @@ class ApiService {
     return response.data;
   }
 
-  async changeUserRole(userId: number, role: string): Promise<ApiResponse<{ user: any }>> {
-    const response = await this.api.patch(`/users/${userId}/role`, { role });
+  async changeUserRole(userId: number, role: string, supervisorType?: string): Promise<ApiResponse<{ user: any }>> {
+    const response = await this.api.patch(`/users/${userId}/role`, { role, supervisor_type: supervisorType || undefined });
     return response.data;
   }
 
