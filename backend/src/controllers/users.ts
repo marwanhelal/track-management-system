@@ -1034,4 +1034,3 @@ export const changeUserRole = async (req: Request, res: Response): Promise<void>
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
-};
