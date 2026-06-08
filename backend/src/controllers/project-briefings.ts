@@ -92,11 +92,11 @@ export const getBriefingById = async (req: Request, res: Response): Promise<void
     const [phasesRes, historyRes] = await Promise.all([
       query(
         `SELECT pbp.id AS briefing_phase_id, pp.id AS phase_id,
-                pp.phase_name, pp.phase_type, pp.status AS phase_status
+                pp.phase_name, pp.status AS phase_status, pp.phase_order
          FROM project_briefing_phases pbp
          JOIN project_phases pp ON pp.id = pbp.phase_id
          WHERE pbp.briefing_id = $1
-         ORDER BY pp.phase_name`,
+         ORDER BY pp.phase_order`,
         [id]
       ),
       query(

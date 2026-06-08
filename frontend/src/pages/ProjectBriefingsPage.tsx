@@ -269,7 +269,7 @@ const CreateBriefingDialog: React.FC<{ open: boolean; onClose: () => void; onCre
                         <Checkbox size="small" checked={form.phase_ids.includes(ph.id)} onChange={() => {}} sx={{ p: 0 }} />
                         <Box sx={{ flex: 1 }}>
                           <Typography variant="body2" fontWeight={form.phase_ids.includes(ph.id) ? 700 : 400}>{ph.phase_name}</Typography>
-                          {ph.phase_type && <Typography variant="caption" color="text.secondary">{ph.phase_type}</Typography>}
+                          {ph.phase_order && <Typography variant="caption" color="text.secondary">Phase {ph.phase_order}</Typography>}
                         </Box>
                         <Chip label={ph.status || 'pending'} size="small" sx={{ height: 18, fontSize: '0.6rem' }} />
                       </Box>
